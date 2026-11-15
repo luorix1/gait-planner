@@ -114,7 +114,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
                     moment=B.to_torch(env.data.qfrc_total)[: nv * n].view(nv, n).T[:, jcol] / mass,
                     act_sat=s.activation > accept.SAT,
                     at_limit=((q[:, lim_dof] < lim_lo) | (q[:, lim_dof] > lim_hi)).any(1),
-                    sphere=sph, touching=sph[..., 1] - task.ground(sph[..., 0]) < accept.TOUCH_M,
+                    sphere=sph, touching=sph[..., 1] - task.ground(sph[..., 0], sph[..., 2]) < accept.TOUCH_M,
                     emg_act=s.activation @ emg_w)
         for k, v in step.items():
             trace[k].append(v.cpu())

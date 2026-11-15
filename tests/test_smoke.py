@@ -246,3 +246,73 @@ def test_emg_scores() -> None:
     out = emg.compare(ref, s, unreliable=("rectusfemoris",))
     assert abs(out["soleus"]["r"] - 1) < 1e-9 and out["soleus"]["on_off_agreement"] == 1.0
     assert not out["rectusfemoris"]["scored"] and abs(out["mean_r"] - 1) < 1e-9
+
+
+def test_heightfield_lookup_and_atlas() -> None:
+    """gp.terrain.hf_height (numpy and torch) is SPRINT's heightfield surface, blocks included; tiles packed by atlas()
+    read back their own heights through their offsets."""
+    from sprint.terrain import hf_height as sprint_hf
+
+    from gp.terrain import atlas, hf_height
+    rng = np.random.default_rng(0)
+    tiles = []
+    for nz, nx in ((30, 50), (18, 70), (40, 25)):
+        h = rng.normal(0, 0.05, (nz, nx))
+        b = np.where(rng.random((nz - 1, nx - 1)) < 0.3, rng.normal(0.2, 0.1, (nz - 1, nx - 1)), np.nan)
+        tiles.append(dict(heights=h, block=b, origin=(rng.uniform(-3, 3), rng.uniform(-3, 3))))
+    cell = 0.05
+    t0 = tiles[0]
+    x = rng.uniform(t0["origin"][0] - 0.5, t0["origin"][0] + 50 * cell + 0.5, 500)
+    z = rng.uniform(t0["origin"][1] - 0.5, t0["origin"][1] + 30 * cell + 0.5, 500)
+    ref = np.array([sprint_hf(t0["heights"], cell, t0["origin"], a, c, block=t0["block"]) for a, c in zip(x, z, strict=True)])
+    assert np.abs(hf_height(t0["heights"], t0["block"], cell, t0["origin"], x, z) - ref).max() < 1e-9
+    tt = hf_height(torch.as_tensor(t0["heights"]), torch.as_tensor(t0["block"]), cell, t0["origin"],
+                   torch.as_tensor(x), torch.as_tensor(z)).numpy()
+    assert np.abs(tt - ref).max() < 1e-9
+    A = atlas(tiles, cell)
+    for k, t in enumerate(tiles):
+        nz, nx = t["heights"].shape
+        x = rng.uniform(t["origin"][0], t["origin"][0] + (nx - 1) * cell, 300)
+        z = rng.uniform(t["origin"][1], t["origin"][1] + (nz - 1) * cell, 300)
+        own = hf_height(t["heights"], t["block"], cell, t["origin"], x, z)
+        via = hf_height(A["heights"], A["block"], cell, A["origin"], x + A["offsets"][k, 0], z + A["offsets"][k, 1])
+        assert np.abs(own - via).max() < 1e-9, k
+
+
+def test_clip_on_heightfield(D: dict) -> None:
+    """A stairs clip on a heightfield tile of its own profile matches it on the profile (style record, height scan),
+    mixes with a profile clip in one env, and steps; the scan's mirror swaps left and right."""
+    from sprint.terrain import HFIELD
+
+    from gp.data import heightfield_gap
+    from gp.tasks import SCAN_LATERAL, TerrainImitation
+    from gp.terrain import atlas, tile_from_profile
+    cls = list(D["terrain_class"])
+    i = cls.index("stairs_up")
+    two = data.take(D, [cls.index("level"), i])
+    P = np.c_[D["profile_x"][i][: D["profile_n"][i]], D["profile_y"][i][: D["profile_n"][i]]]
+    s, n = int(D["start"][i]), int(D["frames"][i])
+    xr = (D["qpos"][s:s + n, 3].min() - 3, D["qpos"][s:s + n, 3].max() + 3)
+    zr = (D["qpos"][s:s + n, 5].min() - 3, D["qpos"][s:s + n, 5].max() + 3)
+    A = atlas([tile_from_profile(P, xr, zr, 0.02)], 0.02)
+    mixed = dict(two, terrain_kind=np.array([0, 1]), hf_offset=np.array([[0.0, 0.0], A["offsets"][0]]), hf=A)
+    env_p = _env(TerrainImitation(two, starts=[(0, 10), (1, 10)]), worlds=2)
+    env_h = _env(TerrainImitation(mixed, starts=[(0, 10), (1, 10)]), worlds=2)
+    op, oh = env_p.torch(env_p.reset()), env_h.torch(env_h.reset())
+    tid = env_h.data.terrain_id.numpy()[:2]
+    assert tid[0] >= 0 and tid[1] == HFIELD
+    rp, rh = env_p.task.record(env_p.state), env_h.task.record(env_h.state)
+    assert torch.allclose(rp, rh, atol=1e-5)                                       # same pose, same ground under it
+    scan = slice(env_h.task.obs_dim - len(env_h.task.scan_f), env_h.task.obs_dim)
+    d = (op[:, scan] - oh[:, scan]).abs()
+    assert float(d.median()) < 1e-4 and float((d < 0.01).float().mean()) > 0.95   # risers within one 2 cm cell
+    for _ in range(5):
+        env_h.step(torch.full((2, env_h.action_dim), 0.05))
+    assert torch.isfinite(env_h.torch(env_h.obs)).all()
+    perm, _, _ = env_h.task.mirror_maps()
+    blk = perm[scan]
+    assert np.array_equal(blk[blk - scan.start] , np.arange(scan.start, scan.stop)) and len(SCAN_LATERAL) == 3
+    ctr = np.zeros((1, 1, 3))
+    ctr[0, 0] = [xr[0] + 1.0, 0.05, zr[0] + 1.0]
+    g = heightfield_gap(A, A["offsets"][0], ctr, np.array([0.03]))
+    assert abs(float(g[0, 0]) - (0.02 - P[0, 1])) < 1e-6                                   # flat start of the tile

@@ -1,8 +1,9 @@
 """The two SPRINT tasks, both on SPRINT's imitation recipe (``sprint.recipes.imitation.Imitation``):
 
 - :class:`TerrainImitation`, the full-pose DeepMimic baseline: the recipe's reward, observation and falls, on each
-  clip's own terrain profile, with a height scan in the observation and resets raised by the clip's per-frame
-  lift (no contact sphere starts inside the terrain).
+  clip's own terrain (a SPRINT profile, or a tile of one shared heightfield for ground a profile cannot describe:
+  turns, platforms, gaps), with a 2D height scan in the observation and resets raised by the clip's per-frame lift
+  (no contact sphere starts inside the terrain).
 - :class:`PlanTracking`, the planner's task: the actor sees its body, the height scan and the plan (per foot:
   down or not, the foothold, time to touchdown and lift-off; and the centre-of-mass target) at the recipe's
   lookahead taps, never the full pose; the critic also reads the full reference (privileged). Reward: matching
@@ -17,14 +18,16 @@ from typing import Any
 
 import numpy as np
 import torch
-from sprint.recipes.imitation import _POLAR, Imitation, ImitationConfig, _qrot
+from sprint.recipes.imitation import _POLAR, Imitation, ImitationConfig, _heading, _qrot
 
 from . import data as gpdata
 from .smp import Prior, StyleReward, W
-from .terrain import height
+from .terrain import height, hf_height
 
-#: Height scan: terrain height under these offsets ahead of the root (m, along x: every v1 terrain runs along x).
-SCAN = tuple(np.round(np.arange(-0.4, 1.21, 0.1), 2))
+#: Height scan: terrain height relative to the root at these offsets in the root's heading frame (m): forward x lateral,
+#: forward-major. Lateral offsets are symmetric, so the left/right mirror swaps them.
+SCAN_FORWARD = tuple(np.round(np.arange(-0.4, 1.21, 0.1), 2))
+SCAN_LATERAL = (-0.2, 0.0, 0.2)
 
 
 def recipe_config(**kw: Any) -> ImitationConfig:
@@ -52,9 +55,10 @@ class TerrainImitation(Imitation):
             self.csign = gpdata.coord_mirror_signs(model)
             self.blocks = self._blocks(model)
             self._obs_dim = sum(b[1] for b in self.blocks)
-        n = len(SCAN)
-        self.blocks.append(("height_scan", n, list(range(n)), [1.0] * n))
-        self._obs_dim += n
+        nf, nl = len(SCAN_FORWARD), len(SCAN_LATERAL)
+        perm = [f * nl + (nl - 1 - k) for f in range(nf) for k in range(nl)]
+        self.blocks.append(("height_scan", nf * nl, perm, [1.0] * (nf * nl)))
+        self._obs_dim += nf * nl
         bn = list(model.body_names)
         self.key = [bn.index(b) for b in gpdata.KEY_BODIES]
         h = model.host
@@ -83,11 +87,27 @@ class TerrainImitation(Imitation):
         D, dev = self.D, self.dev
         env.data.set_terrains([np.c_[x[:n], y[:n]] for x, y, n in zip(D["profile_x"], D["profile_y"], D["profile_n"],
                                                                        strict=True)])
-        self.terrain_of_clip = torch.arange(len(self.motions), dtype=torch.int32, device=dev)
+        # clips on the shared heightfield (D["hf"]: gp.terrain.atlas; D["terrain_kind"] 1, D["hf_offset"] their tile)
+        from sprint import _backend as B
+        from sprint.terrain import HFIELD
+        kind = np.asarray(D.get("terrain_kind", np.zeros(len(self.motions), int)))
+        self.on_hf = torch.as_tensor(kind == 1, device=dev)
+        self.hf = None
+        if self.on_hf.any():
+            hf = D["hf"]
+            env.data.set_heightfield(hf["heights"], hf["cell"], hf["origin"], hf["block"])
+            self.hf = dict(heights=torch.as_tensor(hf["heights"], dtype=torch.float32, device=dev),
+                           block=torch.as_tensor(hf["block"], dtype=torch.float32, device=dev),
+                           cell=float(hf["cell"]), origin=tuple(float(v) for v in hf["origin"]))
+            self.hf_off = torch.as_tensor(D["hf_offset"], dtype=torch.float32, device=dev)
+            self._offset = B.to_torch(env.data.terrain_offset)
+        self.terrain_of_clip = torch.where(self.on_hf, torch.full((len(kind),), HFIELD, device=dev),
+                                           torch.arange(len(kind), device=dev)).to(torch.int32)
         self.tX = torch.as_tensor(D["profile_x"], dtype=torch.float32, device=dev)
         self.tY = torch.as_tensor(D["profile_y"], dtype=torch.float32, device=dev)
         self.lift = torch.as_tensor(D["lift"], dtype=torch.float32, device=dev)
-        self.scan = torch.as_tensor(SCAN, dtype=torch.float32, device=dev)
+        g = torch.as_tensor([(f, k) for f in SCAN_FORWARD for k in SCAN_LATERAL], dtype=torch.float32, device=dev)
+        self.scan_f, self.scan_l = g[:, 0], g[:, 1]
         self.key_b = torch.as_tensor(self.key, device=dev)
         T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=dev)  # noqa: E731
         self.p_contact, self.p_foothold, self.p_com = T(D["plan_contact"], torch.bool), T(D["foothold"]), T(D["com"])
@@ -97,20 +117,30 @@ class TerrainImitation(Imitation):
         fs = T(self.feet_side, torch.long)
         self.feet_w = torch.stack([(fs == i).float() for i in range(2)])                          # [2, feet] sums
 
-    def ground(self, x: Any) -> Any:
-        """Terrain height under ``x`` ``[N, S]``, each world on its clip's profile."""
-        return height(self.tX, self.tY, self.clip, x)
+    def ground(self, x: Any, z: Any) -> Any:
+        """Terrain height under ``(x, z)`` ``[N, S]``, each world on its clip's terrain: its profile (which ignores z),
+        or its tile of the shared heightfield."""
+        h = height(self.tX, self.tY, self.clip, x)
+        if self.hf is None:
+            return h
+        off = self.hf_off[self.clip]
+        f = self.hf
+        hh = hf_height(f["heights"], f["block"], f["cell"], f["origin"], x + off[:, :1], z + off[:, 1:2])
+        return torch.where(self.on_hf[self.clip][:, None], hh, h)
 
     def reset(self, s: Any, worlds: Any) -> None:
         super().reset(s, worlds)
         idx = worlds.nonzero().squeeze(1)
         if idx.numel():
             s.qpos[idx, self.L.vertical] += self.lift[self.frame[idx]]
+            if self.hf is not None:                    # each heightfield clip stands on its own tile
+                self._offset[idx] = self.hf_off[self.clip[idx]]
 
     def record(self, s: Any) -> Any:
         """This step's style record (:func:`gp.data.record_layout`), as :func:`gp.data.style_records` from data."""
         p, q = s.body_pos[:, self.root], s.body_quat[:, self.root]
-        return torch.cat([p, q, s.qpos[:, self.tracked], s.body_pos[:, self.key_b].flatten(1), self.ground(p[:, :1])], 1)
+        return torch.cat([p, q, s.qpos[:, self.tracked], s.body_pos[:, self.key_b].flatten(1),
+                          self.ground(p[:, :1], p[:, 2:3])], 1)
 
     # -- the simulation's side of the plan (both tasks: the planner's reward, everyone's evaluation) ----------------
     def com(self, s: Any) -> Any:
@@ -134,8 +164,10 @@ class TerrainImitation(Imitation):
 
     def observation(self, s: Any) -> Any:
         root = s.body_com_pos()[:, self.root]
-        scan = self.ground(root[:, :1] + self.scan) - root[:, 1:2]
-        return torch.cat([super().observation(s), scan], 1)
+        M = _heading(s.body_quat[:, self.root])                       # rows: forward, up, lateral (world)
+        x = root[:, :1] + self.scan_f * M[:, 0, :1] + self.scan_l * M[:, 2, :1]
+        z = root[:, 2:3] + self.scan_f * M[:, 0, 2:3] + self.scan_l * M[:, 2, 2:3]
+        return torch.cat([super().observation(s), self.ground(x, z) - root[:, 1:2]], 1)
 
 
 @dataclass
@@ -198,7 +230,6 @@ class PlanTracking(TerrainImitation):
         rq = s.body_quat[:, self.root]
         root = s.body_com_pos()[:, self.root]
         com = self.com(s)
-        from sprint.recipes.imitation import _heading
         M = _heading(rq)
         last = self.clip_last[self.clip] + self.taps[-1]
         parts = [obs]
@@ -212,7 +243,6 @@ class PlanTracking(TerrainImitation):
     def reward(self, s: Any) -> Any:
         super().reward(s)                   # advances the frame; falls and the imitation metrics (logged, not paid)
         c, pc, f = self.config, self.plan, self.frame
-        from sprint.recipes.imitation import _heading
         down_ref = self.p_contact[f]                                                          # [N, 2]
         down = self.foot_force(s) > pc.contact_bw * self.bw
         r_contact = (down == down_ref).float().mean(1)

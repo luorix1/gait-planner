@@ -81,7 +81,8 @@ pose; the prior trains; PPO runs an iteration.
 - **Metabolic cost at 0.6 MPa** (`gp.data.SPECIFIC_TENSION`): Rajagopal's F0 = PCSA x 60 N/cm^2, and SPRINT's default
   0.25 MPa makes every muscle 2.4x heavy, so heat (charged per kg) read 2.4x high. From the same states the cost falls
   to 0.53-0.60x (9.4 -> 5.2 W/kg at 10 % excitation everywhere). Forces are unchanged (tested).
-- **Observation:** the actor reads its body, a height scan (17 points, -0.4 to 1.2 m along x) and the plan at the
+- **Observation:** the actor reads its body, a 2D height scan (17 points from -0.4 to 1.2 m ahead x 3 at -0.2, 0,
+  0.2 m to the side, in its heading frame) and the plan at the
   recipe's lookahead taps (0-40 steps = 1 s). The critic also reads the full reference.
 - **Falls:** the recipe's (pelvis over 0.3 m from the clip's, or tilted over 60 deg, for 3 steps).
 - **G0 thresholds** (`check_prior.py`): real beats each degraded copy in >= 95 % of pairs; with the threshold at
@@ -124,6 +125,16 @@ Pearson r of the mean profiles and on/off agreement; rectus femoris is shown, no
 mostly vasti crosstalk outside its swing burst). The ceiling, training subjects' real EMG against the held-out
 subjects', is r 0.87-0.92 and agreement 0.86-0.89 by class.
 
+## Heightfield terrain (`gp/terrain.py`, `gp/tasks.py`)
+
+A clip's ground is either a SPRINT profile or a tile of one shared heightfield (`Data.set_heightfield`), for ground a
+profile cannot describe: turns, winding stairs, platforms, gaps. `gp.terrain.atlas` packs tiles into one map and
+returns each tile's offset; a clip on it has `terrain_kind` 1 and `hf_offset` its tile's, and the tasks set the
+world's `terrain_id` to SPRINT's HFIELD and its `terrain_offset` at every reset. `gp.terrain.hf_height` (numpy and
+torch) is SPRINT's surface exactly, block cells included; `gp.data.heightfield_gap` gives the reset lift on a tile.
+One env mixes profile and heightfield clips. Tested: a stairs clip on a 2 cm tile of its own profile has the same
+style record and, but within one cell of a riser, the same height scan.
+
 ## Random terrain (`gp/terrain_gen.py`)
 
 Courses along +x of level runs, ramps and stair flights, as SPRINT profiles: level at both ends, a level landing
@@ -136,6 +147,7 @@ terrain, because the plan belongs to it): it is for evaluating on new ground and
 ## Known limits
 
 - Plans are copied from real clips; footholds are not predicted (plan doc, open question 2).
-- Terrain profiles run along x; every v1 terrain does, the PARC obstacles do not.
+- v1's data is all profiles. Heightfield clips (the PARC obstacles, generated 2D courses) run in the tasks but are not
+  built into the data yet.
 - `gp/tasks.py` patches SPRINT's reference kinematics to run in chunks for the duration of setup (1.5M frames in one
   Data would take ~18 GB of GPU memory). Upstream fix: chunk in SPRINT.

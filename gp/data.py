@@ -161,6 +161,16 @@ def sphere_gap(P: np.ndarray, ctr: np.ndarray, r: np.ndarray) -> np.ndarray:
     return np.where(inside, -dist, dist) - r
 
 
+def heightfield_gap(hf: dict[str, Any], offset: Any, ctr: np.ndarray, r: np.ndarray) -> np.ndarray:
+    """Clearance ``[T, S]`` of spheres (centres ``[T, S, 3]`` in a clip's frame, radii ``[S]``) above that clip's tile of
+    the shared heightfield (``hf``: gp.terrain.atlas, ``offset`` the tile's), measured straight down: negative =
+    inside. The heightfield counterpart of :func:`sphere_gap`, for the reset lift of heightfield clips."""
+    from .terrain import hf_height
+    h = hf_height(np.asarray(hf["heights"]), np.asarray(hf["block"]), hf["cell"], hf["origin"],
+                  ctr[..., 0] + offset[0], ctr[..., 2] + offset[1])
+    return ctr[..., 1] - r - h
+
+
 def build(limit: int | None = None, out: Path = OUT) -> None:
     """``limit``: the first clips only (smoke tests), written to ``out``."""
     from sprint.recipes.motion import _lowpass, _rotate, forward_kinematics_np, model_layout
@@ -279,7 +289,8 @@ def take(D: dict[str, Any], clips: Any) -> dict[str, Any]:
     """Some clips of a loaded ``D`` (indices into its clips), re-offset."""
     clips = np.asarray(clips)
     rows = np.concatenate([np.arange(D["start"][i], D["start"][i] + D["frames"][i]) for i in clips])
-    out = dict(D, **{k: D[k][clips] for k in PER_CLIP}, **{k: D[k][rows] for k in PER_FRAME})
+    out = dict(D, **{k: D[k][clips] for k in PER_CLIP}, **{k: D[k][rows] for k in PER_FRAME},
+               **{k: np.asarray(D[k])[clips] for k in ("terrain_kind", "hf_offset") if k in D})
     out["start"] = np.r_[0, np.cumsum(out["frames"])[:-1]]
     return out
 
