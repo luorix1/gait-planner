@@ -10,9 +10,10 @@ moment columns are not used: they are not free moments at the centre of pressure
 horizontal axes), and the vertical free moment barely moves the joint moments reported here. Every force element
 is removed from the model, so the moments are net joint moments, comparable with Camargo's own.
 
-A frame is valid where Camargo's own ID is (both legs' hip, knee and ankle: they blank frames whose contacts
-missed the plates) and every foot the clip has down carries a plate. The result is resampled onto v1's 40 Hz
-frames.
+Validity is per leg: a leg's joint moments depend only on what is distal to it, its own motion and its own foot's
+force. A leg is valid where Camargo's own ID for it is (they blank each leg whose contact missed the plates; 64 % of
+frames per leg against 36 % for both at once) and its foot, when down, carries a plate. Trunk and pelvis rows need
+both legs. The result is resampled onto v1's 40 Hz frames.
 
 Run, two stages (different interpreters):
   1. extract plates and Camargo's ID from the archives (mat-io):
@@ -44,7 +45,13 @@ FPS = 30.0
 CUTOFF_HZ = 6.0
 MIN_N = 20.0
 C = np.array([[1.0, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])     # lab (OpenSim, y up) -> canonical (z up), as the adapter
-LEGS = [f"{j}_{s}" for j in ("hip_flexion", "knee_angle", "ankle_angle") for s in ("r", "l")]
+SAGITTAL = ("hip_flexion", "knee_angle", "ankle_angle")
+
+
+def side_of(coord: str) -> str:
+    """'r' or 'l' for a leg coordinate (``knee_angle_r``, ``knee_angle_r_beta``), '' for pelvis and lumbar."""
+    parts = coord.split("_")
+    return "r" if "r" in parts[1:] else "l" if "l" in parts[1:] else ""
 
 
 def v1_camargo_clips() -> list[str]:
@@ -120,9 +127,16 @@ def clip_times(name: str) -> np.ndarray:
     return start + np.arange(a, b) / FPS
 
 
-def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float, mass_ratio: float) -> tuple[np.ndarray, np.ndarray]:
+def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float,
+                   mass_ratio: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Each plate's force and centre of pressure at times ``t``, in the export's OpenSim frame: ``[T, P, 3]`` each
-    (NaN centre of pressure where the plate carries under ``MIN_N``)."""
+    (NaN centre of pressure where the plate carries under ``MIN_N``), and each plate's footprint ``[P, 4]`` (x min,
+    x max, z min, z max): the extent of its loaded centres of pressure over the whole trial.
+
+    Below ``MIN_N`` a plate reads noise and its centre of pressure is meaningless (an unloaded default), so the force
+    is zeroed there before the 6 Hz low-pass, and the centre of pressure is held at the nearest loaded sample: the
+    force the zero-phase filter spreads a few ms past a touchdown or a lift-off acts at the heel-strike or toe-off
+    point. (Without this, 2-3 frames at each heel strike read hip moments of -6 to -8 N m/kg; fixed 2026-11-14.)"""
     m = canonical_meta(name)
     raw = np.load(RAW / m["subject"].removeprefix("camargo_") / f"{m['trial'].replace('/', '__')}.npz", allow_pickle=True)
     ft, fp = raw["fp_time"], raw["fp"]
@@ -132,16 +146,28 @@ def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float, mass_rati
     to_osim = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])      # canonical (x, y, z) -> OpenSim (x, z, -y)
     M = to_osim @ Rz @ C
     dt = float(np.median(np.diff(ft)))
-    F_all, P_all = [], []
+    F_all, P_all, boxes = [], [], []
     for p in range(n_plate):
-        F = _lowpass(fp[:, 9 * p: 9 * p + 3], dt)
-        P = fp[:, 9 * p + 3: 9 * p + 6].copy()
+        Fr, P = fp[:, 9 * p: 9 * p + 3].copy(), fp[:, 9 * p + 3: 9 * p + 6].copy()
+        on = Fr[:, 1] > MIN_N
+        Fr[~on] = 0.0
+        box = np.full(4, np.nan)
+        if on.any():
+            k = np.arange(len(on))
+            prev = np.maximum.accumulate(np.where(on, k, -1))
+            nxt = np.minimum.accumulate(np.where(on, k, len(on))[::-1])[::-1]
+            prev, nxt = np.where(prev < 0, nxt, prev), np.where(nxt >= len(on), prev, nxt)
+            P = P[np.where(k - prev <= nxt - k, prev, nxt)]
+            xz = (P[on] @ M.T * scale)[:, [0, 2]]
+            box = np.array([xz[:, 0].min(), xz[:, 0].max(), xz[:, 1].min(), xz[:, 1].max()])
+        boxes.append(box)
+        F = _lowpass(Fr, dt)
         Fi = np.stack([np.interp(t, ft, F[:, k]) for k in range(3)], 1)
         Pi = np.stack([np.interp(t, ft, P[:, k]) for k in range(3)], 1)
         Pi[Fi[:, 1] < MIN_N] = np.nan
         F_all.append(Fi @ M.T * mass_ratio)
         P_all.append(Pi @ M.T * scale)
-    return np.stack(F_all, 1), np.stack(P_all, 1)
+    return np.stack(F_all, 1), np.stack(P_all, 1), np.array(boxes)
 
 
 def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None:
@@ -158,7 +184,7 @@ def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None
     model.updForceSet().clearAndDestroy()      # net joint moments: no muscles, contacts or limit forces act
     state = model.initSystem()
     m_model = sum(model.getBodySet().get(i).getMass() for i in range(model.getBodySet().getSize()))
-    F, P = plates_on_clip(name, t, T["scale"], T.get("aligned_yaw_rad", 0.0), m_model / mass[subj])
+    F, P, box = plates_on_clip(name, t, T["scale"], T.get("aligned_yaw_rad", 0.0), m_model / mass[subj])
     # feet: midpoint of calcn and toes origins, from the clip's own kinematics
     cs = model.getCoordinateSet()
     cols = [(cs.get(i), names.index(cs.get(i).getName())) for i in range(cs.getSize())]
@@ -223,7 +249,7 @@ def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None
         key = next((c for c in lab if c in (f"{n}_moment", f"{n}_force")), None)
         if key is not None:
             out[:, j] = np.interp(t - t[0], tt, sto.getDependentColumn(key).to_numpy()) / m_model
-    # validity: Camargo's own ID, and every foot down carries a plate
+    # validity per leg (see the module docstring)
     raw = np.load(RAW / subj / f"{m['trial'].replace('/', '__')}.npz", allow_pickle=True)    # our own files
     ic = [str(x) for x in raw["id_cols"]]
     theirs = np.stack([np.interp(t, raw["id_time"], raw["id"][:, ic.index(f"{n}_moment")]) if f"{n}_moment" in ic
@@ -231,11 +257,18 @@ def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None
     for n in names:                     # their knee and MTP count extension positive (gait2392); Rajagopal flexion
         if n.startswith(("knee_angle", "mtp_angle")):
             theirs[:, names.index(n)] *= -1
-    legs = [names.index(n) for n in LEGS]
     ct = exp["contact"].astype(bool)
     down = np.stack([ct[:, 2] | ct[:, 3], ct[:, 0] | ct[:, 1]], 1)                    # r, l (contact: heel_l, toe_l, heel_r, toe_r)
     carried = grf[..., 1] > MIN_N
-    valid = np.isfinite(theirs[:, legs]).all(1) & (carried | ~down).all(1)
+    valid = np.stack([np.isfinite(theirs[:, [names.index(f"{j}_{s}") for j in SAGITTAL]]).all(1)
+                      & (carried[:, i] | ~down[:, i]) for i, s in enumerate(("r", "l"))], 1)   # [T, 2]: r, l
+    # one plate under both feet cannot say how the weight splits: both legs invalid while both are down on it
+    pad = 0.15                      # m around the footprint: the loaded centres of pressure under-cover a plate
+    fx, fz = foot[:, None, :, 0], foot[:, None, :, 2]                                  # [T, 1, 2]
+    inside = ((fx >= box[None, :, None, 0] - pad) & (fx <= box[None, :, None, 1] + pad)
+              & (fz >= box[None, :, None, 2] - pad) & (fz <= box[None, :, None, 3] + pad))    # [T, P, 2]
+    shared = (on & inside.all(2)).any(1) & down.all(1)
+    valid &= ~shared[:, None]
     for f in stem.parent.glob(f"{name}.*"):
         f.unlink()
     g = 9.80665
@@ -290,19 +323,22 @@ def solve(jobs: int) -> None:
         src = np.arange(len(r["valid"])) / FPS
         dst = np.arange(k) / 40.0
         near = np.clip(np.rint(dst * FPS).astype(int), 0, len(src) - 1)
-        ok = r["valid"][near]
+        ok_r, ok_l = r["valid"][near, 0], r["valid"][near, 1]
+        mask = {"r": ok_r, "l": ok_l, "": ok_r & ok_l}
         cols = [r["coord_names"].index(x) for x in names_v1]
         for out, a in ((moment, r["moment"][:, cols]), (theirs, r["theirs"][:, cols])):
             v = np.stack([np.interp(dst, src, a[:, j]) for j in range(a.shape[1])], 1)
-            v[~ok] = np.nan
+            for j, x in enumerate(names_v1):
+                v[~mask[side_of(x)], j] = np.nan
             out[s:s + k] = v
         g = np.stack([np.stack([np.interp(dst, src, r["grf_bw"][:, f, a]) for a in range(3)], 1) for f in range(2)], 1)
-        g[~ok] = np.nan
+        g[~ok_r, 0], g[~ok_l, 1] = np.nan, np.nan
         grf[s:s + k] = g[:, ::-1]                       # stored (l, r) like the plans
         cls = str(c["terrain_class"][i])
-        sm = summary.setdefault(cls, dict(clips=0, valid_frames=0, frames=0))
+        sm = summary.setdefault(cls, dict(clips=0, valid_frames_r=0, valid_frames_l=0, frames=0))
         sm["clips"] += 1
-        sm["valid_frames"] += int(ok.sum())
+        sm["valid_frames_r"] += int(ok_r.sum())
+        sm["valid_frames_l"] += int(ok_l.sum())
         sm["frames"] += k
     # Rajagopal v3 vs Camargo's own, on valid frames: peaks per class (N m/kg) and the frame-wise RMS difference
     for cls, sm in summary.items():
