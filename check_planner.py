@@ -2,7 +2,8 @@
 
 - **Held-out windows** (test_trial + test_terrain, and train for comparison): from each window's real history, ground
   and goal, generate the future and compare with the real plan: per-frame contact agreement; each foot's next
-  touchdown (whether both have one, and if so its timing and foothold error); the centre of mass 0.6 s on.
+  touchdown (whether both have one, and if so its timing and foothold error); the centre of mass and the pelvis
+  orientation 0.6 s on.
 - **Generated courses** (gp.terrain_gen, difficulties ``--difficulty``): roll the planner out from a standing start
   (gp.planner.plan_course) and check every foothold: on the course (the ground there is the course's height at the
   nearest centreline point, and within the causeway), not in a gap, not across an edge (the ground within 8 cm varies
@@ -22,10 +23,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from sprint.recipes.imitation import _qmul
 
 from gp import data
 from gp.free import REFINE, stand_in_plan
-from gp.planner import HIST, HZ, Planner, Windows, plan_course
+from gp.planner import HIST, HZ, Planner, Windows, plan_course, qexp, yaw_quat
 from gp.terrain import hf_height
 from gp.terrain_gen import CourseSpec, course_tile, sample_course2d
 
@@ -54,11 +56,14 @@ def window_metrics(planner: Planner, W: Windows, n: int, seed: int = 0) -> dict[
     err = (hold(fut, kp) - hold(true, kt)).norm(dim=-1)[both]
     dt_s = (kp - kt).abs()[both].float() / HZ
     k6 = int(0.6 * HZ) - 1
+    pel = lambda y: _qmul(yaw_quat(torch.atan2(y[:, k6, 10], y[:, k6, 9])), qexp(y[:, k6, 11:14]))  # noqa: E731
+    pel_err = torch.rad2deg(2 * torch.acos((pel(fut) * pel(true)).sum(-1).abs().clamp(max=1.0)))
     q = lambda v, f: float(torch.quantile(v, f)) if v.numel() else float("nan")  # noqa: E731
     return dict(windows=n, contact_agreement=float((dp == dt).float().mean()), touchdown_exists_agree=float((hp == ht).float().mean()),
                 touchdown_time_med_s=q(dt_s, 0.5), touchdown_time_p90_s=q(dt_s, 0.9),
                 foothold_err_med_m=q(err, 0.5), foothold_err_p90_m=q(err, 0.9),
-                com_err_0p6s_med_m=q((fut[:, k6, [6, 8]] - true[:, k6, [6, 8]]).norm(dim=1), 0.5))
+                com_err_0p6s_med_m=q((fut[:, k6, [6, 8]] - true[:, k6, [6, 8]]).norm(dim=1), 0.5),
+                pelvis_err_0p6s_med_deg=q(pel_err, 0.5))
 
 
 def course_metrics(P: dict, T: dict, spec: CourseSpec) -> dict[str, float]:

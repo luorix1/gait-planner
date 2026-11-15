@@ -99,7 +99,10 @@ def test_plan_tracking_steps(D: dict, tmp_path) -> None:
     offsets = np.cumsum([0] + [b[1] for b in task.blocks])[:-1]
     actor_blocks = {b[0].split("[")[0] for b, o in zip(task.blocks, offsets, strict=True) if o in set(cols.tolist())}
     assert "joint_angle_error" not in actor_blocks and "plan_feet" in actor_blocks and "height_scan" in actor_blocks
-    for k in ("r_contact", "r_foothold", "r_com", "r_style"):
+    assert "root_orientation_error" in actor_blocks and "root_position_error" not in actor_blocks   # pelvis orientation
+    pc = task.plan
+    assert abs(pc.w_contact + pc.w_foothold + pc.w_com + pc.w_orient + pc.w_style - 1.0) < 1e-9
+    for k in ("r_contact", "r_foothold", "r_com", "r_orient", "r_style"):
         v = task.metrics[k]
         assert torch.isfinite(v).all() and (v >= 0).all() and (v <= 1).all(), k
 
@@ -181,6 +184,27 @@ def test_accept_check() -> None:
     assert accept.check(clean, accept.thresholds(acc, "test_trial", "level", "run"))["unchecked"] == ["grf", "joints"]
     assert accept.check(clean, accept.thresholds(acc, "test_trial", "obstacles", "run"))["unchecked"] == [
         "style", "grf", "joints"]
+    # running takes AB01's running limits on level ground and ramps, still none on obstacles
+    run_thr = dict(grf_peak_bw=0.4, grf_loading_rate_bw_s=40.0, band=None, stance_s=list(accept.RUN_STANCE_S),
+                   joint_peak_nm_per_kg=dict(hip_flexion=2.5, knee_angle=2.2, ankle_angle=2.4))
+    acc["kinetics_run"] = run_thr
+    t = accept.thresholds(acc, "test_trial", "ramp_up", "run")
+    assert t["grf_peak_bw"] == 0.4 and t["style_loss"] is None
+    assert accept.check(clean, accept.thresholds(acc, "test_trial", "level", "run"))["failed"] == ["grf"]   # 0.5 > 0.4
+    assert accept.thresholds(acc, "test_trial", "level", "walk")["grf_peak_bw"] == 1.5
+    assert "grf_peak_bw" not in accept.thresholds(acc, "test_trial", "obstacles", "run")
+    acc["kinetics_run"] = dict(run_thr, by_speed=dict(speed_mps=[2.0, 4.0], grf_peak_bw=[0.4, 0.8],
+                                                      grf_loading_rate_bw_s=[40.0, 60.0],
+                                                      joint_peak_nm_per_kg=dict(hip_flexion=[2.5, 4.5],
+                                                                                knee_angle=[2.2, 2.4],
+                                                                                ankle_angle=[2.4, 3.2])))
+    fast = accept.thresholds(acc, "test_trial", "level", "run", speed=3.0)               # limits rise with speed
+    assert abs(fast["grf_peak_bw"] - 0.6) < 1e-9 and abs(fast["joint_peak_nm_per_kg"]["hip_flexion"] - 3.5) < 1e-9
+    assert accept.thresholds(acc, "test_trial", "level", "run", speed=9.0)["grf_peak_bw"] == 0.8   # held past the top
+    assert accept.thresholds(acc, "test_trial", "level", "run")["grf_peak_bw"] == 0.4             # no speed: pooled
+    assert accept.thresholds(acc, "test_trial", "level", "walk", speed=3.0)["grf_peak_bw"] == 1.5  # walking unaffected
+    run = np.r_[np.zeros(5), np.ones(10), np.zeros(10), np.ones(10), np.zeros(5)].astype(bool)   # 0.25 s stances
+    assert len(accept.stances(run, accept.RUN_STANCE_S)) == 2 and not accept.stances(run)
 
 
 def test_mirror_records(D: dict) -> None:
@@ -421,9 +445,10 @@ def test_planner(D: dict) -> None:
     x, p, g = W(a)
     assert torch.equal(g, x[:, -1, GOAL]) and x[:, HIST - 1, 6:9].abs().max() == 0
     k = a[:, None] + W.k
-    d, h, c, ps = world(x, W.com[a], W.psi[a])
+    d, h, c, ps, qu = world(x, W.com[a], W.psi[a])
     assert torch.equal(d, W.down[k]) and (h - W.hold[k]).abs().max() < 1e-5 and (c - W.com[k]).abs().max() < 1e-5
-    assert (features(d, h, c, ps, W.com[a], W.psi[a]) - x).abs().max() < 1e-5
+    assert (1 - (qu * W.quat[k]).sum(-1).abs()).max() < 1e-5                       # pelvis orientation round-trips
+    assert (features(d, h, c, ps, qu, W.com[a], W.psi[a]) - x).abs().max() < 1e-4
     xm, pm = mirror(*mirror(x, p))
     assert torch.equal(xm, x) and torch.equal(pm, p)
     torch.manual_seed(0)
@@ -441,8 +466,10 @@ def test_planner(D: dict) -> None:
     c0 = 0                                                  # decode a real clip's plan from every other frame
     s, n = D["start"][c0], D["frames"][c0]
     f = np.arange(s, s + n, STRIDE)
-    Pl = to_plan(D["plan_contact"][f], D["foothold"][f][..., [0, 2]], D["com"][f], W.psi[f].numpy(),
+    Pl = to_plan(D["plan_contact"][f], D["foothold"][f][..., [0, 2]], D["com"][f], W.psi[f].numpy(), W.quat[f].numpy(),
                  lambda x_, z_: data.ground_under(D, c0, x_, z_))
+    q40 = W.quat[s:s + len(Pl["pelvis_quat"])].numpy()
+    assert (1 - np.abs((Pl["pelvis_quat"] * q40).sum(-1))).max() < 1e-3           # slerped between plan frames
     m = len(Pl["plan_contact"])
     assert (Pl["plan_contact"] == D["plan_contact"][s:s + m]).mean() > 0.97
     assert np.abs(Pl["foothold"][..., [0, 2]] - D["foothold"][s:s + m][..., [0, 2]]).max() < 1e-4
@@ -450,6 +477,10 @@ def test_planner(D: dict) -> None:
     stand = next(i for i in range(len(full["name"])) if full["mode"][i] == "stand" and full["terrain_class"][i] == "level")
     T = course_tile(sample_course2d(np.random.default_rng(3), 0.5), cell=full["hf"]["cell"] / REFINE)
     plan = plan_course(P, [T], full, stand)[0]
-    assert set(plan) == set(stand_in_plan(T, 0.98)) - {"steps"} and len(plan["com"]) == len(plan["plan_contact"])
+    assert set(plan) == set(stand_in_plan(T, 0.98)) - {"steps"} | {"pelvis_quat"} and len(plan["com"]) == len(plan["plan_contact"])
     F = course_clips([T], data.take(full, [stand]), 0, plans=[plan])
     assert F["frames"][0] == len(plan["com"]) and np.isfinite(F["qpos"]).all()
+    # the free clip's pelvis follows the planned orientation
+    rl = data.record_layout
+    rq = F["record"][:, rl(len(F["tracked"]))["root_quat"]]
+    assert (1 - np.abs((rq * plan["pelvis_quat"]).sum(-1))).max() < 1e-4

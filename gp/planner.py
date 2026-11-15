@@ -2,7 +2,8 @@
 
 Like PARC's generator (Xu et al. 2025: motion diffusion conditioned on a local heightmap and a target), but it
 generates the plan, not the pose. A plan frame (20 Hz) is each foot's down flag (+-1) and the xz of its current or next
-foothold, the centre of mass, and the heading (``CHANNELS``). A window is ``HIST`` frames of the plan so far (given,
+foothold, the centre of mass, and the pelvis orientation as its heading and its tilt from that heading (a rotation
+vector; ``CHANNELS``). A window is ``HIST`` frames of the plan so far (given,
 clean) and ``FUT`` frames to generate, all in the heading frame of the last given frame (the anchor): positions
 relative to its centre of mass, heading relative to its heading. Conditions:
 - **ground**: terrain height on a forward x lateral grid (``PATCH_F`` x ``PATCH_L``) in the anchor frame, relative to
@@ -30,6 +31,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sprint.recipes.imitation import _qconj, _qmul, _rotvec
 
 from . import data as gpdata
 from .smp import _alphas_cumprod, _Block, _timestep_embedding
@@ -41,11 +43,11 @@ HIST, FUT, KEEP = 8, 24, 10                  # 0.4 s given, 1.2 s generated, 0.5
 PATCH_F = tuple(np.round(np.arange(-0.6, 3.01, 0.1), 2))
 PATCH_L = tuple(np.round(np.arange(-0.8, 0.81, 0.1), 2))
 CHANNELS = ("down_l", "down_r", "hold_l_f", "hold_l_lat", "hold_r_f", "hold_r_lat", "com_f", "com_y", "com_lat",
-            "cos_dpsi", "sin_dpsi")
+            "cos_dpsi", "sin_dpsi", "tilt_x", "tilt_y", "tilt_z")
 C = len(CHANNELS)
 GOAL = [6, 8]                                # the goal is the last generated frame's com_f, com_lat
-MIRROR_PERM = [1, 0, 4, 5, 2, 3, 6, 7, 8, 9, 10]
-MIRROR_SIGN = [1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0]
+MIRROR_PERM = [1, 0, 4, 5, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13]
+MIRROR_SIGN = [1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0]   # tilt: a pseudovector
 T_DIFF = 50
 MIN_STD = 0.05
 
@@ -56,6 +58,24 @@ def heading(quat: torch.Tensor) -> torch.Tensor:
     """Heading (rotation about +y) of a body's x axis, from quaternions ``[..., 4]`` (x, y, z, w)."""
     x, y, z, w = quat.unbind(-1)
     return torch.atan2(-2 * (x * z - w * y), 1 - 2 * (y * y + z * z))
+
+
+def yaw_quat(psi: torch.Tensor) -> torch.Tensor:
+    """Quaternions (x, y, z, w) of heading ``psi`` (rotation about +y)."""
+    z = torch.zeros_like(psi)
+    return torch.stack([z, torch.sin(psi / 2), z, torch.cos(psi / 2)], -1)
+
+
+def qexp(v: torch.Tensor) -> torch.Tensor:
+    """Quaternions of rotation vectors ``[..., 3]`` (the inverse of SPRINT's ``_rotvec``)."""
+    a = v.norm(dim=-1, keepdim=True)
+    k = torch.where(a > 1e-6, torch.sin(a / 2) / a.clamp_min(1e-6), 0.5 - a * a / 48)
+    return torch.cat([v * k, torch.cos(a / 2)], -1)
+
+
+def tilt(quat: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
+    """A body's orientation ``quat`` less its heading ``psi``, as a rotation vector: ``quat = yaw(psi) * exp(tilt)``."""
+    return _rotvec(_qmul(_qconj(yaw_quat(psi)), quat))
 
 
 def to_frame(xz: torch.Tensor, origin: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
@@ -74,25 +94,27 @@ def from_frame(fl: torch.Tensor, origin: torch.Tensor, psi: torch.Tensor) -> tor
     return origin.view(*v, 2) + torch.stack([fl[..., 0] * c + fl[..., 1] * s, -fl[..., 0] * s + fl[..., 1] * c], -1)
 
 
-def features(down: torch.Tensor, hold: torch.Tensor, com: torch.Tensor, psi: torch.Tensor, a_com: torch.Tensor,
-             a_psi: torch.Tensor) -> torch.Tensor:
-    """World plan frames (down ``[B, K, 2]``, foothold xz ``[B, K, 2, 2]``, com ``[B, K, 3]``, heading ``[B, K]``) ->
-    ``[B, K, C]`` in the frame of anchor (``a_com`` ``[B, 3]``, ``a_psi`` ``[B]``)."""
+def features(down: torch.Tensor, hold: torch.Tensor, com: torch.Tensor, psi: torch.Tensor, quat: torch.Tensor,
+             a_com: torch.Tensor, a_psi: torch.Tensor) -> torch.Tensor:
+    """World plan frames (down ``[B, K, 2]``, foothold xz ``[B, K, 2, 2]``, com ``[B, K, 3]``, heading ``[B, K]``,
+    pelvis orientation ``[B, K, 4]``) -> ``[B, K, C]`` in the frame of anchor (``a_com`` ``[B, 3]``, ``a_psi`` ``[B]``)."""
     o = a_com[:, [0, 2]]
     cxz = to_frame(com[..., [0, 2]], o, a_psi)
     dpsi = psi - a_psi[:, None]
     return torch.cat([down.float() * 2 - 1, to_frame(hold, o, a_psi).flatten(2), cxz[..., :1],
                       (com[..., 1] - a_com[:, 1:2])[..., None], cxz[..., 1:], dpsi.cos()[..., None],
-                      dpsi.sin()[..., None]], -1)
+                      dpsi.sin()[..., None], tilt(quat, psi)], -1)
 
 
 def world(x: torch.Tensor, a_com: torch.Tensor, a_psi: torch.Tensor) -> tuple[torch.Tensor, ...]:
-    """Inverse of :func:`features`: ``[B, K, C]`` -> (down, foothold xz, com, heading), the down flag thresholded at 0."""
+    """Inverse of :func:`features`: ``[B, K, C]`` -> (down, foothold xz, com, heading, pelvis orientation), the down
+    flag thresholded at 0."""
     o = a_com[:, [0, 2]]
     cxz = from_frame(x[..., GOAL], o, a_psi)
     com = torch.stack([cxz[..., 0], x[..., 7] + a_com[:, 1:2], cxz[..., 1]], -1)
-    return (x[..., :2] > 0, from_frame(x[..., 2:6].unflatten(-1, (2, 2)), o, a_psi), com,
-            a_psi[:, None] + torch.atan2(x[..., 10], x[..., 9]))
+    psi = a_psi[:, None] + torch.atan2(x[..., 10], x[..., 9])
+    return (x[..., :2] > 0, from_frame(x[..., 2:6].unflatten(-1, (2, 2)), o, a_psi), com, psi,
+            _qmul(yaw_quat(psi), qexp(x[..., 11:14])))
 
 
 def patch(G: Ground, clip: torch.Tensor, a_com: torch.Tensor, a_psi: torch.Tensor) -> torch.Tensor:
@@ -117,7 +139,9 @@ class Windows:
         self.down = T(D["plan_contact"], torch.bool)
         self.hold = T(D["foothold"])[..., [0, 2]]
         self.com = T(D["com"])
-        self.psi = heading(T(D["record"])[:, gpdata.record_layout(len(D["tracked"]))["root_quat"]])
+        q = T(D["record"])[:, gpdata.record_layout(len(D["tracked"]))["root_quat"]]
+        self.quat = q / q.norm(dim=-1, keepdim=True)
+        self.psi = heading(self.quat)
         self.clip = T(np.repeat(np.arange(len(D["frames"])), D["frames"]), torch.long)
         self.G = Ground.of(D, device)
         self.anchors = T(np.concatenate([np.arange(s + STRIDE * (HIST - 1), s + n - STRIDE * FUT)
@@ -126,7 +150,7 @@ class Windows:
 
     def __call__(self, a: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         k = a[:, None] + self.k
-        x = features(self.down[k], self.hold[k], self.com[k], self.psi[k], self.com[a], self.psi[a])
+        x = features(self.down[k], self.hold[k], self.com[k], self.psi[k], self.quat[k], self.com[a], self.psi[a])
         return x, patch(self.G, self.clip[a], self.com[a], self.psi[a]), x[:, -1, GOAL]
 
     def batch(self, n: int, gen: torch.Generator | None = None, mirrored: bool = True
@@ -235,9 +259,12 @@ class Planner(nn.Module):
 
 # --- plans -----------------------------------------------------------------------------------------------------
 
-def to_plan(down: np.ndarray, hold: np.ndarray, com: np.ndarray, psi: np.ndarray, ground: Any) -> dict[str, Any]:
-    """A 20 Hz world plan (down ``[K, 2]``, foothold xz ``[K, 2, 2]``, com ``[K, 3]``, heading ``[K]``) -> the tasks'
-    40 Hz plan with gp.free.stand_in_plan's keys. ``ground(x, z)``: terrain height (numpy)."""
+def to_plan(down: np.ndarray, hold: np.ndarray, com: np.ndarray, psi: np.ndarray, quat: np.ndarray,
+            ground: Any) -> dict[str, Any]:
+    """A 20 Hz world plan (down ``[K, 2]``, foothold xz ``[K, 2, 2]``, com ``[K, 3]``, heading ``[K]``, pelvis
+    orientation ``[K, 4]``) -> the tasks' 40 Hz plan: gp.free.stand_in_plan's keys and ``pelvis_quat`` ``[T, 4]``
+    (slerped). ``ground(x, z)``: terrain height (numpy)."""
+    from scipy.spatial.transform import Rotation, Slerp
     K = len(down)
     n = STRIDE * (K - 1) + 1
     i, t = np.arange(n) // STRIDE, np.arange(n) / STRIDE
@@ -247,7 +274,8 @@ def to_plan(down: np.ndarray, hold: np.ndarray, com: np.ndarray, psi: np.ndarray
     com40 = np.stack([np.interp(t, np.arange(K), com[:, j]) for j in range(3)], 1)
     s_com = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(com40[:, [0, 2]], axis=0), axis=1))]
     return dict(plan_contact=c, foothold=np.stack(hold3, 1), t_touchdown=np.stack(td, 1), t_liftoff=np.stack(lo, 1),
-                com=com40, s_com=s_com, heading=np.interp(t, np.arange(K), np.unwrap(psi)))
+                com=com40, s_com=s_com, heading=np.interp(t, np.arange(K), np.unwrap(psi)),
+                pelvis_quat=Slerp(np.arange(K), Rotation.from_quat(quat))(t).as_quat())
 
 
 def plan_course(planner: Planner, tiles: list[dict[str, Any]], D: dict[str, Any], stand: int, *, speed: float = 1.2,
@@ -290,9 +318,9 @@ def plan_course(planner: Planner, tiles: list[dict[str, Any]], D: dict[str, Any]
         fut = planner.generate(hist, patch(G, clip, a_com, a_psi), goal, gen)[:, :KEEP]
         seq.append(world(fut, a_com, a_psi))
         a_com, a_psi = seq[-1][2][:, -1], seq[-1][3][:, -1]
-        recent = [torch.cat([s[j] for s in seq], 1)[:, -HIST:] for j in range(4)]
+        recent = [torch.cat([s[j] for s in seq], 1)[:, -HIST:] for j in range(5)]
         hist = features(*recent, a_com, a_psi)
-    full = [torch.cat([s[j] for s in seq], 1).cpu().numpy() for j in range(4)]
+    full = [torch.cat([s[j] for s in seq], 1).cpu().numpy() for j in range(5)]
     return [to_plan(*(f[b] for f in full),
                     ground=lambda x, z, T=T: hf_height(T["heights"], T["block"], T["cell"], T["origin"], x, z))
             for b, T in enumerate(tiles)]

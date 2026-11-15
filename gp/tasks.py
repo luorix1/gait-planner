@@ -5,10 +5,12 @@
   turns, platforms, gaps), with a 2D height scan in the observation and resets raised by the clip's per-frame lift
   (no contact sphere starts inside the terrain).
 - :class:`PlanTracking`, the planner's task: the actor sees its body, the height scan and the plan (per foot:
-  down or not, the foothold, time to touchdown and lift-off; and the centre-of-mass target) at the recipe's
-  lookahead taps, never the full pose; the critic also reads the full reference (privileged). Reward: matching
-  the planned contacts and footholds, staying in the centre-of-mass band, the frozen style prior's score, minus
-  the recipe's effort terms. Falls stay the recipe's (pelvis 0.3 m from the clip's or tilted 60 deg from it).
+  down or not, the foothold, time to touchdown and lift-off; the centre-of-mass target; and the pelvis orientation,
+  as the recipe's root orientation error) at the recipe's lookahead taps, never the joint angles; the critic also
+  reads the full reference (privileged). Reward: matching the planned contacts and footholds, staying in the
+  centre-of-mass band and the pelvis-orientation band, the frozen style prior's score, minus the recipe's effort
+  terms. The pelvis orientation fixes where the hips are, so with the footholds it leaves each leg little more than
+  its knee's swivel and the ankle (user 2026-11-15: too many free degrees of freedom without it). Falls stay the recipe's (pelvis 0.3 m from the clip's or tilted 60 deg from it).
 
 Free clips (gp.free: generated courses, no reference motion; ``D["free"]``) start at their first frame only. In
 :class:`PlanTracking` they fall by losing the plan's centre of mass (gp.free.FREE_FALL_M) or tilting 60 deg, and the
@@ -22,7 +24,7 @@ from typing import Any
 
 import numpy as np
 import torch
-from sprint.recipes.imitation import _POLAR, Imitation, ImitationConfig, _heading, _qrot
+from sprint.recipes.imitation import _POLAR, Imitation, ImitationConfig, _heading, _qconj, _qmul, _qrot, _rotvec
 
 from . import data as gpdata
 from .free import FREE_FALL_M
@@ -176,9 +178,12 @@ class PlanConfig:
     w_contact: float = 0.15
     w_foothold: float = 0.15
     tol_foothold: float = 0.10             # m, horizontal
-    w_com: float = 0.20
+    w_com: float = 0.10
     com_band: tuple[float, float, float] = (0.10, 0.05, 0.05)   # m half-widths: forward, up, lateral (heading frame)
     tol_com: float = 0.05                  # m beyond the band
+    w_orient: float = 0.10                 # the pelvis orientation (the root's)
+    orient_band: float = 0.10              # rad (6 deg) of rotation from the planned orientation, free
+    tol_orient: float = 0.10               # rad beyond the band
     w_style: float = 0.50
     contact_bw: float = 0.05               # a foot is down above this fraction of body weight
     prior: str = ""                        # the style prior's file (train_prior.py)
@@ -188,7 +193,7 @@ class PlanTracking(TerrainImitation):
     """Track the plan; see the module docstring."""
 
     #: The reference itself: the critic's alone (the actor reads the plan, not the pose).
-    CRITIC_ONLY = (*Imitation.CRITIC_ONLY, "root_position_error", "root_orientation_error", "joint_angle_error",
+    CRITIC_ONLY = (*Imitation.CRITIC_ONLY, "root_position_error", "joint_angle_error",
                    "joint_velocity_error", "root_velocity_error", "feet_position_error", "free_episode")
 
     def __init__(self, D: dict[str, Any], config: ImitationConfig | None = None, plan: PlanConfig | None = None, *,
@@ -263,6 +268,8 @@ class PlanTracking(TerrainImitation):
         M = _heading(s.body_quat[:, self.root])
         e = torch.einsum("nij,nj->ni", M, self.com(s) - self.p_com[f]).abs()
         r_com = torch.exp(-0.5 * ((e - self.band).clamp_min(0) / pc.tol_com).pow(2).sum(1))
+        eo = _rotvec(_qmul(_qconj(s.body_quat[:, self.root]), self.ref["root_quat"][f])).norm(dim=1)     # rad
+        r_orient = torch.exp(-0.5 * ((eo - pc.orient_band).clamp_min(0) / pc.tol_orient).pow(2))
         self.ring = torch.cat([self.ring[:, 1:], self.record(s)[:, None]], 1)
         r_style, sds = self.style(self.ring)
         metabolic = s.metabolic_power.sum(1) / s.total_mass
@@ -274,8 +281,9 @@ class PlanTracking(TerrainImitation):
             mean = (ag * self.bal_mask).sum(2) / k
             var = ((ag - mean[..., None]).pow(2) * self.bal_mask).sum(2) / k
             effort = effort + c.w_balance * (var / (mean.pow(2) + c.balance_eps ** 2)).sum(1)
-        plan = pc.w_contact * r_contact + pc.w_foothold * r_foothold + pc.w_com * r_com
-        self.metrics.update(plan=plan, r_contact=r_contact, r_foothold=r_foothold, r_com=r_com, r_style=r_style,
+        plan = pc.w_contact * r_contact + pc.w_foothold * r_foothold + pc.w_com * r_com + pc.w_orient * r_orient
+        self.metrics.update(plan=plan, r_contact=r_contact, r_foothold=r_foothold, r_com=r_com, r_orient=r_orient,
+                            orient_error_deg=torch.rad2deg(eo), r_style=r_style,
                             sds_loss=sds, effort=effort, foothold_error=d.mean(1), com_error=e.norm(dim=1))
         return plan + pc.w_style * r_style - effort
 

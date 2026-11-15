@@ -67,6 +67,7 @@ svg.dia { width:100%; height:auto; display:block }
 .band { fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.5; stroke-dasharray:5 5 }
 .fR { fill:var(--blue) } .fL { fill:var(--blue-2) }
 .dot { fill:var(--amber); stroke:var(--panel); stroke-width:3 }
+.pel { fill:var(--ink) }
 .call { fill:none; stroke:var(--muted); stroke-width:1.5 }
 .grid { stroke:var(--line); stroke-width:1 }
 
@@ -148,7 +149,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <header>
   <p class="eyebrow">gait_planner · plan · updated 15 Nov 2026</p>
   <h1>Sparse-target planner</h1>
-  <p class="lede">A planner says where and when each foot lands and where the body's centre of mass should be. A muscle policy works out the rest. A style prior and six checks against human data decide which new episodes are kept, so new skills come out of the loop instead of from new recordings.</p>
+  <p class="lede">A planner says where and when each foot lands, where the body's centre of mass should be, and which way the pelvis faces. A muscle policy works out the rest. A style prior and six checks against human data decide which new episodes are kept, so new skills come out of the loop instead of from new recordings.</p>
   <div class="chips">
     <span class="chip done"><i></i>Data, training code, planner network: built</span>
     <span class="chip next"><i></i>First GPU runs: next</span>
@@ -166,7 +167,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
   <div class="split">
     <img class="gif" src="flow.gif" alt="30-second animation: real motion trains the planner, muscle policy and style prior; each loop round tries new ground and keeps only episodes that pass six checks; when running, the planner hands plans to the muscle policy at 40 Hz." width="640" height="360">
     <div class="parts">
-      <div class="part"><div class="ic">P</div><div><h3>Planner</h3><p>Given the ground ahead and a goal, it proposes footholds, when each foot is down, and a band for the centre of mass. It is learned from the start, as in PARC.</p></div></div>
+      <div class="part"><div class="ic">P</div><div><h3>Planner</h3><p>Given the ground ahead and a goal, it proposes footholds, when each foot is down, a band for the centre of mass and the pelvis orientation. It is learned from the start, as in PARC.</p></div></div>
       <div class="part"><div class="ic">M</div><div><h3>Muscle policy</h3><p>Drives 90 muscles at 40 Hz in our GPU simulator to follow the plan. Joint angles are left free; nothing tells it the full pose.</p></div></div>
       <div class="part"><div class="ic">✓</div><div><h3>Gatekeepers</h3><p>A style prior scores how human the motion looks. Six checks compare forces, loads and effort with human data. Only episodes that pass become new training data.</p></div></div>
     </div>
@@ -176,10 +177,10 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <section aria-labelledby="s-plan">
   <div class="sec-head">
     <h2 id="s-plan">What a plan looks like</h2>
-    <p>Feet get a place and a time. The body gets a band. The joints are free. Overlapping foot intervals mean walking, and a gap between them means flight, so the plan sets the gait without dictating the swing.</p>
+    <p>Feet get a place and a time. The body gets a band, and the pelvis an orientation, which fixes where the hips are. The joints are free. Overlapping foot intervals mean walking, and a gap between them means flight, so the plan sets the gait without dictating the swing.</p>
   </div>
   <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 440" role="img" aria-label="A plan on stairs: alternating footholds on each tread, a centre-of-mass band above them, and per-foot contact timing below with short double-support overlaps.">
+    <svg class="dia" viewBox="0 0 1200 440" role="img" aria-label="A plan on stairs: alternating footholds on each tread, a centre-of-mass band above them with the pelvis orientation marked inside it, and per-foot contact timing below with short double-support overlaps.">
       <!-- terrain: level, five treads up, level -->
       <path class="rock" d="M160 300 H480 V266 H570 V232 H660 V198 H750 V164 H840 V130 H1180 V330 H160 Z"/>
       <!-- centre-of-mass band -->
@@ -207,11 +208,16 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <!-- callouts -->
       <path class="call" d="M218 286 V112 H230"/><text class="ta" x="236" y="117">Foothold: where, and which foot</text>
       <path class="call" d="M330 196 V158 H342"/><text class="ta" x="348" y="163">Centre-of-mass band</text>
+      <!-- pelvis orientation inside the band: which way it faces and tilts -->
+      <g class="pel" transform="translate(250 214) rotate(-8)"><rect x="-16" y="-6" width="32" height="12" rx="5"/><path d="M16 -6 L27 0 L16 6 z"/></g>
+      <g class="pel" transform="translate(705 129) rotate(-8)"><rect x="-16" y="-6" width="32" height="12" rx="5"/><path d="M16 -6 L27 0 L16 6 z"/></g>
+      <g class="pel" transform="translate(1050 44) rotate(-8)"><rect x="-16" y="-6" width="32" height="12" rx="5"/><path d="M16 -6 L27 0 L16 6 z"/></g>
+      <path class="call" d="M705 120 V70 H692"/><text class="ta" x="686" y="75" text-anchor="end">Pelvis orientation</text>
       <path class="call" d="M408 420 L408 432 L440 432"/><text class="ta" x="446" y="436">Both feet down (walking)</text>
       <text class="ts" x="1180" y="436" text-anchor="end">time runs left to right</text>
     </svg>
   </div>
-  <p class="muted" style="font-size:15px">The policy sees its own body, a 17 × 3 height scan of the ground ahead and the next second of the plan. It is rewarded for contacts (0.15), footholds within 10 cm (0.15), staying in the band (0.20) and the style score (0.50), minus muscle effort.</p>
+  <p class="muted" style="font-size:15px">The policy sees its own body, a 17 × 3 height scan of the ground ahead and the next second of the plan. It is rewarded for contacts (0.15), footholds within 10 cm (0.15), staying in the band (0.10), keeping the pelvis within 6° of its planned orientation (0.10) and the style score (0.50), minus muscle effort.</p>
 </section>
 
 <section aria-labelledby="s-train">
@@ -278,13 +284,13 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <p class="muted" style="font-size:15px">Seen from above, lighter is higher. Start at top left: down a flight, a landing turn, two more flights, a gap, then stop. Footholds: left light blue, right dark blue; amber is the centre of mass.</p>
       <dl class="spec">
         <dt>Reads</dt><dd>the ground 3.6 m ahead and 1.6 m across, and a goal</dd>
-        <dt>Writes</dt><dd>the next 1.2 s of plan; keeps 0.5 s, then plans again</dd>
+        <dt>Writes</dt><dd>the next 1.2 s of plan, pelvis orientation included; keeps 0.5 s, then plans again</dd>
         <dt>Courses finished</dt><dd>12 of 12</dd>
-        <dt>Footholds on the course</dt><dd>99 %</dd>
+        <dt>Footholds on the course</dt><dd>99.6 %</dd>
         <dt>Across a stair edge</dt><dd>8 % (it often skips a tread)</dd>
-        <dt>Held-out clips</dt><dd>next touchdown 0.05 s and 12 cm off (median)</dd>
+        <dt>Held-out clips</dt><dd>next touchdown 0.05 s and 11 cm off; pelvis orientation 4° off 0.6 s ahead (medians)</dd>
       </dl>
-      <p class="note">These numbers come from a small model trained for 29 minutes on the CPU, a check that the pieces fit. The full model trains on the GPU. Stairs are weak because they are half a minute of the data; the loop is meant to fix that.</p>
+      <p class="note">These numbers come from a small model (2 layers instead of 4, 6k iterations instead of 200k, one minute on the GPU), a check that the pieces fit. The full model is the real run. Stairs are weak because they are half a minute of the data; the loop is meant to fix that.</p>
     </div>
   </div>
 </section>
@@ -297,12 +303,12 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
   <div class="checks">
     <div class="check"><div class="k"><b>1</b><h3>Looks human</h3></div><p>Style prior score over 2 s windows.</p><span class="src">vs real clips, same terrain</span></div>
     <div class="check"><div class="k"><b>2</b><h3>Follows the plan</h3></div><p>Contacts at the planned times, feet on the footholds.</p><span class="src">vs the plan</span></div>
-    <div class="check"><div class="k"><b>3</b><h3>Ground force</h3></div><p>Peak force and loading rate.</p><span class="src">vs Camargo, walking</span></div>
-    <div class="check"><div class="k"><b>4</b><h3>Joint loads</h3></div><p>Hip, knee and ankle net moments.</p><span class="src">vs Camargo, walking</span></div>
+    <div class="check"><div class="k"><b>3</b><h3>Ground force</h3></div><p>Peak force and loading rate.</p><span class="src">vs Camargo walking, AB01 running</span></div>
+    <div class="check"><div class="k"><b>4</b><h3>Joint loads</h3></div><p>Hip, knee and ankle net moments.</p><span class="src">vs Camargo walking, AB01 running</span></div>
     <div class="check"><div class="k"><b>5</b><h3>Muscle effort</h3></div><p>No muscle stuck at full activation.</p><span class="src">saturation limit</span></div>
     <div class="check"><div class="k"><b>6</b><h3>Clean contact</h3></div><p>No sliding feet, no joints driven into their limits.</p><span class="src">sliding and limit hits</span></div>
   </div>
-  <p class="muted" style="font-size:15px">Camargo 2021 (22 subjects; inverse dynamics redone on our body, matching their own at r 0.88–0.997) is the human reference for forces, moments and EMG. It is all walking, so running and jumping skip checks 3 and 4 until limits for them are chosen. AB01's 2.5 minutes of treadmill running on force plates can supply running's.</p>
+  <p class="muted" style="font-size:15px">Camargo 2021 (22 subjects; inverse dynamics redone on our body, matching their own at r 0.88–0.997) is the human reference for forces, moments and EMG. It is all walking, so running takes its limits from AB01's 2.5 minutes of treadmill running on force plates (inverse dynamics on the same body; the plates' 14 ms lag behind the cameras corrected). AB01 ran at 2.0–2.7 m/s and PARC at 3.4 m/s typically, so the running limits rise with the target speed, following AB01's own trend plus a margin that widens the further they extrapolate, up to 4.5 m/s. Jumps, drops and platforms still skip checks 3 and 4.</p>
 </section>
 
 <section aria-labelledby="s-run">
@@ -359,7 +365,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <section aria-labelledby="s-road">
   <div class="sec-head"><h2 id="s-road">Roadmap and gates</h2><p>Each phase ends at a gate. Phase 1 decides whether sparse targets can match full-pose tracking at all.</p></div>
   <div class="road">
-    <div class="phase done"><span class="st">Done</span><h3>0 · Data</h3><p>Dataset, plans, references, filter limits, CPU checks.</p><div class="gate"><b>G0</b>The prior ranks real motion above 95 % of degraded copies, for every subject.</div></div>
+    <div class="phase done"><span class="st">Done</span><h3>0 · Data</h3><p>Dataset, plans, references, filter limits, tests, an end-to-end trial of every step.</p><div class="gate"><b>G0</b>The prior ranks real motion above 95 % of degraded copies, for every subject.</div></div>
     <div class="phase now"><span class="st">Next</span><h3>1 · Feasibility</h3><p>Level and ramps: sparse plan + style vs full-pose tracking.</p><div class="gate"><b>G1</b>Half of episodes accepted; kinetics in the human band at least as often as the baseline; 10k steps/s.</div></div>
     <div class="phase"><span class="st">Later</span><h3>2 · Stairs</h3><p>Footholds on treads, up and down.</p><div class="gate"><b>G2</b>Stairs accepted at least half as often as level ground, both directions.</div></div>
     <div class="phase"><span class="st">Parts built</span><h3>3 · Planner loop</h3><p>Learned planner on generated ground, PARC-style rounds. Generator, planner and clip-free episodes are built; the rounds are next.</p><div class="gate"><b>G3</b>Each round adds coverage; acceptance stays within 10 points; the frozen prior's scores hold.</div></div>
@@ -381,14 +387,14 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
   <div class="sec-head"><h2 id="s-details">Details</h2></div>
   <div>
     <details><summary>Run order (your GPU runs)</summary><div>
-      <table><thead><tr><th>Step</th><th>Command</th><th>Gives</th></tr></thead><tbody>
-        <tr><td class="num">1</td><td><code>train_prior.py --out runs/prior_v1</code></td><td>the style prior (200k iterations)</td></tr>
-        <tr><td class="num">2</td><td><code>check_prior.py runs/prior_v1/prior.pt</code>, then <code>python -m gp.accept --prior …</code></td><td>gate G0; the style limit for check 1</td></tr>
-        <tr><td class="num">3</td><td><code>train.py --task baseline</code> and <code>--task planner</code>, equal <code>--hours</code></td><td>the two Phase 1 policies</td></tr>
-        <tr><td class="num">4</td><td><code>evaluate.py</code>, then <code>g1.py</code> and <code>emg_report.py</code></td><td>gate G1 and EMG timing</td></tr>
-        <tr><td class="num">5</td><td><code>train_planner.py --out runs/planner_net_v1</code>, then <code>check_planner.py runs/planner_net_v1/planner.pt</code></td><td>the planner network (200k iterations) and its score before physics</td></tr>
+      <table><thead><tr><th>Step</th><th>Command</th><th>Gives</th><th>Time (idle 4090)</th></tr></thead><tbody>
+        <tr><td class="num">1</td><td><code>train_prior.py --out runs/prior_v1</code></td><td>the style prior (200k iterations)</td><td class="num">~22 min</td></tr>
+        <tr><td class="num">2</td><td><code>check_prior.py runs/prior_v1/prior.pt</code>, then <code>python -m gp.accept --prior …</code></td><td>gate G0 (must pass); the style limit for check 1</td><td class="num">minutes</td></tr>
+        <tr><td class="num">3</td><td><code>train.py --task baseline</code> and <code>--task planner</code>, equal <code>--hours</code>, side by side</td><td>the two Phase 1 policies</td><td class="num">your hours</td></tr>
+        <tr><td class="num">4</td><td><code>evaluate.py</code>, then <code>g1.py</code> and <code>emg_report.py</code></td><td>gate G1 and EMG timing</td><td class="num">under an hour</td></tr>
+        <tr><td class="num">5</td><td><code>train_planner.py --out runs/planner_net_v1</code>, then <code>check_planner.py runs/planner_net_v1/planner.pt</code></td><td>the planner network (200k iterations) and its score before physics</td><td class="num">~3.4 h alone</td></tr>
       </tbody></table>
-      <p class="muted" style="font-size:14px; margin-top:10px">Every step before these is done and checked on the CPU (16 tests pass). In the code, <code>--task planner</code> trains the muscle policy on plans copied from clips; the planner network trains on its own (step 5) and drives the policy once the loop runs.</p>
+      <p class="muted" style="font-size:14px; margin-top:10px">Every step has been run end to end with tiny settings, and 16 tests pass. In the code, <code>--task planner</code> trains the muscle policy on plans copied from clips; the planner network trains on its own (step 5) and drives the policy once the loop runs.</p>
     </div></details>
     <details><summary>Settings</summary><div>
       <ul class="tight">
@@ -417,6 +423,8 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     </div></details>
     <details><summary>Decisions and open question</summary><div>
       <table><thead><tr><th>Date</th><th>Decision</th></tr></thead><tbody>
+        <tr><td class="num">15 Nov</td><td>The plan includes the pelvis orientation (6° band, weight 0.10, the centre-of-mass band's weight halved to 0.10): with the footholds it pins the hips, leaving each leg little more than the knee's swivel and the ankle.</td></tr>
+        <tr><td class="num">15 Nov</td><td>Running limits come from AB01's treadmill running and rise with target speed to 4.5 m/s.</td></tr>
         <tr><td class="num">15 Nov</td><td>The planner is a diffusion model over the plan (not the pose), reading the ground ahead and a goal.</td></tr>
         <tr><td class="num">15 Nov</td><td>Generated courses run along the grid; winding stairs dropped (their walls come out jagged on square cells); PARC-style turning stairs added.</td></tr>
         <tr><td class="num">15 Nov</td><td>Dropped the 5 hand-assisted climbs and one toe-through-platform clip from PARC.</td></tr>

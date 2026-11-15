@@ -137,7 +137,8 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
         k = int(steps[i])
         tr = {key: torch.stack(v)[:k, i].numpy() for key, v in trace.items()}
         tr.update(fell=bool(fell[i]), metabolic_j_per_kg_m=float(metab_j[i] / mass / path_len[i].clamp_min(1e-3)))
-        row.update(accept.check(tr, accept.thresholds(thresholds, split, row["terrain_class"], row["mode"])))
+        row.update(accept.check(tr, accept.thresholds(thresholds, split, row["terrain_class"], row["mode"],
+                                                      float(D["speed_mps"][i]))))
         pr = emg.stride_profiles(tr["fv"][:, 1] > accept.DOWN_BW, tr["emg_act"])
         row["emg_strides"] = len(pr)
         if row["mode"] != "run":                         # Camargo's EMG reference is all walking

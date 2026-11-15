@@ -113,7 +113,8 @@ def course_clips(tiles: list[dict[str, Any]], D: dict[str, Any], stand: int, pla
     L = model_layout(model)
     h = model.host
     names_c = list(D["coord_names"])
-    ix = {c: names_c.index(c) for c in ("pelvis_tx", "pelvis_ty", "pelvis_tz", "pelvis_rotation")}
+    ix = {c: names_c.index(c) for c in ("pelvis_tx", "pelvis_ty", "pelvis_tz", "pelvis_tilt", "pelvis_list",
+                                        "pelvis_rotation")}
     q0 = np.asarray(D["qpos"][D["start"][stand]], np.float64)
     com0 = np.asarray(D["com"][D["start"][stand]], np.float64)
     to_pelvis = np.array([q0[ix["pelvis_tx"]] - com0[0], q0[ix["pelvis_tz"]] - com0[2]])   # heading 0, standing
@@ -131,6 +132,10 @@ def course_clips(tiles: list[dict[str, Any]], D: dict[str, Any], stand: int, pla
         q[:, ix["pelvis_tz"]] = P["com"][:, 2] - s_ * to_pelvis[0] + c * to_pelvis[1]
         q[:, ix["pelvis_ty"]] = q0[ix["pelvis_ty"]] + P["com"][:, 1] - com0[1]
         q[:, ix["pelvis_rotation"]] = ps
+        if "pelvis_quat" in P:                         # a planner's plan: its pelvis orientation (the joint is Z-X-Y)
+            from scipy.spatial.transform import Rotation
+            e = Rotation.from_quat(P["pelvis_quat"]).as_euler("ZXY")
+            q[:, ix["pelvis_tilt"]], q[:, ix["pelvis_list"]], q[:, ix["pelvis_rotation"]] = e[:, 0], e[:, 1], np.unwrap(e[:, 2])
         qd = np.gradient(q, 1.0 / gpdata.HZ, axis=0)
         xp, xq = (a.astype(np.float64) for a in forward_kinematics_np(model, q.astype(np.float32)))
         ctr = xp[:, sph_body] + _rotate(xq[:, sph_body], np.broadcast_to(h["geom_pos"][sph], xp[:, sph_body].shape))

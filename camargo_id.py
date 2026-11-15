@@ -127,24 +127,28 @@ def clip_times(name: str) -> np.ndarray:
     return start + np.arange(a, b) / FPS
 
 
-def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float,
-                   mass_ratio: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Each plate's force and centre of pressure at times ``t``, in the export's OpenSim frame: ``[T, P, 3]`` each
-    (NaN centre of pressure where the plate carries under ``MIN_N``), and each plate's footprint ``[P, 4]`` (x min,
-    x max, z min, z max): the extent of its loaded centres of pressure over the whole trial.
+def plate_transform(yaw: float) -> np.ndarray:
+    """Lab (OpenSim, y up) -> the export's OpenSim frame, before the leg-length scale: canonical, the export's turn
+    about +z (seedlib.prep), back to OpenSim axes."""
+    ca, sa = np.cos(yaw), np.sin(yaw)
+    Rz = np.array([[ca, -sa, 0], [sa, ca, 0], [0, 0, 1.0]])
+    to_osim = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])      # canonical (x, y, z) -> OpenSim (x, z, -y)
+    return to_osim @ Rz @ C
+
+
+def carry_plates(ft: np.ndarray, fp: np.ndarray, t: np.ndarray, M: np.ndarray, scale: float, mass_ratio: float,
+                 cop_shift: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Plates (``fp`` ``[N, 9 P]``: per plate force, centre of pressure, moment, lab frame, at times ``ft``) -> each
+    plate's force and centre of pressure at times ``t`` in the export's frame (``M``, ``scale``; forces times
+    ``mass_ratio``): ``[T, P, 3]`` each (NaN centre of pressure where the plate carries under ``MIN_N``), and each
+    plate's footprint ``[P, 4]`` (x min, x max, z min, z max): the extent of its loaded centres of pressure.
+    ``cop_shift`` ``[N, 3]`` (lab) is added to the centres of pressure first (a treadmill belt's travel).
 
     Below ``MIN_N`` a plate reads noise and its centre of pressure is meaningless (an unloaded default), so the force
     is zeroed there before the 6 Hz low-pass, and the centre of pressure is held at the nearest loaded sample: the
     force the zero-phase filter spreads a few ms past a touchdown or a lift-off acts at the heel-strike or toe-off
     point. (Without this, 2-3 frames at each heel strike read hip moments of -6 to -8 N m/kg; fixed 2026-11-14.)"""
-    m = canonical_meta(name)
-    raw = np.load(RAW / m["subject"].removeprefix("camargo_") / f"{m['trial'].replace('/', '__')}.npz", allow_pickle=True)
-    ft, fp = raw["fp_time"], raw["fp"]
     n_plate = fp.shape[1] // 9
-    ca, sa = np.cos(yaw), np.sin(yaw)
-    Rz = np.array([[ca, -sa, 0], [sa, ca, 0], [0, 0, 1.0]])
-    to_osim = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])      # canonical (x, y, z) -> OpenSim (x, z, -y)
-    M = to_osim @ Rz @ C
     dt = float(np.median(np.diff(ft)))
     F_all, P_all, boxes = [], [], []
     for p in range(n_plate):
@@ -158,6 +162,8 @@ def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float,
             nxt = np.minimum.accumulate(np.where(on, k, len(on))[::-1])[::-1]
             prev, nxt = np.where(prev < 0, nxt, prev), np.where(nxt >= len(on), prev, nxt)
             P = P[np.where(k - prev <= nxt - k, prev, nxt)]
+            if cop_shift is not None:
+                P = P + cop_shift
             xz = (P[on] @ M.T * scale)[:, [0, 2]]
             box = np.array([xz[:, 0].min(), xz[:, 0].max(), xz[:, 1].min(), xz[:, 1].max()])
         boxes.append(box)
@@ -170,22 +176,31 @@ def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float,
     return np.stack(F_all, 1), np.stack(P_all, 1), np.array(boxes)
 
 
-def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None:
-    import opensim as osim
-    exp = np.load(SEED / "osim_export" / "camargo" / f"{name}.npz")
-    T = json.loads(str(exp["terrain"]))
+def plates_on_clip(name: str, t: np.ndarray, scale: float, yaw: float,
+                   mass_ratio: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A Camargo clip's plates at times ``t`` (:func:`carry_plates`)."""
     m = canonical_meta(name)
-    subj = m["subject"].removeprefix("camargo_")
-    t = clip_times(name)
-    q, names = exp["q"].astype(float), list(exp["coord_names"])
-    if len(t) != len(q):
-        return None
+    raw = np.load(RAW / m["subject"].removeprefix("camargo_") / f"{m['trial'].replace('/', '__')}.npz", allow_pickle=True)
+    return carry_plates(raw["fp_time"], raw["fp"], t, plate_transform(yaw), scale, mass_ratio)
+
+
+def force_free_model(model_path: str) -> tuple:
+    """(model, state, mass) with every force element removed: inverse dynamics then gives net joint moments."""
+    import opensim as osim
     model = osim.Model(model_path)
     model.updForceSet().clearAndDestroy()      # net joint moments: no muscles, contacts or limit forces act
     state = model.initSystem()
-    m_model = sum(model.getBodySet().get(i).getMass() for i in range(model.getBodySet().getSize()))
-    F, P, box = plates_on_clip(name, t, T["scale"], T.get("aligned_yaw_rad", 0.0), m_model / mass[subj])
-    # feet: midpoint of calcn and toes origins, from the clip's own kinematics
+    return model, state, sum(model.getBodySet().get(i).getMass() for i in range(model.getBodySet().getSize()))
+
+
+def net_moments(model, state, m_model: float, q: np.ndarray, names: list[str], t: np.ndarray, F: np.ndarray,
+                P: np.ndarray, tmp: Path, name: str) -> dict:
+    """OpenSim inverse dynamics of coordinates ``q`` ``[T, n]`` (``names``) at times ``t`` under plates ``F``, ``P``
+    ``[T, P, 3]`` (:func:`carry_plates`), each loaded plate given to the nearer foot (horizontal distance to the
+    midpoint of its calcaneus and toes origins) and applied to that calcaneus. -> ``moment`` ``[T, n]`` (N m/kg),
+    per foot (r, l) ``grf`` ``[T, 2, 3]`` (N) and ``foot`` positions, and per plate ``side`` ``[T, P]`` (0 r, 1 l,
+    -1 unloaded) and ``on``."""
+    import opensim as osim
     cs = model.getCoordinateSet()
     cols = [(cs.get(i), names.index(cs.get(i).getName())) for i in range(cs.getSize())]
     bodies = {s: (model.getBodySet().get(f"calcn_{s}"), model.getBodySet().get(f"toes_{s}")) for s in ("r", "l")}
@@ -249,6 +264,24 @@ def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None
         key = next((c for c in lab if c in (f"{n}_moment", f"{n}_force")), None)
         if key is not None:
             out[:, j] = np.interp(t - t[0], tt, sto.getDependentColumn(key).to_numpy()) / m_model
+    for f in stem.parent.glob(f"{name}.*"):
+        f.unlink()
+    return dict(moment=out, grf=grf, foot=foot, side=side, on=on)
+
+
+def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None:
+    exp = np.load(SEED / "osim_export" / "camargo" / f"{name}.npz")
+    T = json.loads(str(exp["terrain"]))
+    m = canonical_meta(name)
+    subj = m["subject"].removeprefix("camargo_")
+    t = clip_times(name)
+    q, names = exp["q"].astype(float), list(exp["coord_names"])
+    if len(t) != len(q):
+        return None
+    model, state, m_model = force_free_model(model_path)
+    F, P, box = plates_on_clip(name, t, T["scale"], T.get("aligned_yaw_rad", 0.0), m_model / mass[subj])
+    r = net_moments(model, state, m_model, q, names, t, F, P, tmp, name)
+    out, grf, foot, on = r["moment"], r["grf"], r["foot"], r["on"]
     # validity per leg (see the module docstring)
     raw = np.load(RAW / subj / f"{m['trial'].replace('/', '__')}.npz", allow_pickle=True)    # our own files
     ic = [str(x) for x in raw["id_cols"]]
@@ -269,8 +302,6 @@ def solve_clip(name: str, model_path: str, mass: dict, tmp: Path) -> dict | None
               & (fz >= box[None, :, None, 2] - pad) & (fz <= box[None, :, None, 3] + pad))    # [T, P, 2]
     shared = (on & inside.all(2)).any(1) & down.all(1)
     valid &= ~shared[:, None]
-    for f in stem.parent.glob(f"{name}.*"):
-        f.unlink()
     g = 9.80665
     return dict(moment=out, theirs=theirs, grf_bw=grf / (m_model * g), valid=valid, coord_names=names)
 

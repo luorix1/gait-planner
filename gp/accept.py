@@ -1,14 +1,24 @@
 """The acceptance filter (plan doc, gate G1): six checks an episode must pass to join the planner's dataset. Kinetic
 thresholds are Camargo's per terrain class (all its subjects, ``data.REF``; user 2026-11-15: the most nominal human
 data); the style threshold comes from the active dataset's real clips of the same split and class. Camargo is all
-walking, so a running episode, or a class Camargo lacks (PARC's obstacles), leaves the GRF and joint checks unchecked.
+walking, so running takes AB01's treadmill running instead (``ab01_id.py``: 15 clips at 2.0-2.7 m/s, level and
++-5 deg, one subject; one ``kinetics_run`` entry, used for running on level ground and ramps). A class neither has
+(PARC's obstacles: jumps, drops, platforms) leaves the GRF and joint checks unchecked.
+
+**Running limits rise with speed.** The dataset's running is faster than AB01's (PARC: median 3.4 m/s, up to 4.5), and
+AB01's peaks rise with speed (per m/s: GRF +0.22 BW, matching ~0.2 in Nilsson & Thorstensson 1989; ankle +0.45, hip
++0.87 N m/kg; knee flat, as Schache et al. 2011 found for knee stance work). So each running limit is a function of the
+episode's target speed: the larger of AB01's pooled 95th percentile and the 95 % prediction bound of a straight line
+through AB01's level clips' peaks against speed (``RUN_PI``). The bound widens with distance from AB01's speeds, which
+is the headroom for extrapolating from one subject at 2.0-2.7 m/s. Tabulated every 0.25 m/s up to the dataset's
+fastest running clip; faster than that, the fastest's limits hold.
 
 | Check | Rejects when | Threshold from |
 |---|---|---|
 | Style | a 2 s window's mean SDS loss is above the real 95th percentile (its score below the 5th) | the prior on real windows |
 | Plan followed | a planned contact (3+ frames) with under half its frames in contact; a stance more than 15 cm from its planned foothold; the centre of mass out of its band over 10 % of steps | fixed |
-| Ground reaction | peak vertical force or peak loading rate above the real 95th percentile | Camargo's plates |
-| Joint loads | peak net moment at a hip, knee or ankle above the real 95th percentile | Camargo ID on Rajagopal v3 |
+| Ground reaction | peak vertical force or peak loading rate above the real 95th percentile | Camargo's plates (running: AB01's treadmill) |
+| Joint loads | peak net moment at a hip, knee or ankle above the real 95th percentile | Camargo (running: AB01) ID on Rajagopal v3 |
 | Muscle effort | a muscle above 0.95 activation over 10 % of any 1 s window | fixed |
 | Contact | a touching contact sphere sliding over 2 cm, or a coordinate within 1 deg of a limit over 5 % of steps | fixed |
 
@@ -23,7 +33,8 @@ Departures from the plan doc's drawing:
 
 For G1's curve comparison: per class, the real 5th-95th percentile band of the right leg's hip, knee and ankle
 moments and vertical force over the right stance (touchdown to lift-off, 101 points; whole strides are rarely all on
-plates); an episode's score is the fraction of its stances' points inside the band.
+plates; stances of 0.3-1.5 s, running 0.12-0.45 s); an episode's score is the fraction of its stances' points inside
+the band.
 
 Run: .venv/bin/python -m gp.accept [--prior runs/prior_v1/prior.pt]  (without a prior: no style threshold yet)
 Out: data/<dataset>/accept.json: ``kinetics`` per class, ``style`` per split and class
@@ -51,6 +62,9 @@ FOOTHOLD_MISS_M, CONTACT_HALF, COM_OUT_FRAC = 0.15, 0.5, 0.10
 SLIP_M, TOUCH_M = 0.02, 0.005
 LIMIT_MARGIN, LIMIT_FRAC = math.radians(1.0), 0.05
 STANCE_S = (0.3, 1.5)
+RUN_STANCE_S = (0.12, 0.45)
+RUN_CLASSES = ("level", "ramp_up", "ramp_down")     # AB01 ran on these; not PARC's obstacles
+RUN_PI = 0.95                                        # one-sided prediction bound of the speed trend (running limits)
 PCT_HI, PCT_LO = 95, 5
 
 
@@ -78,10 +92,10 @@ def grf_measures(fv: np.ndarray, down: np.ndarray) -> tuple[float, float]:
     return peak, lr
 
 
-def stances(down_r: np.ndarray) -> list[tuple[int, int]]:
-    """Right stances, touchdown to lift-off, of plausible length (one cut short by the clip's ends is dropped)."""
-    return [(a, b) for a, b in runs(down_r, 3) if a > 0 and b < len(down_r) - 1
-            and STANCE_S[0] <= (b - a) / data.HZ <= STANCE_S[1]]
+def stances(down_r: np.ndarray, span: tuple[float, float] = STANCE_S) -> list[tuple[int, int]]:
+    """Right stances, touchdown to lift-off, of plausible length ``span`` (s; one cut short by the clip's ends is
+    dropped)."""
+    return [(a, b) for a, b in runs(down_r, 3) if a > 0 and b < len(down_r) - 1 and span[0] <= (b - a) / data.HZ <= span[1]]
 
 
 def resample(x: np.ndarray, a: int, b: int) -> np.ndarray:
@@ -89,30 +103,81 @@ def resample(x: np.ndarray, a: int, b: int) -> np.ndarray:
 
 
 # --- calibration on real clips -----------------------------------------------------------------------------------
-def _real_clips() -> list[dict[str, Any]]:
-    """Per real Camargo clip: its class, kinetics (NaN where that leg is invalid: validity is per leg, see
-    camargo_id.py) and both feet's contacts."""
-    c = np.load(data.REF / "clips.npz")
-    K = np.load(data.REF / "kinetics.npz")
-    p = np.load(data.REF / "plans.npz")
+def _real_clips(src: Any = None, kinetics: str = "kinetics.npz", source: str = "camargo2021",
+                mode: str | None = None) -> list[dict[str, Any]]:
+    """Per real clip of ``source`` (and ``mode``) in dataset ``src`` (default ``data.REF``, Camargo): its class,
+    kinetics from ``kinetics`` (NaN where that leg is invalid: validity is per leg, see camargo_id.py and ab01_id.py)
+    and both feet's contacts."""
+    src = src or data.REF
+    c = np.load(src / "clips.npz")
+    K = np.load(src / kinetics)
+    p = np.load(src / "plans.npz")
     names = list(K["coord_names"])
     jcol = [names.index(j) for j in JOINTS]
     out = []
-    for i in np.flatnonzero(c["source"] == "camargo2021"):
+    for i in np.flatnonzero((c["source"] == source) & ((c["mode"] == mode) if mode else True)):
         s, n = int(c["start"][i]), int(c["frames"][i])
         m = K["moment_nm_per_kg"][s:s + n][:, jcol].astype(float)
         fv = K["grf_bw"][s:s + n][..., 1].astype(float)            # (l, r)
         if np.isfinite(m).sum(0).min() < data.HZ:      # under 1 s of valid frames for some joint
             continue
-        out.append(dict(cls=str(c["terrain_class"][i]), m=m, fv=fv, down=p["contact"][s:s + n], start=s, frames=n))
+        out.append(dict(cls=str(c["terrain_class"][i]), m=m, fv=fv, down=p["contact"][s:s + n], start=s, frames=n,
+                        speed=float(c["speed_mps"][i])))
     return out
 
 
-def _curves(m: np.ndarray, fv: np.ndarray, down_r: np.ndarray) -> list[np.ndarray]:
+def _peaks(r: dict[str, Any]) -> dict[str, float]:
+    """One clip's filter measures: GRF peak and loading rate, and each joint's peak moment over both legs."""
+    g = grf_measures(r["fv"], r["down"])
+    pk = np.nanmax(np.abs(r["m"]), 0)
+    return dict(grf_peak_bw=g[0], grf_loading_rate_bw_s=g[1],
+                **{j: float(max(pk[JOINTS.index(f"{j}_l")], pk[JOINTS.index(f"{j}_r")]))
+                   for j in ("hip_flexion", "knee_angle", "ankle_angle")})
+
+
+def _by_speed(rs: list[dict[str, Any]], base: dict[str, Any], top: float) -> dict[str, Any]:
+    """Running limits against target speed (module docstring): per measure, at speeds 2.0 to ``top`` every 0.25 m/s,
+    the larger of ``base``'s limit and the ``RUN_PI`` prediction bound of a line through the level clips' peaks."""
+    from scipy import stats
+    lv = [r for r in rs if r["cls"] == "level"]
+    x = np.array([r["speed"] for r in lv])
+    v = np.unique(np.r_[np.arange(2.0, top, 0.25), top]).round(3)
+    pk = [_peaks(r) for r in lv]
+    t = stats.t.ppf(RUN_PI, len(x) - 2)
+    sxx = ((x - x.mean()) ** 2).sum()
+
+    def bound(key: str, floor: float) -> list[float]:
+        y = np.array([q[key] for q in pk])
+        slope, icpt = np.polyfit(x, y, 1)
+        se = np.sqrt(((y - slope * x - icpt) ** 2).sum() / (len(x) - 2))
+        pi = slope * v + icpt + t * se * np.sqrt(1 + 1 / len(x) + (v - x.mean()) ** 2 / sxx)
+        return np.maximum(pi, floor).round(3).tolist()
+
+    return dict(speed_mps=v.tolist(), grf_peak_bw=bound("grf_peak_bw", base["grf_peak_bw"]),
+                grf_loading_rate_bw_s=bound("grf_loading_rate_bw_s", base["grf_loading_rate_bw_s"]),
+                joint_peak_nm_per_kg={j: bound(j, base["joint_peak_nm_per_kg"][j])
+                                      for j in ("hip_flexion", "knee_angle", "ankle_angle")})
+
+
+def _limits(rs: list[dict[str, Any]], span: tuple[float, float] = STANCE_S) -> dict[str, Any]:
+    """The kinetic limits of a set of real clips: 95th percentiles of their per-clip peaks, and the G1 bands."""
+    peaks = np.array([np.nanmax(np.abs(r["m"]), 0) for r in rs])                             # [clips, 6], per leg
+    g = np.array([grf_measures(r["fv"], r["down"]) for r in rs])
+    cur = np.array([x for r in rs for x in _curves(r["m"], r["fv"], r["down"][:, 1], span)])
+    joint_peak = {j: float(np.nanpercentile(peaks[:, [JOINTS.index(f"{j}_l"), JOINTS.index(f"{j}_r")]], PCT_HI))
+                  for j in ("hip_flexion", "knee_angle", "ankle_angle")}
+    return dict(clips=len(rs), stances=len(cur), grf_peak_bw=float(np.nanpercentile(g[:, 0], PCT_HI)),
+                grf_loading_rate_bw_s=float(np.nanpercentile(g[:, 1], PCT_HI)), joint_peak_nm_per_kg=joint_peak,
+                band={c: [np.percentile(cur[:, k], PCT_LO, 0).round(4).tolist(),
+                          np.percentile(cur[:, k], PCT_HI, 0).round(4).tolist()] for k, c in enumerate(CURVES)}
+                if len(cur) >= 10 else None, stance_s=list(span))
+
+
+def _curves(m: np.ndarray, fv: np.ndarray, down_r: np.ndarray, span: tuple[float, float] = STANCE_S) -> list[np.ndarray]:
     """``[4, 101]`` per right stance whose every frame is finite."""
     cols = [JOINTS.index(c) for c in CURVES[:3]]
     out = []
-    for a, b in stances(down_r):
+    for a, b in stances(down_r, span):
         seg = np.c_[m[a:b + 1, cols], fv[a:b + 1, 1]]
         if np.isfinite(seg).all():
             out.append(np.stack([resample(seg[:, k], 0, b - a) for k in range(4)]))
@@ -149,18 +214,14 @@ def calibrate(prior: str | None = None) -> dict[str, Any]:
                                kinetics_from=str(data.REF), kinetics={}, style={})
     clips = _real_clips()
     for cls in sorted({r["cls"] for r in clips}):
-        rs = [r for r in clips if r["cls"] == cls]
-        peaks = np.array([np.nanmax(np.abs(r["m"]), 0) for r in rs])                         # [clips, 6], per leg
-        g = np.array([grf_measures(r["fv"], r["down"]) for r in rs])
-        cur = np.array([x for r in rs for x in _curves(r["m"], r["fv"], r["down"][:, 1])])
-        joint_peak = {j: float(np.nanpercentile(peaks[:, [JOINTS.index(f"{j}_l"), JOINTS.index(f"{j}_r")]], PCT_HI))
-                      for j in ("hip_flexion", "knee_angle", "ankle_angle")}
-        res["kinetics"][cls] = dict(
-            clips=len(rs), stances=len(cur), grf_peak_bw=float(np.nanpercentile(g[:, 0], PCT_HI)),
-            grf_loading_rate_bw_s=float(np.nanpercentile(g[:, 1], PCT_HI)), joint_peak_nm_per_kg=joint_peak,
-            band={c: [np.percentile(cur[:, k], PCT_LO, 0).round(4).tolist(),
-                      np.percentile(cur[:, k], PCT_HI, 0).round(4).tolist()] for k, c in enumerate(CURVES)}
-            if len(cur) >= 10 else None)
+        res["kinetics"][cls] = _limits([r for r in clips if r["cls"] == cls])
+    if (data.OUT / "kinetics_ab01.npz").exists():                       # ab01_id.py
+        run = _real_clips(data.OUT, "kinetics_ab01.npz", "ab01", "run")
+        res["kinetics_run"] = dict(_limits(run, RUN_STANCE_S), source="AB01 treadmill running, ab01_id.py",
+                                   classes=list(RUN_CLASSES))
+        c = np.load(data.OUT / "clips.npz")
+        top = float(c["speed_mps"][c["mode"] == "run"].max())          # the dataset's fastest running clip
+        res["kinetics_run"]["by_speed"] = _by_speed(run, res["kinetics_run"], top)
     for split in SPLITS:
         style = _style_losses(prior, split) if prior else {}
         res["style"][split] = {cls: float(np.percentile(v, PCT_HI)) for cls, v in style.items()}
@@ -168,12 +229,20 @@ def calibrate(prior: str | None = None) -> dict[str, Any]:
     return res
 
 
-def thresholds(acc: dict[str, Any] | None, split: str, cls: str, mode: str) -> dict[str, Any] | None:
-    """One episode's thresholds from ``accept.json``: Camargo's kinetics for its class (none when running or when
-    Camargo lacks the class) and the style threshold of its split and class."""
+def thresholds(acc: dict[str, Any] | None, split: str, cls: str, mode: str,
+               speed: float | None = None) -> dict[str, Any] | None:
+    """One episode's thresholds from ``accept.json``: Camargo's kinetics for its class (none when Camargo lacks the
+    class), or AB01's running kinetics when running on level ground or a ramp (none on obstacles), at the episode's
+    target ``speed`` (m/s; the reference clip's or the plan's) when given, and the style threshold of its split and
+    class."""
     if not acc:
         return None
-    kin = acc["kinetics"].get(cls) if mode != "run" else None
+    kin = acc["kinetics"].get(cls) if mode != "run" else acc.get("kinetics_run") if cls in RUN_CLASSES else None
+    if kin and mode == "run" and speed is not None and "by_speed" in kin:
+        b = kin["by_speed"]
+        at = lambda y: float(np.interp(speed, b["speed_mps"], y))  # noqa: E731
+        kin = dict(kin, grf_peak_bw=at(b["grf_peak_bw"]), grf_loading_rate_bw_s=at(b["grf_loading_rate_bw_s"]),
+                   joint_peak_nm_per_kg={j: at(y) for j, y in b["joint_peak_nm_per_kg"].items()})
     return dict(kin or {}, style_loss=acc["style"].get(split, {}).get(cls))
 
 
@@ -234,7 +303,7 @@ def check(tr: dict[str, Any], thr: dict[str, Any] | None) -> dict[str, Any]:
     if band:
         cols = [JOINTS.index(c) for c in CURVES[:3]]
         frac: dict[str, list[float]] = {c: [] for c in CURVES}
-        for a, b in stances(down[:, 1]):
+        for a, b in stances(down[:, 1], tuple(thr.get("stance_s", STANCE_S))):
             seg = np.c_[m[a:b + 1, cols], fv[a:b + 1, 1]]
             for k, c in enumerate(CURVES):
                 y = resample(seg[:, k], 0, b - a)
@@ -252,6 +321,15 @@ if __name__ == "__main__":
         print(f"Camargo {cls:12s} clips {t['clips']:4d} stances {t['stances']:5d}  GRF {t['grf_peak_bw']:.2f} BW "
               f"{t['grf_loading_rate_bw_s']:.1f} BW/s  moments " + " ".join(f"{k.split('_')[0]} {v:.2f}" for k, v in
                                                                      t["joint_peak_nm_per_kg"].items()))
+    if "kinetics_run" in r:
+        t = r["kinetics_run"]
+        print(f"AB01 running        clips {t['clips']:4d} stances {t['stances']:5d}  GRF {t['grf_peak_bw']:.2f} BW "
+              f"{t['grf_loading_rate_bw_s']:.1f} BW/s  moments " + " ".join(f"{k.split('_')[0]} {v:.2f}" for k, v in
+                                                                     t["joint_peak_nm_per_kg"].items()))
+        b = t["by_speed"]
+        for k, v in enumerate(b["speed_mps"]):
+            print(f"  running at {v:4.2f} m/s: GRF {b['grf_peak_bw'][k]:.2f} BW {b['grf_loading_rate_bw_s'][k]:.1f} BW/s"
+                  "  moments " + " ".join(f"{j.split('_')[0]} {y[k]:.2f}" for j, y in b["joint_peak_nm_per_kg"].items()))
     for split, st in r["style"].items():
         print(f"style {split:12s} " + "  ".join(f"{c} {v:.3f}" for c, v in st.items()))
     print("->", data.OUT / "accept.json")
