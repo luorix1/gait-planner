@@ -27,7 +27,7 @@ P_LO, P_HI = 10, 95
 
 
 def load_emg() -> tuple[np.ndarray, list[str], dict[str, list[str]], tuple[str, ...]]:
-    z = np.load(data.OUT / "emg.npz")
+    z = np.load(data.REF / "emg.npz")
     return z["envelope"], list(z["channels"]), json.loads(str(z["muscles"])), tuple(z["unreliable"])
 
 
@@ -47,8 +47,8 @@ def stride_profiles(down_r: np.ndarray, x: np.ndarray) -> np.ndarray:
 
 def reference(split: str) -> dict[str, dict[str, Any]]:
     """Per class: the real mean profile and on-probability ``[C, 101]`` (normalised per subject and channel) and the
-    stride count, from the Camargo clips of ``split``."""
-    c, p = np.load(data.OUT / "clips.npz"), np.load(data.OUT / "plans.npz")
+    stride count, from the Camargo clips of ``split`` (a v1 split: ``test_subject`` or ``train``)."""
+    c, p = np.load(data.REF / "clips.npz"), np.load(data.REF / "plans.npz")
     env, channels, _, _ = load_emg()
     subj = np.repeat(c["subject"], c["frames"])
     norm: dict[str, tuple[np.ndarray, np.ndarray]] = {}

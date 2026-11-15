@@ -140,3 +140,15 @@ def tile_from_profile(P: np.ndarray, x_range: tuple[float, float], z_range: tupl
     hx = height(X1, Y1, np.zeros(1, int), xs[None])[0]
     hc = height(X1, Y1, np.zeros(1, int), (xs[:-1] + cell / 2)[None])[0]
     return dict(heights=np.tile(hx, (len(zs), 1)), block=np.tile(hc, (len(zs) - 1, 1)), origin=(xs[0], zs[0]))
+
+
+def tile_from_boxes(hf: np.ndarray, hf_min: Any, dx: float) -> dict[str, Any]:
+    """A heightfield tile of a box grid as the seed library exports PARC terrain: canonical z-up cell ``hf[i, j]`` sits at
+    ``hf_min + (i, j) * dx`` and is flat over +-dx/2 (nearest-cell lookup), and the model frame has x = canonical x,
+    z = -canonical y. Every cell is a block, so walls stay vertical; vertices take their highest neighbour."""
+    hf = np.asarray(hf, np.float64)
+    B = hf[:, ::-1].T                                     # [nz, nx]: rows along model z (ascending), columns along x
+    P = np.pad(B, 1, mode="edge")
+    H = np.maximum.reduce([P[:-1, :-1], P[1:, :-1], P[:-1, 1:], P[1:, 1:]])
+    origin = (float(hf_min[0]) - dx / 2, -(float(hf_min[1]) + (hf.shape[1] - 0.5) * dx))
+    return dict(heights=H, block=B, origin=origin, cell=float(dx))

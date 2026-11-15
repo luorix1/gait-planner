@@ -1,10 +1,11 @@
-"""EMG timing of trained policies against Camargo's EMG on held-out subjects (gp/emg.py), with the real-data ceiling.
+"""EMG timing of trained policies (episodes of ``--split``, walking only) against Camargo's EMG (gp/emg.py): the
+reference is Camargo's held-out subjects, the ceiling its other subjects against them.
 
 For each terrain class: per muscle, the Pearson r of the policy's mean stride profile against the real one, and on/off
 agreement; their means over the scored muscles (rectus femoris is shown, not scored). The ceiling is the same score for the
-training subjects' real EMG against the held-out subjects': what subject-to-subject variation alone leaves.
+other Camargo subjects' real EMG against the held-out subjects': what subject-to-subject variation alone leaves.
 
-Run: .venv/bin/python emg_report.py runs/planner_v1 [runs/baseline_v1] [--split test_subject]
+Run: .venv/bin/python emg_report.py runs/planner_v1 [runs/baseline_v1] [--split test_trial]
      (after evaluate.py, which writes <run>/emg_strides.npz)
 Out: <first run>/emg_timing.json and <first run>/emg_<class>.png per class
 """
@@ -27,7 +28,7 @@ def main() -> None:
     a = ap.parse_args()
     runs = [Path(r) for r in a.runs]
     _, channels, _, unreliable = emg.load_emg()
-    ref, ceiling_ref = emg.reference(a.split), emg.reference("train")
+    ref, ceiling_ref = emg.reference("test_subject"), emg.reference("train")       # Camargo (data.REF) splits
     sims = {}
     for r in runs:
         z = np.load(r / "emg_strides.npz")

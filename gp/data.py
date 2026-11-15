@@ -1,6 +1,12 @@
-"""The training data, built once from the seed library's Rajagopal v3 export. Two datasets (``DATASETS``):
+"""The training data, built once from the seed library's Rajagopal v3 export. Datasets (``DATASETS``):
 
-- **ab01** (the default, ``data/ab01``): our AB01 pilot alone, one subject: treadmill standing and locomotion at -15 to
+- **v2** (the default, ``data/v2``, user 2026-11-15): AB01 as below plus PARC's capture (running, platforms, gaps, a
+  few stairs; one performer, already passed through PARC's physics tracker), so the loop starts with every skill it
+  is meant to combine. PARC terrain is a box grid, built into one shared heightfield (``hf_*`` in ``clips.npz``,
+  ``terrain_kind`` 1). PARC clips named ``_mdm_`` (likely PARC generator output) and clips that use the hands are
+  left out. PARC is split by motion (a motion's tracked, untracked, straightened and terrain-jittered copies
+  together, by its last ``<word>_<NNN>`` tag): ``crc32(tag) % 10 == 0`` goes to ``test_trial``.
+- **ab01** (``data/ab01``): our AB01 pilot alone, one subject: treadmill standing and locomotion at -15 to
   15 deg (the belt travel integrated, so the lab frame climbs or descends) and the 12 overground walks with turns.
   Split by trial: ``test_terrain`` = every +-15 deg trial (locomotion and standing); ``test_trial`` = trial 4 of each
   overground speed and the 1.2 m/s treadmill trials at 0, +5 and -10 deg; ``train`` = the rest.
@@ -9,8 +15,7 @@
   ground); kept for reproduction and for the Camargo kinetics and EMG built on it.
 
 Both:
-- **Dropped**: clips with a joint speed over 20 rad/s anywhere (``MAX_JOINT_SPEED``; source IK glitches). PARC
-  obstacle clips are not used (heightfield-only terrain and not measured human motion).
+- **Dropped**: clips with a joint speed over 20 rad/s anywhere (``MAX_JOINT_SPEED``; source IK glitches).
 - **Motion**: coordinates low-passed at 6 Hz and differentiated as SPRINT's ``load_motion`` does, resampled from
   30 Hz to the 40 Hz control step SPRINT's imitation recipe is tuned at. Each clip is moved so it starts at
   x = z = 0, its terrain profile with it.
@@ -22,24 +27,30 @@ Both:
 - **Style records** (``plans.npz`` ``record``): the per-frame quantities the style prior's windows are built from
   (:func:`gp.smp.window_features`), from the same forward kinematics the simulation uses.
 
-Run (CPU, ~1 min for ab01): ``.venv/bin/python -m gp.data [ab01|v1]``
+Kinetic, GRF and EMG references stay Camargo's (``REF`` = ``data/v1``; user 2026-11-15: the most nominal human data).
+
+Run (CPU, ~1 min): ``.venv/bin/python -m gp.data [v2|ab01|v1]``
 Out: ``data/<dataset>/clips.npz``, ``plans.npz``, ``split.json``
 """
 
 from __future__ import annotations
 
 import json
+import re
 import time
+import zlib
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from .terrain import height, pad, profile
+from .terrain import atlas, height, hf_height, pad, profile, tile_from_boxes
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASET = "ab01"                         # the active dataset; data/v1 is kept for reproduction
+DATASET = "v2"                           # the active dataset; data/ab01 and data/v1 are kept for reproduction
 OUT = ROOT / "data" / DATASET
+#: Camargo's inverse dynamics, plates and EMG (built on v1): the human reference ranges for every dataset.
+REF = ROOT / "data" / "v1"
 SEED = Path.home() / "Jinwoo/seed_library/data/osim_export"
 #: Byte-identical to the model the seed library's IK used (STC/assets/models/gait/Rajagopal_lower_collision_v3.osim).
 MODEL = Path.home() / "Jinwoo/neural_test/models/Rajagopal_lower_collision_v3.osim"
@@ -67,6 +78,15 @@ def split_ab01(r: dict[str, Any]) -> str:
     return "test_terrain" if mc in AB01_TEST_TERRAIN else "test_trial" if mc in AB01_TEST_TRIAL else "train"
 
 
+def split_v2(r: dict[str, Any]) -> str:
+    if r["source"] == "ab01":
+        return split_ab01(r)
+    # PARC: one motion's copies together (``_dm`` tracked and untracked versions, ``_straight``, ``_wN`` terrain
+    # jitter) by its last ``<word>_<NNN>`` tag; distinct motions sharing a tag just stay together
+    tag = re.findall(r"([a-z]+_\d{3})", r["name"])[-1]
+    return "test_trial" if zlib.crc32(tag.encode()) % 10 == 0 else "train"
+
+
 def split_of(r: dict[str, Any]) -> str:
     if r["subject"] in TEST_SUBJECTS:
         return "test_subject"
@@ -84,6 +104,8 @@ SPECIFIC_TENSION = 0.6e6
 
 
 DATASETS: dict[str, dict[str, Any]] = {
+    "v2": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"),
+               held_out="AB01 as ab01; PARC test_trial: motions with crc32(<word>_<NNN> tag) % 10 == 0"),
     "ab01": dict(sources=("ab01",), split=split_ab01, splits=("train", "test_trial", "test_terrain"),
                  held_out="test_terrain: AB01 +-15 deg trials; test_trial: overground trial 4 per speed, treadmill "
                           "1.2 m/s at 0/+5/-10 deg"),
@@ -143,10 +165,9 @@ def record_layout(nt: int) -> dict[str, slice]:
 
 
 def style_records(xp: np.ndarray, xq: np.ndarray, qpos: np.ndarray, tracked: np.ndarray, key: list[int],
-                  P: np.ndarray) -> np.ndarray:
-    """Style records ``[T, D]`` from forward kinematics (body origins ``xp``, quaternions ``xq``) on profile ``P``."""
-    X1, Y1 = pad([P])
-    ground = height(X1, Y1, np.zeros(1, int), xp[None, :, 0, 0])[0]
+                  ground: np.ndarray) -> np.ndarray:
+    """Style records ``[T, D]`` from forward kinematics (body origins ``xp``, quaternions ``xq``) and the terrain
+    height under the root ``ground`` ``[T]``."""
     return np.concatenate([xp[:, 0], xq[:, 0], qpos[:, tracked], xp[:, key].reshape(len(xp), -1), ground[:, None]], 1)
 
 
@@ -190,6 +211,16 @@ def sphere_gap(P: np.ndarray, ctr: np.ndarray, r: np.ndarray) -> np.ndarray:
     return np.where(inside, -dist, dist) - r
 
 
+def ground_under(D: dict[str, Any], c: int, x: np.ndarray, z: np.ndarray) -> np.ndarray:
+    """Terrain height at ``(x, z)`` for clip ``c`` of a loaded ``D``: its profile, or its tile of the shared heightfield."""
+    if D["terrain_kind"][c] == 1:
+        hf, off = D["hf"], D["hf_offset"][c]
+        return hf_height(hf["heights"], hf["block"], hf["cell"], hf["origin"], x + off[0], z + off[1])
+    n = D["profile_n"][c]
+    X1, Y1 = pad([np.c_[D["profile_x"][c][:n], D["profile_y"][c][:n]]])
+    return height(X1, Y1, np.zeros(1, int), np.asarray(x, np.float64).reshape(1, -1))[0].reshape(np.shape(x))
+
+
 def heightfield_gap(hf: dict[str, Any], offset: Any, ctr: np.ndarray, r: np.ndarray) -> np.ndarray:
     """Clearance ``[T, S]`` of spheres (centres ``[T, S, 3]`` in a clip's frame, radii ``[S]``) above that clip's tile of
     the shared heightfield (``hf``: gp.terrain.atlas, ``offset`` the tile's), measured straight down: negative =
@@ -221,24 +252,30 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
     ds = DATASETS[dataset]
     out = out or ROOT / "data" / dataset
     rows = [r for f in sorted(SEED.glob("manifest_*.json")) for r in json.loads(f.read_text())
-            if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")][:limit]
+            if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")
+            and "_mdm_" not in r["name"]][:limit]
     meta: dict[str, list[Any]] = {k: [] for k in ("name", "subject", "source", "terrain_class", "mode", "split",
                                                   "grade_deg", "stair_rise_m", "speed_mps", "frames")}
     arrays: dict[str, list[np.ndarray]] = {k: [] for k in ("qpos", "qvel", "contact", "lift", "plan_contact", "foothold",
                                                            "t_touchdown", "t_liftoff", "com", "record")}
-    profiles, glitched = [], []
+    profiles, tiles, glitched = [], [], []
     rot = [k for k, c in enumerate(names) if not c.startswith("pelvis_t")]
     for n, r in enumerate(rows):
         d = np.load(SEED / r["file"])
         cn = list(d["coord_names"])
         q = d["q"][:, [cn.index(c) for c in names]].astype(np.float64)
-        P = profile(json.loads(str(d["terrain"])))
-        if P is None:
-            raise ValueError(f"{r['name']}: no profile terrain")
+        T = json.loads(str(d["terrain"]))
+        P, tile = profile(T), None
+        if P is None:                                    # PARC box grid -> a tile of the shared heightfield
+            if T.get("type") != "heightfield":
+                raise ValueError(f"{r['name']}: terrain {T.get('type')}")
+            tile, P = tile_from_boxes(d["hf"], d["hf_min"], float(d["dx"])), np.array([[-1.0, 0.0], [1.0, 0.0]])
         x0, z0 = q[0, tx], q[0, tz]
         q[:, tx] -= x0
         q[:, tz] -= z0
         P = P - [x0, 0.0]
+        if tile is not None:
+            tile["origin"] = (tile["origin"][0] - x0, tile["origin"][1] - z0)
         # SPRINT's load_motion: low-pass, central differences, low-pass again; then onto the control grid
         src_dt = 1.0 / SRC_HZ
         ts = np.arange(len(q)) * src_dt
@@ -260,13 +297,21 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
         pc = np.stack([contact[:, 0] | contact[:, 1], contact[:, 2] | contact[:, 3]], 1)
         hold, td, lo = zip(*(plan_targets(pc[:, i], bottom[:, sph_side == s].mean(1)) for i, s in enumerate(SIDES)),
                            strict=True)
-        lift = np.maximum(0.0, -sphere_gap(P, ctr[..., :2], rad).min(1)) + 0.001
-        rec = style_records(xp, xq, qpos, L.tracked, key, P)
+        if tile is None:
+            X1, Y1 = pad([P])
+            ground = height(X1, Y1, np.zeros(1, int), xp[None, :, 0, 0])[0]
+            gap = sphere_gap(P, ctr[..., :2], rad)
+        else:
+            ground = hf_height(tile["heights"], tile["block"], tile["cell"], tile["origin"], xp[:, 0, 0], xp[:, 0, 2])
+            gap = heightfield_gap(tile, (0.0, 0.0), ctr, rad)
+        lift = np.maximum(0.0, -gap.min(1)) + 0.001
+        rec = style_records(xp, xq, qpos, L.tracked, key, ground)
         for k, v in (("qpos", qpos), ("qvel", qvel), ("contact", contact), ("lift", lift), ("plan_contact", pc),
                      ("foothold", np.stack(hold, 1)), ("t_touchdown", np.stack(td, 1)), ("t_liftoff", np.stack(lo, 1)),
                      ("com", com), ("record", rec)):
             arrays[k].append(v.astype(bool) if v.dtype == bool else v.astype(np.float32))
         profiles.append(P)
+        tiles.append(tile)
         horiz = qvel[:, [tx, tz]]
         for k, v in (("name", r["name"]), ("subject", r["subject"]), ("source", r["source"]),
                      ("terrain_class", r["terrain_class"]), ("mode", r["mode"]), ("split", ds["split"](r)),
@@ -277,12 +322,22 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
             print(f"{n}/{len(rows)} clips, {time.time() - t0:.0f} s", flush=True)
     X, Y = pad(profiles)
     frames = np.array(meta["frames"])
+    kind = np.array([t is not None for t in tiles], int)
+    hf_offset, hf = np.zeros((len(tiles), 2)), {}
+    if kind.any():
+        on = [t for t in tiles if t is not None]
+        cell = on[0]["cell"]
+        if not all(np.isclose(t["cell"], cell) for t in on):
+            raise ValueError("heightfield clips with different cell sizes cannot share one map")
+        A = atlas(on, cell)
+        hf_offset[kind == 1] = A["offsets"]
+        hf = dict(hf_heights=A["heights"], hf_block=A["block"], hf_origin=np.array(A["origin"]), hf_cell=cell)
     out.mkdir(parents=True, exist_ok=True)
     cat = {k: np.concatenate(v) for k, v in arrays.items()}
     np.savez(out / "clips.npz", coord_names=np.array(names), start=np.r_[0, np.cumsum(frames)[:-1]],
              profile_x=X, profile_y=Y, profile_n=np.array([len(P) for P in profiles]), qpos=cat["qpos"],
-             qvel=cat["qvel"], contact=cat["contact"], lift=cat["lift"],
-             hz=HZ, **{k: np.array(v) for k, v in meta.items()})
+             qvel=cat["qvel"], contact=cat["contact"], lift=cat["lift"], terrain_kind=kind, hf_offset=hf_offset,
+             hz=HZ, **hf, **{k: np.array(v) for k, v in meta.items()})
     np.savez(out / "plans.npz", contact=cat["plan_contact"], foothold=cat["foothold"], t_touchdown=cat["t_touchdown"],
              t_liftoff=cat["t_liftoff"], com=cat["com"], record=cat["record"], key_bodies=np.array(KEY_BODIES),
              tracked=np.array([names[k] for k in L.tracked]))
@@ -308,6 +363,11 @@ def load(split: str | tuple[str, ...] = "train", src: Path = OUT) -> dict[str, A
     D.update({k: p[k][rows] for k in ("foothold", "t_touchdown", "t_liftoff", "com", "record")})
     D.update(plan_contact=p["contact"][rows], start=np.r_[0, np.cumsum(frames)[:-1]], coord_names=list(c["coord_names"]),
              hz=float(c["hz"]), key_bodies=list(p["key_bodies"]), tracked=list(p["tracked"]))
+    D.update(terrain_kind=c["terrain_kind"][keep] if "terrain_kind" in c else np.zeros(len(keep), int),
+             hf_offset=c["hf_offset"][keep] if "hf_offset" in c else np.zeros((len(keep), 2)))
+    if "hf_heights" in c:
+        D["hf"] = dict(heights=c["hf_heights"], block=c["hf_block"], cell=float(c["hf_cell"]),
+                       origin=tuple(float(v) for v in c["hf_origin"]))
     return D
 
 

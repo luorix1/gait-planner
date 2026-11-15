@@ -1,6 +1,6 @@
 """CPU smoke checks: terrain lookups match SPRINT, both tasks step with consistent observations and finite rewards,
 the prior trains and scores, and PPO runs an iteration. Run: .venv/bin/python -m pytest tests -q
-(needs data/v1: python -m gp.data)."""
+(needs the active dataset: python -m gp.data)."""
 
 from __future__ import annotations
 
@@ -176,6 +176,11 @@ def test_accept_check() -> None:
     assert "plan" in accept.check(missed, thr)["failed"]
     assert accept.check(dict(clean, fell=True), thr)["failed"] == ["fell"]
     assert accept.check(clean, dict(thr, style_loss=None))["unchecked"] == ["style"]
+    acc = dict(kinetics=dict(level={k: v for k, v in thr.items() if k != "style_loss"}), style=dict(test_trial=dict(level=1.0)))
+    assert accept.thresholds(acc, "test_trial", "level", "walk") == thr                # Camargo kinetics + our style
+    assert accept.check(clean, accept.thresholds(acc, "test_trial", "level", "run"))["unchecked"] == ["grf", "joints"]
+    assert accept.check(clean, accept.thresholds(acc, "test_trial", "obstacles", "run"))["unchecked"] == [
+        "style", "grf", "joints"]
 
 
 def test_mirror_records(D: dict) -> None:
@@ -196,10 +201,11 @@ def test_mirror_records(D: dict) -> None:
         rows = np.arange(int(D["start"][i]) + 5, int(D["start"][i]) + 45, 5)
         q = D["qpos"][rows].astype(np.float64)
         qm = q[:, [names.index(mirrored(n)) for n in names]] * cs
-        P = np.c_[D["profile_x"][i][: D["profile_n"][i]], D["profile_y"][i][: D["profile_n"][i]]]
         xp, xq = forward_kinematics_np(model, qm.astype(np.float32))
         key = [list(model.body_names).index(b) for b in data.KEY_BODIES]
-        ref = style_records(xp.astype(np.float64), xq.astype(np.float64), qm, L.tracked, key, P)
+        # the mirrored pose stands on the mirrored terrain: the original ground at the reflected root (z -> -z)
+        ground = data.ground_under(D, i, xp[:, 0, 0].astype(np.float64), -xp[:, 0, 2].astype(np.float64))
+        ref = style_records(xp.astype(np.float64), xq.astype(np.float64), qm, L.tracked, key, ground)
         rec = torch.as_tensor(D["record"][rows])
         got = mirror_records(rec, maps).numpy()
         lay = record_layout(len(D["tracked"]))
@@ -321,3 +327,24 @@ def test_clip_on_heightfield(D: dict) -> None:
     ctr[0, 0] = [xr[0] + 1.0, 0.05, zr[0] + 1.0]
     g = heightfield_gap(A, A["offsets"][0], ctr, np.array([0.03]))
     assert abs(float(g[0, 0]) - (0.02 - P[0, 1])) < 1e-6                                   # flat start of the tile
+
+
+def test_parc_tile_matches_boxes() -> None:
+    """A PARC clip's box grid as a heightfield tile reads the same heights as the seed library's nearest-cell lookup
+    (canonical (x, y) = model (x, -z)), away from cell edges."""
+    import json
+
+    from gp.terrain import hf_height, tile_from_boxes
+    r = next(r for r in json.loads((data.SEED / "manifest_parc.json").read_text())
+             if r["exported"] and r["terrain_class"] == "obstacles")
+    d = np.load(data.SEED / r["file"])
+    hf, lo, dx = d["hf"].astype(np.float64), d["hf_min"].astype(np.float64), float(d["dx"])
+    assert np.ptp(hf) > 0.3                                                   # a clip with real platforms
+    t = tile_from_boxes(hf, lo, dx)
+    rng = np.random.default_rng(0)
+    ij = rng.uniform(0, 1, (2000, 2)) * (np.array(hf.shape) - 1)
+    ij = ij[np.abs(ij - np.round(ij)).max(1) < 0.45]                          # not on a cell edge
+    xy = lo + ij * dx
+    ref = hf[tuple(np.round(ij).astype(int).T)]
+    got = hf_height(t["heights"], t["block"], t["cell"], t["origin"], xy[:, 0], -xy[:, 1])
+    assert np.abs(got - ref).max() < 1e-9

@@ -5,7 +5,7 @@ the task's metrics averaged over the episode (the planner's contact, foothold, c
 recipe's joint error for both). With ``--prior`` (default: the planner's own) both tasks are also scored by the
 same style prior (SDS loss of the simulated motion, from its 14th step), so the baseline and the planner compare.
 
-Each episode also runs through the acceptance filter (gp/accept.py, thresholds from ``data/v1/accept.json``): the
+Each episode also runs through the acceptance filter (gp/accept.py, thresholds from ``data/<dataset>/accept.json``): the
 six checks, accepted or not, the numbers behind each, and G1's share of the right-stance moment and force curves
 inside the real band. The style check needs ``accept.json`` calibrated with the same prior. The activations of the
 muscles Camargo's EMG measured are saved per right stride (``emg_strides.npz``) for ``emg_report.py``.
@@ -129,6 +129,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
     out, strides = [], []
     for i in range(n):
         row = dict(clip=str(D["name"][i]), terrain_class=str(D["terrain_class"][i]), subject=str(D["subject"][i]),
+                   mode=str(D["mode"][i]),
                    completed=not bool(fell[i]), survived=float(steps[i] / possible[i].clamp_min(1)),
                    **{k: float(v[i] / steps[i].clamp_min(1)) for k, v in sums.items()})
         if scorer is not None:
@@ -136,11 +137,11 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
         k = int(steps[i])
         tr = {key: torch.stack(v)[:k, i].numpy() for key, v in trace.items()}
         tr.update(fell=bool(fell[i]), metabolic_j_per_kg_m=float(metab_j[i] / mass / path_len[i].clamp_min(1e-3)))
-        thr = (thresholds or {}).get(split, {}).get(row["terrain_class"])
-        row.update(accept.check(tr, thr))
+        row.update(accept.check(tr, accept.thresholds(thresholds, split, row["terrain_class"], row["mode"])))
         pr = emg.stride_profiles(tr["fv"][:, 1] > accept.DOWN_BW, tr["emg_act"])
         row["emg_strides"] = len(pr)
-        strides += [(x, row["terrain_class"]) for x in pr]
+        if row["mode"] != "run":                         # Camargo's EMG reference is all walking
+            strides += [(x, row["terrain_class"]) for x in pr]
         out.append(row)
     return out, strides
 
@@ -161,9 +162,7 @@ def main() -> None:
     thresholds = json.loads(acc_path.read_text()) if acc_path.exists() else None
     if thresholds and (not prior or Path(thresholds.get("prior") or "").resolve() != Path(prior).resolve()):
         print(f"style check off: {acc_path} was calibrated with prior {thresholds.get('prior')}, not {prior or 'none'}")
-        for sp in accept.SPLITS:
-            for t in thresholds.get(sp, {}).values():
-                t["style_loss"] = None
+        thresholds["style"] = {}
     report = {}
     prof, prof_split, prof_cls = [], [], []
     for split in a.splits:

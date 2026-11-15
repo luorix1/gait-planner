@@ -29,7 +29,7 @@ MIN_ACCEPT, MIN_SPS = 0.5, 10_000
 def main() -> None:
     planner, baseline = Path(sys.argv[1]), Path(sys.argv[2])
     ep, eb = (json.loads((r / "eval.json").read_text()) for r in (planner, baseline))
-    rows = [r for r in ep[HELD] if r["terrain_class"] in LEVEL_RAMP]
+    rows = [r for r in ep[HELD] if r["terrain_class"] in LEVEL_RAMP and r.get("mode") != "run"]   # Camargo walks
     acc = float(np.mean([r["accepted"] for r in rows])) if rows else float("nan")
     unchecked = sorted({c for r in rows for c in r.get("unchecked", [])})
     fails: dict[str, int] = {}

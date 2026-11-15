@@ -1,5 +1,7 @@
-"""The acceptance filter (plan doc, gate G1): six checks an episode must pass to join the planner's dataset, with
-thresholds from the real clips of the same split and terrain class (held-out subjects, held-out terrain).
+"""The acceptance filter (plan doc, gate G1): six checks an episode must pass to join the planner's dataset. Kinetic
+thresholds are Camargo's per terrain class (all its subjects, ``data.REF``; user 2026-11-15: the most nominal human
+data); the style threshold comes from the active dataset's real clips of the same split and class. Camargo is all
+walking, so a running episode, or a class Camargo lacks (PARC's obstacles), leaves the GRF and joint checks unchecked.
 
 | Check | Rejects when | Threshold from |
 |---|---|---|
@@ -24,7 +26,7 @@ moments and vertical force over the right stance (touchdown to lift-off, 101 poi
 plates); an episode's score is the fraction of its stances' points inside the band.
 
 Run: .venv/bin/python -m gp.accept [--prior runs/prior_v1/prior.pt]  (without a prior: no style threshold yet)
-Out: data/v1/accept.json
+Out: data/<dataset>/accept.json: ``kinetics`` per class, ``style`` per split and class
 """
 
 from __future__ import annotations
@@ -87,16 +89,16 @@ def resample(x: np.ndarray, a: int, b: int) -> np.ndarray:
 
 
 # --- calibration on real clips -----------------------------------------------------------------------------------
-def _real_clips(split: str) -> list[dict[str, Any]]:
-    """Per real Camargo clip of ``split``: its class, kinetics (NaN where that leg is invalid: validity is per leg,
-    see camargo_id.py) and both feet's contacts."""
-    c = np.load(data.OUT / "clips.npz")
-    K = np.load(data.OUT / "kinetics.npz")
-    p = np.load(data.OUT / "plans.npz")
+def _real_clips() -> list[dict[str, Any]]:
+    """Per real Camargo clip: its class, kinetics (NaN where that leg is invalid: validity is per leg, see
+    camargo_id.py) and both feet's contacts."""
+    c = np.load(data.REF / "clips.npz")
+    K = np.load(data.REF / "kinetics.npz")
+    p = np.load(data.REF / "plans.npz")
     names = list(K["coord_names"])
     jcol = [names.index(j) for j in JOINTS]
     out = []
-    for i in np.flatnonzero((c["split"] == split) & (c["source"] == "camargo2021")):
+    for i in np.flatnonzero(c["source"] == "camargo2021"):
         s, n = int(c["start"][i]), int(c["frames"][i])
         m = K["moment_nm_per_kg"][s:s + n][:, jcol].astype(float)
         fv = K["grf_bw"][s:s + n][..., 1].astype(float)            # (l, r)
@@ -143,27 +145,36 @@ def _style_losses(prior_path: str, split: str, per_class: int = 400) -> dict[str
 
 
 def calibrate(prior: str | None = None) -> dict[str, Any]:
-    res: dict[str, Any] = dict(prior=prior, percentiles=[PCT_LO, PCT_HI], joints=JOINTS, curves=CURVES)
+    res: dict[str, Any] = dict(prior=prior, percentiles=[PCT_LO, PCT_HI], joints=JOINTS, curves=CURVES,
+                               kinetics_from=str(data.REF), kinetics={}, style={})
+    clips = _real_clips()
+    for cls in sorted({r["cls"] for r in clips}):
+        rs = [r for r in clips if r["cls"] == cls]
+        peaks = np.array([np.nanmax(np.abs(r["m"]), 0) for r in rs])                         # [clips, 6], per leg
+        g = np.array([grf_measures(r["fv"], r["down"]) for r in rs])
+        cur = np.array([x for r in rs for x in _curves(r["m"], r["fv"], r["down"][:, 1])])
+        joint_peak = {j: float(np.nanpercentile(peaks[:, [JOINTS.index(f"{j}_l"), JOINTS.index(f"{j}_r")]], PCT_HI))
+                      for j in ("hip_flexion", "knee_angle", "ankle_angle")}
+        res["kinetics"][cls] = dict(
+            clips=len(rs), stances=len(cur), grf_peak_bw=float(np.nanpercentile(g[:, 0], PCT_HI)),
+            grf_loading_rate_bw_s=float(np.nanpercentile(g[:, 1], PCT_HI)), joint_peak_nm_per_kg=joint_peak,
+            band={c: [np.percentile(cur[:, k], PCT_LO, 0).round(4).tolist(),
+                      np.percentile(cur[:, k], PCT_HI, 0).round(4).tolist()] for k, c in enumerate(CURVES)}
+            if len(cur) >= 10 else None)
     for split in SPLITS:
-        clips = _real_clips(split)
         style = _style_losses(prior, split) if prior else {}
-        res[split] = {}
-        for cls in sorted({r["cls"] for r in clips}):
-            rs = [r for r in clips if r["cls"] == cls]
-            peaks = np.array([np.nanmax(np.abs(r["m"]), 0) for r in rs])                     # [clips, 6], per leg
-            g = np.array([grf_measures(r["fv"], r["down"]) for r in rs])
-            cur = np.array([x for r in rs for x in _curves(r["m"], r["fv"], r["down"][:, 1])])
-            joint_peak = {j: float(np.nanpercentile(peaks[:, [JOINTS.index(f"{j}_l"), JOINTS.index(f"{j}_r")]], PCT_HI))
-                          for j in ("hip_flexion", "knee_angle", "ankle_angle")}
-            res[split][cls] = dict(
-                clips=len(rs), stances=len(cur), grf_peak_bw=float(np.nanpercentile(g[:, 0], PCT_HI)),
-                grf_loading_rate_bw_s=float(np.nanpercentile(g[:, 1], PCT_HI)), joint_peak_nm_per_kg=joint_peak,
-                style_loss=float(np.percentile(style[cls], PCT_HI)) if cls in style else None,
-                band={c: [np.percentile(cur[:, k], PCT_LO, 0).round(4).tolist(),
-                          np.percentile(cur[:, k], PCT_HI, 0).round(4).tolist()] for k, c in enumerate(CURVES)}
-                if len(cur) >= 10 else None)
+        res["style"][split] = {cls: float(np.percentile(v, PCT_HI)) for cls, v in style.items()}
     (data.OUT / "accept.json").write_text(json.dumps(res, indent=1))
     return res
+
+
+def thresholds(acc: dict[str, Any] | None, split: str, cls: str, mode: str) -> dict[str, Any] | None:
+    """One episode's thresholds from ``accept.json``: Camargo's kinetics for its class (none when running or when
+    Camargo lacks the class) and the style threshold of its split and class."""
+    if not acc:
+        return None
+    kin = acc["kinetics"].get(cls) if mode != "run" else None
+    return dict(kin or {}, style_loss=acc["style"].get(split, {}).get(cls))
 
 
 # --- the filter --------------------------------------------------------------------------------------------------
@@ -198,8 +209,9 @@ def check(tr: dict[str, Any], thr: dict[str, Any] | None) -> dict[str, Any]:
     jp = {j: float(np.abs(m[:, [JOINTS.index(f"{j}_l"), JOINTS.index(f"{j}_r")]]).max())
           for j in ("hip_flexion", "knee_angle", "ankle_angle")}
     out.update(grf_peak_bw=peak, grf_loading_rate_bw_s=lr, joint_peak_nm_per_kg=jp)
-    out["grf"] = None if not thr else bool(peak <= thr["grf_peak_bw"] and lr <= thr["grf_loading_rate_bw_s"])
-    out["joints"] = None if not thr else bool(all(jp[j] <= thr["joint_peak_nm_per_kg"][j] for j in jp))
+    kin = bool(thr and "grf_peak_bw" in thr)
+    out["grf"] = None if not kin else bool(peak <= thr["grf_peak_bw"] and lr <= thr["grf_loading_rate_bw_s"])
+    out["joints"] = None if not kin else bool(all(jp[j] <= thr["joint_peak_nm_per_kg"][j] for j in jp))
     # muscle effort
     sat = tr["act_sat"].astype(float)
     k = min(SAT_WIN, len(sat))
@@ -236,10 +248,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--prior", default=None)
     r = calibrate(ap.parse_args().prior)
-    for split in SPLITS:
-        for cls, t in r[split].items():
-            print(f"{split:12s} {cls:12s} clips {t['clips']:4d} stances {t['stances']:5d}  GRF {t['grf_peak_bw']:.2f} BW "
-                  f"{t['grf_loading_rate_bw_s']:.1f} BW/s  moments " + " ".join(f"{k.split('_')[0]} {v:.2f}" for k, v in
-                                                                         t["joint_peak_nm_per_kg"].items())
-                  + f"  style {t['style_loss'] if t['style_loss'] is not None else '-'}")
+    for cls, t in r["kinetics"].items():
+        print(f"Camargo {cls:12s} clips {t['clips']:4d} stances {t['stances']:5d}  GRF {t['grf_peak_bw']:.2f} BW "
+              f"{t['grf_loading_rate_bw_s']:.1f} BW/s  moments " + " ".join(f"{k.split('_')[0]} {v:.2f}" for k, v in
+                                                                     t["joint_peak_nm_per_kg"].items()))
+    for split, st in r["style"].items():
+        print(f"style {split:12s} " + "  ".join(f"{c} {v:.3f}" for c, v in st.items()))
     print("->", data.OUT / "accept.json")

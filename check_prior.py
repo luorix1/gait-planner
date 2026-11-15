@@ -65,8 +65,8 @@ def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str) -> 
                     q[:, names.index(n + s)] += np.radians(deg)
             q[:, names.index("pelvis_ty")] -= (sphere_bottoms(model, q.astype(np.float32), L)[..., 1].min(1) - low0).mean()
             xp, xq = forward_kinematics_np(model, q.astype(np.float32))
-        P = np.c_[D["profile_x"][c][: D["profile_n"][c]], D["profile_y"][c][: D["profile_n"][c]]]
-        out.append(data.style_records(xp.astype(np.float64), xq.astype(np.float64), q, L.tracked, key, P))
+        ground = data.ground_under(D, c, xp[:, 0, 0].astype(np.float64), xp[:, 0, 2].astype(np.float64))
+        out.append(data.style_records(xp.astype(np.float64), xq.astype(np.float64), q, L.tracked, key, ground))
     return np.stack(out).astype(np.float32)
 
 
@@ -79,7 +79,7 @@ def score(prior: Prior, rec: np.ndarray, draws: int = 4) -> np.ndarray:
 
 def unseen_skills(prior: Prior, model: object, L: object, thr: float, rng: np.random.Generator) -> dict:
     """Share of real Camargo windows below ``thr`` and median score, per class (empty for the v1 prior: it saw them)."""
-    src = data.ROOT / "data" / "v1"
+    src = data.REF
     if data.DATASET == "v1" or not (src / "clips.npz").exists():
         return {}
     D = data.load(("train", "test_subject", "test_terrain"), src)

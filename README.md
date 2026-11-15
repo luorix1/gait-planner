@@ -19,10 +19,10 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 
 | Step | Command | Device |
 |---|---|---|
-| 0. data (done) | `python -m gp.data` -> `data/ab01/` (the active dataset; `python -m gp.data v1` rebuilds v1) | CPU, 15 s |
-| 0b. kinetics (v1 only, done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
-| 0c. filter thresholds (v1 only, done) | `python -m gp.accept` -> `data/v1/accept.json` | CPU |
-| 0d. EMG envelopes (v1 only, done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
+| 0. data (done) | `python -m gp.data` -> `data/v2/` (the active dataset; `ab01` or `v1` as an argument rebuilds those) | CPU, 15 s |
+| 0b. Camargo kinetics (done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
+| 0c. filter thresholds (done) | `python -m gp.accept` -> `data/v2/accept.json` (Camargo kinetics per class) | CPU |
+| 0d. Camargo EMG (done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
@@ -43,7 +43,7 @@ pose; the prior trains; PPO runs an iteration.
 
 | Path | What |
 |---|---|
-| `gp/data.py` | builds `data/v1` from the seed library: split, 40 Hz clips, terrain profiles, reset lifts, plans, style records |
+| `gp/data.py` | builds `data/<dataset>` from the seed library: split, 40 Hz clips, terrain (profiles, PARC heightfield tiles), reset lifts, plans, style records |
 | `gp/terrain.py` | seed-library terrain -> SPRINT profiles; height lookups (numpy, torch) |
 | `gp/smp.py` | the style prior: TinyMDM's DiT, diffusion schedule, window features, SDS reward (port of MimicKit) |
 | `gp/tasks.py` | `TerrainImitation` (full-pose baseline) and `PlanTracking` (the planner's task), both on SPRINT's imitation recipe |
@@ -57,19 +57,27 @@ pose; the prior trains; PPO runs an iteration.
 
 ## Data (`data/<dataset>/split.json`)
 
-**ab01, the active dataset (2026-11-14).** Our AB01 pilot alone: 291 clips, 46 min at 40 Hz, one subject.
+**v2, the active dataset (2026-11-15).** AB01 (below) plus PARC's capture, so the loop starts with every skill it is
+meant to combine: 504 clips, 1.08 h. PARC adds 213 clips (18 min, one performer, already passed through PARC's physics
+tracker): level running (3.3 m/s median), platforms, gap jumps, 5 stair clips and 2 walks. Its terrain is a box grid
+(0.39 m cells), built into one shared heightfield; each clip stands on its own tile. Left out: clips that use the hands
+and 3 `_mdm_` clips (likely PARC generator output). PARC is split by motion (tracked, untracked, straightened and
+jittered copies together): `train` 412 clips (51 min), `test_trial` 70 (10 min), `test_terrain` 22 (AB01's). Seen in
+the Studio exports: swing toes clip a stair riser for 0.1 s (`stairs_001`, up to 18 cm) and landing toes sink 3-6 cm
+for a few frames in the jumps.
+
+**ab01 (`data/ab01`).** Our AB01 pilot alone: 291 clips, 46 min at 40 Hz, one subject.
 - Treadmill standing (7 grades) and locomotion (-15 to 15 deg, 0.4-2.8 m/s; the belt travel integrated, so the lab frame
   climbs or descends), and all 12 overground walks with turns (mc_047-058, 188 windows, 30 min).
 - **Split by trial** (one subject, so there are no held-out subjects): `train` 213 clips (34 min); `test_trial` 56
   (9 min): trial 4 of each overground speed and the 1.2 m/s treadmill trials at 0, +5 and -10 deg; `test_terrain` 22
   (4 min): every +-15 deg trial. `data.HELD_OUT` names the held-out-motion split the gate and the evaluation use.
-- AB01 has no stairs: the stairs machinery stays tested, on synthetic stairs.
+- AB01 has no stairs and 2.5 min of treadmill running (1.9-2.7 m/s).
 
 **v1 (`data/v1`), set aside.** AB01 + Camargo 2021: 6,533 clips, 13.8 h; split by three held-out Camargo subjects and
 the steepest/tallest Camargo terrain. Camargo is out for now: its IK welds the lumbar (the trunk never moves) and some
 stair clips' heels never reach the ground (unclear whether theirs or our processing). The Camargo kinetics and EMG below
-are built on v1 and do not apply to ab01; AB01 has its own (treadmill force plates for 47 trials, EMG for all 59), not
-yet processed.
+are built on v1 and stay the human references for every dataset (user 2026-11-15: the most nominal human data).
 
 Both:
 - **Dropped:** clips whose joint speed passes 20 rad/s anywhere (source IK spikes; 1 AB01 window, 10 Camargo clips).
@@ -115,13 +123,15 @@ plate, and Camargo's own ID exists there). Against Camargo's own ID (their knee 
 
 ## Acceptance filter and G1 (`gp/accept.py`, `g1.py`)
 
-The plan doc's six checks, each threshold the 5th or 95th percentile of the same measure on the real clips of the
-episode's split and terrain class: style (2 s windows), plan followed, ground reaction (peak force, loading rate),
+The plan doc's six checks, each threshold the 5th or 95th percentile of the same measure on real clips: kinetics on
+all 22 Camargo subjects per terrain class, style on the active dataset's clips of the episode's split and class. Camargo
+is all walking, so running episodes and classes it lacks (PARC's obstacles) leave the GRF and joint checks unchecked,
+and G1 and the EMG report use walking episodes only. The checks: style (2 s windows), plan followed, ground reaction (peak force, loading rate),
 joint loads, muscle effort (saturation), contact (sliding spheres, joint limits). A fallen episode is rejected first.
 `evaluate.py` runs every episode through it. Two departures from the doc's drawing:
 - joint loads are **net joint moments**, not knee and hip reaction forces: SPRINT's reaction pass refuses wrapped
   muscle paths, which Rajagopal v3 has, and real reaction forces would need muscle-force estimates;
-- metabolic cost per metre is **reported, not gated**: there is no human metabolic data in v1.
+- metabolic cost per metre is **reported, not gated**: there is no human metabolic data in the references.
 
 G1's curve check compares the right stance (touchdown to lift-off), not the whole stride: a whole stride is almost
 never on plates throughout.
@@ -158,7 +168,7 @@ terrain, because the plan belongs to it): it is for evaluating on new ground and
 ## Known limits
 
 - Plans are copied from real clips; footholds are not predicted (plan doc, open question 2).
-- v1's data is all profiles. Heightfield clips (the PARC obstacles, generated 2D courses) run in the tasks but are not
-  built into the data yet.
+- Generated 2D courses (turns, winding stairs) run in the tasks but are not built into the data yet; PARC's tiles are.
+- Running and jumping have no kinetic reference; ceilings are still to be chosen.
 - `gp/tasks.py` patches SPRINT's reference kinematics to run in chunks for the duration of setup (1.5M frames in one
   Data would take ~18 GB of GPU memory). Upstream fix: chunk in SPRINT.
