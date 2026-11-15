@@ -239,13 +239,16 @@ class StyleReward:
 
     @torch.no_grad()
     def __call__(self, rec: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """-> (reward ``[B]``, mean SDS loss ``[B]``)."""
+        """-> (reward ``[B]``, mean SDS loss ``[B]``). A window with a non-finite record (a diverged world, which SPRINT
+        resets after the reward and pays nothing) scores 0 and stays out of the normaliser: one NaN there made every
+        later reward NaN (the first planner run, 2026-11-15)."""
         loss = self.prior.sds(self.prior.features(rec), self.steps)
-        r = torch.exp(-self.scale * (loss / self.mean_abs.clamp_min(1e-4)).mean(1))
+        ok = torch.isfinite(loss).all(1)
+        loss = torch.where(ok[:, None], loss, torch.zeros_like(loss))
+        r = torch.where(ok, torch.exp(-self.scale * (loss / self.mean_abs.clamp_min(1e-4)).mean(1)), torch.zeros_like(ok, dtype=loss.dtype))
         if self.count < self.norm_samples:                       # after scoring, as MimicKit (it updates per iteration)
-            n = loss.shape[0]
-            self.mean_abs = (self.count * self.mean_abs + loss.abs().sum(0)) / (self.count + n)
-            self.count += n
+            self.mean_abs = (self.count * self.mean_abs + loss.abs().sum(0)) / (self.count + ok.sum())
+            self.count += loss.shape[0]                          # host-side count (no sync); diverged rows are rare
         return r, loss.mean(1)
 
     def state_dict(self) -> dict[str, Any]:

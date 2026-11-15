@@ -507,3 +507,5 @@ def test_diverged_world(D: dict, tmp_path) -> None:
         for _ in range(3):
             obs, r, *_ = env.step(torch.full((2, env.action_dim), 0.05))
         assert torch.isfinite(torch.as_tensor(r)).all() and torch.isfinite(torch.as_tensor(obs)[1]).all()
+        if isinstance(task, PlanTracking):                   # the style normaliser stays clean (the NaN-forever bug)
+            assert torch.isfinite(task.style.mean_abs).all() and torch.isfinite(task.metrics["r_style"]).all()
