@@ -484,3 +484,26 @@ def test_planner(D: dict) -> None:
     rl = data.record_layout
     rq = F["record"][:, rl(len(F["tracked"]))["root_quat"]]
     assert (1 - np.abs((rq * plan["pelvis_quat"]).sum(-1))).max() < 1e-4
+
+
+def test_diverged_world(D: dict, tmp_path) -> None:
+    """A world whose state goes non-finite (SPRINT resets it after the task's reward and observation) must not crash
+    the task: the heightfield lookup once cast NaN to an index and took the GPU down 5 min into the first runs."""
+    from gp.tasks import PlanConfig, PlanTracking, TerrainImitation
+    from gp.terrain import hf_height
+    H, B = np.zeros((3, 3)), np.full((2, 2), np.nan)
+    for x in (np.array([np.nan, np.inf, 0.5]), torch.tensor([np.nan, np.inf, 0.5])):
+        t = (lambda a: a) if isinstance(x, np.ndarray) else torch.as_tensor  # noqa: E731
+        h = hf_height(t(H), t(B), 1.0, (0.0, 0.0), x, x * 0)
+        assert np.isfinite(np.asarray(h)).all()
+    full = data.load("train")
+    hfc = int(np.flatnonzero(np.asarray(full["terrain_kind"]) == 1)[0])
+    Ds = data.take(full, [hfc, int(np.flatnonzero(np.asarray(full["terrain_kind"]) == 0)[0])])
+    for task in (TerrainImitation(Ds, starts=[(0, 10), (1, 10)]),
+                 PlanTracking(Ds, plan=PlanConfig(prior=_prior(Ds, tmp_path)), starts=[(0, 10), (1, 10)])):
+        env = _env(task, worlds=2)
+        env.reset()
+        env.state.qpos[0] = float("nan")
+        for _ in range(3):
+            obs, r, *_ = env.step(torch.full((2, env.action_dim), 0.05))
+        assert torch.isfinite(torch.as_tensor(r)).all() and torch.isfinite(torch.as_tensor(obs)[1]).all()

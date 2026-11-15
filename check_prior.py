@@ -4,7 +4,9 @@ windows, and does it do so for every subject?
 Degradations, each built from the real window's coordinates and re-run through the same forward kinematics:
 - ``time_warp``: the same motion played 1.5x faster;
 - ``foot_skate``: the whole body slid forward at an extra 0.5 m/s, joints unchanged (planted feet skate);
-- ``crouch``: hips +15 deg, knees +25 deg, ankles +10 deg dorsiflexion, the root lowered to keep the feet down.
+- ``crouch``: hips +15 deg, knees +25 deg, ankles +10 deg dorsiflexion, the root lowered to keep the feet down;
+- ``stiff_knee`` (check_gate.py): knee flexion capped at 15 deg;
+- ``jitter`` (check_gate.py): 3 deg of white noise on every rotational coordinate, frame by frame.
 
 Score = minus the prior's mean SDS loss (4 noise draws, fixed seed). Pass (the plan's G0): real beats its degraded
 copy in >= 95 % of pairs, and with the threshold at the degraded copies' 95th-percentile score, no held-out
@@ -34,6 +36,8 @@ N_WINDOWS = 1500
 WARP = 1.5
 SKATE_MPS = 0.5
 CROUCH_DEG = {"hip_flexion": 15.0, "knee_angle": 25.0, "ankle_angle": 10.0}
+STIFF_KNEE_DEG = 15.0
+JITTER_DEG = 3.0
 
 
 def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str) -> np.ndarray:
@@ -56,6 +60,13 @@ def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str) -> 
             t = (k - k[0]) / data.HZ
             q[:, names.index("pelvis_tx")] += SKATE_MPS * t * np.cos(rot)
             q[:, names.index("pelvis_tz")] -= SKATE_MPS * t * np.sin(rot)
+        if kind == "stiff_knee":
+            for side in ("_l", "_r"):
+                j = names.index("knee_angle" + side)
+                q[:, j] = np.minimum(q[:, j], np.radians(STIFF_KNEE_DEG))
+        if kind == "jitter":
+            rot = [j for j, n in enumerate(names) if not n.startswith("pelvis_t")]
+            q[:, rot] += np.random.default_rng(int(e)).normal(0.0, np.radians(JITTER_DEG), (len(q), len(rot)))
         xp, xq = forward_kinematics_np(model, q.astype(np.float32))
         if kind == "crouch":
             from sprint.recipes.motion import sphere_bottoms

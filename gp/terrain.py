@@ -80,7 +80,8 @@ def height(X: Any, Y: Any, pid: Any, x: Any) -> Any:
 def hf_height(heights: Any, block: Any, cell: float, origin: Any, x: Any, z: Any) -> Any:
     """Surface height at map ``(x, z)`` (any matching shapes; numpy or torch), the surface SPRINT queries and collides
     against: a block cell's top where ``block`` is finite, else the cell's triangle (split along (i, j) -> (i+1, j+1),
-    ``u >= v`` the lower-right one); beyond the grid the border extends."""
+    ``u >= v`` the lower-right one); beyond the grid the border extends. Non-finite coordinates read the grid's corner
+    (a diverged world's numbers are discarded) rather than indexing out of bounds."""
     tch = not isinstance(x, np.ndarray)
     if tch:
         import torch
@@ -89,6 +90,9 @@ def hf_height(heights: Any, block: Any, cell: float, origin: Any, x: Any, z: Any
         floor, clip, where, finite = np.floor, np.clip, np.where, np.isfinite
     nz, nx = heights.shape
     fx, fz = (x - origin[0]) / cell, (z - origin[1]) / cell
+    # a diverged world (non-finite position) must not index out of bounds: SPRINT runs the task's reward and
+    # observation on it before resetting it and discarding both, and a NaN cast to an index crashes the GPU
+    fx, fz = (torch.nan_to_num(fx, 0.0), torch.nan_to_num(fz, 0.0)) if tch else (np.nan_to_num(fx, nan=0.0), np.nan_to_num(fz, nan=0.0))
     i, j = clip(floor(fx), 0, nx - 2), clip(floor(fz), 0, nz - 2)
     u, v = clip(fx - i, 0.0, 1.0), clip(fz - j, 0.0, 1.0)
     i, j = (i.long(), j.long()) if tch else (i.astype(int), j.astype(int))
