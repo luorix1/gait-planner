@@ -4,7 +4,7 @@ batch 512, gradient clip 1.0, 200k iterations, EMA 0.995 every 10 steps after 5k
 beside the training loss.
 
 Run: .venv/bin/python train_prior.py --out runs/prior_v1
-Out: <out>/prior.pt (latest; overwritten every 2k iterations), <out>/progress.csv
+Out: <out>/prior.pt (latest; overwritten every 2k iterations), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from gp import data
 from gp.smp import Prior, W, mirror_maps, mirror_records
@@ -62,6 +63,7 @@ def main() -> None:
     gen = torch.Generator(device=a.device).manual_seed(1)
     log = csv.writer((out / "progress.csv").open("w", buffering=1))
     log.writerow(["iter", "seconds", "train_loss", "held_out_loss"])
+    tb = SummaryWriter(out / "tb", flush_secs=30)
     t0, run = time.time(), 0.0
     for it in range(1, a.iters + 1):
         loss = prior.loss(prior.features(batch(rec, ends, a.batch, mirror=maps)))
@@ -74,13 +76,17 @@ def main() -> None:
         elif it % 10 == 0:
             prior.ema.update_parameters(prior.net)
         run = 0.99 * run + 0.01 * float(loss.detach()) if it > 1 else float(loss.detach())
+        if it % 100 == 0:
+            tb.add_scalar("loss/train", run, it)
         if it % 1000 == 0 or it == a.iters:
             with torch.no_grad():
                 held = float(prior.loss(prior.features(batch(rec_t, ends_t, 4096, gen))))
             log.writerow([it, round(time.time() - t0), round(run, 5), round(held, 5)])
+            tb.add_scalar("loss/held_out", held, it)
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
         if it % 2000 == 0 or it == a.iters:
             prior.save(out / "prior.pt", iters=it, data=str(a.src), mirrored=True)
+    tb.close()
 
 
 if __name__ == "__main__":

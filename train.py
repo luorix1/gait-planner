@@ -9,7 +9,7 @@ terms and learner, so they compare at matched compute (``--hours``).
 Run (GPU, detached; a fresh --out per run):
   setsid nohup .venv/bin/python train.py --task planner --prior runs/prior_v1/prior.pt \
       --out runs/planner_v1 --hours 4 > runs/planner_v1.log 2>&1 < /dev/null &
-Out: <out>/record.json, progress.csv, checkpoint.pt (every 10 min and at the end; the planner's also holds the
+Out: <out>/record.json, progress.csv, tb/ (TensorBoard: tensorboard --logdir runs), checkpoint.pt (every 10 min and at the end; the planner's also holds the
 style reward's normaliser), policy.pt (inference weights).
 """
 
@@ -27,6 +27,7 @@ import sprint
 import torch
 from sprint.recipes.ppo import PPO
 from sprint.recipes.study import default_ppo
+from torch.utils.tensorboard import SummaryWriter
 
 from gp import data
 from gp.tasks import PlanConfig, PlanTracking, TerrainImitation, recipe_config
@@ -76,6 +77,7 @@ def main() -> None:
     print(task.describe(), flush=True)
     rows: list[dict] = []
     f = (out / "progress.csv").open("w", buffering=1)
+    tb = SummaryWriter(out / "tb", flush_secs=30)
     w: csv.DictWriter | None = None
     start = time.time()
     deadline = start + a.hours * 3600
@@ -88,6 +90,9 @@ def main() -> None:
             w.writeheader()
         w.writerow(s)
         rows.append(s)
+        for k, v in s.items():
+            if isinstance(v, (int, float)) and k != "env_steps":
+                tb.add_scalar(k, v, s["env_steps"])
         if len(rows) % 20 == 1:
             keys = [k for k in ("task/imitation", "task/plan", "task/r_style", "task/joint_error_deg", "episode_length",
                                 "terminated_frac", "steps_per_s") if k in s]
@@ -106,6 +111,7 @@ def main() -> None:
             save()
             last = time.time()
     save()
+    tb.close()
     record.update(finished=time.strftime("%Y-%m-%d %H:%M:%S"), env_steps=int(agent.env_steps),
                   train_seconds=round(time.time() - start), final=rows[-1] if rows else None)
     (out / "record.json").write_text(json.dumps(record, indent=1, default=str))
