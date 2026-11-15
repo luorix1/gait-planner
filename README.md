@@ -49,6 +49,7 @@ pose; the prior trains; PPO runs an iteration.
 | `train.py`, `evaluate.py` | train a policy (PPO); evaluate it on held-out clips |
 | `camargo_id.py` | Camargo inverse dynamics on Rajagopal v3 |
 | `gp/accept.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); gate G1 |
+| `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `tests/test_smoke.py` | the CPU checks |
 
 ## Data v1 (`data/v1/split.json`)
@@ -109,6 +110,15 @@ joint loads, muscle effort (saturation), contact (sliding spheres, joint limits)
 
 G1's curve check compares the right stance (touchdown to lift-off), not the whole stride: a whole stride is almost
 never on plates throughout.
+
+## Random terrain (`gp/terrain_gen.py`)
+
+Courses along +x of level runs, ramps and stair flights, as SPRINT profiles: level at both ends, a level landing
+between every two features (no ramp into a ramp, no up-to-down reversal without level ground), one grade or one
+rise and tread per feature, within +-2.5 m of the start. Sizes default to the training split's 5th-95th
+percentiles (ramps 5-12.5 deg over 4.5-6 m, rises 0.10-0.175 m, treads 0.25-0.37 m, 3-8 steps);
+`TerrainSpec.held_out()` samples the held-out range. Not used by v1 training (each episode replays a clip on its own
+terrain, because the plan belongs to it): it is for evaluating on new ground and for the planner's loop (G3).
 
 ## Known limits
 

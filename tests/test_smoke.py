@@ -207,3 +207,26 @@ def test_mirror_records(D: dict) -> None:
         for k in ("root_pos", "joints", "key_pos", "ground"):
             assert np.abs(got[:, lay[k]] - ref[:, lay[k]]).max() < 1e-4, (D["name"][i], k)
         assert torch.allclose(mirror_records(mirror_records(rec, maps), maps), rec)
+
+
+def test_terrain_courses() -> None:
+    """Random courses keep the rules (level start, end and landings; sizes in range; height band), SPRINT accepts
+    their profiles, and SPRINT reads them level at both ends; a ramp straight into a ramp is refused."""
+    from sprint.terrain import height, pack
+
+    from gp.terrain_gen import TerrainSpec, check_course, course_profile, sample_course
+    rng = np.random.default_rng(0)
+    for spec in (TerrainSpec(), TerrainSpec.held_out()):
+        courses = [sample_course(rng, spec) for _ in range(300)]
+        for c in courses:
+            check_course(c, spec)
+        assert {s["kind"] for c in courses for s in c} == {"level", "ramp", "stairs"}
+        assert {s["dir"] for c in courses for s in c if "dir" in s} == {1, -1}
+        profs = [course_profile(c) for c in courses]
+        pack(profs)
+        for P in profs[:50]:
+            assert height(P, P[0, 0] - 5.0) == 0.0 and abs(height(P, P[-1, 0] + 5.0) - P[-1, 1]) < 1e-9
+    bad = [dict(kind="level", run=4.0), dict(kind="ramp", run=5.0, grade_deg=8.0, dir=1),
+           dict(kind="ramp", run=5.0, grade_deg=8.0, dir=-1), dict(kind="level", run=4.0)]
+    with pytest.raises(ValueError, match="straight into"):
+        check_course(bad)
