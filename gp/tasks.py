@@ -46,10 +46,24 @@ class TerrainImitation(Imitation):
 
     def bind(self, model: Any) -> None:
         super().bind(model)
+        if self.symmetric:
+            # the left/right mirror PPO's symmetry loss uses: SPRINT's axis-based coord_signs gets Rajagopal's hip
+            # adduction, hip rotation and knee wrong (gp.data.coord_mirror_signs); rebuild the blocks with FK signs
+            self.csign = gpdata.coord_mirror_signs(model)
+            self.blocks = self._blocks(model)
+            self._obs_dim = sum(b[1] for b in self.blocks)
         n = len(SCAN)
         self.blocks.append(("height_scan", n, list(range(n)), [1.0] * n))
         self._obs_dim += n
-        self.key = [list(model.body_names).index(b) for b in gpdata.KEY_BODIES]
+        bn = list(model.body_names)
+        self.key = [bn.index(b) for b in gpdata.KEY_BODIES]
+        h = model.host
+        sph = self.L.contact_spheres
+        self.sph_body = h["geom_body"][sph].astype(np.int64)
+        self.sph_pos = np.asarray(h["geom_pos"][sph], np.float32)
+        self.sph_r = np.asarray(h["geom_size"][sph][:, 0], np.float32)
+        self.sph_side = np.array([gpdata.SIDES.index(bn[b][-1]) for b in self.sph_body])
+        self.feet_side = np.array([gpdata.SIDES.index(bn[b][-1]) for b in self.L.feet])
 
     def setup(self, env: Any) -> None:
         # ponytail: the recipe's setup runs forward kinematics on every reference frame in one Data (one world per
@@ -75,6 +89,13 @@ class TerrainImitation(Imitation):
         self.lift = torch.as_tensor(D["lift"], dtype=torch.float32, device=dev)
         self.scan = torch.as_tensor(SCAN, dtype=torch.float32, device=dev)
         self.key_b = torch.as_tensor(self.key, device=dev)
+        T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=dev)  # noqa: E731
+        self.p_contact, self.p_foothold, self.p_com = T(D["plan_contact"], torch.bool), T(D["foothold"]), T(D["com"])
+        self.sph_b, self.sph_p, self.sph_rad = T(self.sph_body, torch.long), T(self.sph_pos), T(self.sph_r)
+        side = T(self.sph_side, torch.long)
+        self.sph_w = torch.stack([(side == i).float() / (side == i).sum() for i in range(2)])     # [2, S] means
+        fs = T(self.feet_side, torch.long)
+        self.feet_w = torch.stack([(fs == i).float() for i in range(2)])                          # [2, feet] sums
 
     def ground(self, x: Any) -> Any:
         """Terrain height under ``x`` ``[N, S]``, each world on its clip's profile."""
@@ -90,6 +111,26 @@ class TerrainImitation(Imitation):
         """This step's style record (:func:`gp.data.record_layout`), as :func:`gp.data.style_records` from data."""
         p, q = s.body_pos[:, self.root], s.body_quat[:, self.root]
         return torch.cat([p, q, s.qpos[:, self.tracked], s.body_pos[:, self.key_b].flatten(1), self.ground(p[:, :1])], 1)
+
+    # -- the simulation's side of the plan (both tasks: the planner's reward, everyone's evaluation) ----------------
+    def com(self, s: Any) -> Any:
+        """Whole-body centre of mass ``[N, 3]``."""
+        return (s.body_com_pos() * s.body_mass[:, None]).sum(1) / s.total_mass
+
+    def sphere_bottoms(self, s: Any) -> Any:
+        """Each foot contact sphere's lowest point ``[N, S, 3]``."""
+        b = self.sph_b
+        ctr = s.body_pos[:, b] + _qrot(s.body_quat[:, b], self.sph_p.expand(self.n, -1, -1))
+        ctr[..., 1] -= self.sph_rad
+        return ctr
+
+    def foot_points(self, s: Any) -> Any:
+        """Per side (l, r), the mean of its contact spheres' lowest points ``[N, 2, 3]``, as the plans' footholds."""
+        return torch.einsum("ks,nsc->nkc", self.sph_w, self.sphere_bottoms(s))
+
+    def foot_force(self, s: Any) -> Any:
+        """Per side (l, r), the vertical ground force on its foot bodies ``[N, 2]`` (N)."""
+        return torch.einsum("kf,nf->nk", self.feet_w, s.contact_force()[:, self.feet, 1])
 
     def observation(self, s: Any) -> Any:
         root = s.body_com_pos()[:, self.root]
@@ -131,43 +172,17 @@ class PlanTracking(TerrainImitation):
             self.blocks += [(f"plan_feet[{t}]", 12, [*range(6, 12), *range(6)], foot * 2),
                             (f"plan_com[{t}]", 3, [0, 1, 2], list(_POLAR))]
             self._obs_dim += 15
-        bn = list(model.body_names)
-        h = model.host
-        sph = self.L.contact_spheres
-        self.sph_body = h["geom_body"][sph].astype(np.int64)
-        self.sph_pos = np.asarray(h["geom_pos"][sph], np.float32)
-        self.sph_r = np.asarray(h["geom_size"][sph][:, 0], np.float32)
-        self.sph_side = np.array([gpdata.SIDES.index(bn[b][-1]) for b in self.sph_body])
-        self.feet_side = np.array([gpdata.SIDES.index(bn[b][-1]) for b in self.L.feet])
 
     def setup(self, env: Any) -> None:
         super().setup(env)
         D, dev = self.D, self.dev
         T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=dev)  # noqa: E731
-        self.p_contact, self.p_foothold = T(D["plan_contact"], torch.bool), T(D["foothold"])
-        self.p_td, self.p_lo, self.p_com = T(D["t_touchdown"]), T(D["t_liftoff"]), T(D["com"])
-        self.p_record = T(D["record"])
-        self.sph_b, self.sph_p, self.sph_rad = T(self.sph_body, torch.long), T(self.sph_pos), T(self.sph_r)
-        side = T(self.sph_side, torch.long)
-        self.sph_w = torch.stack([(side == i).float() / (side == i).sum() for i in range(2)])     # [2, S] means
-        fs = T(self.feet_side, torch.long)
-        self.feet_w = torch.stack([(fs == i).float() for i in range(2)])                          # [2, feet] sums
+        self.p_td, self.p_lo, self.p_record = T(D["t_touchdown"]), T(D["t_liftoff"]), T(D["record"])
         self.band = T(self.plan.com_band)
         if not self.plan.prior:
             raise ValueError("PlanConfig.prior: the style prior's file (train_prior.py)")
         self.style = StyleReward(Prior.load(self.plan.prior, dev))
         self.ring = torch.zeros(self.n, W + 1, self.p_record.shape[1], device=dev)
-
-    # -- the simulation's side of the plan -----------------------------------------------------------------------
-    def _com(self, s: Any) -> Any:
-        return (s.body_com_pos() * s.body_mass[:, None]).sum(1) / s.total_mass
-
-    def _foot_points(self, s: Any) -> Any:
-        """Per side, the mean of its contact spheres' lowest points ``[N, 2, 3]`` (as the plans' footholds)."""
-        b = self.sph_b
-        ctr = s.body_pos[:, b] + _qrot(s.body_quat[:, b], self.sph_p.expand(self.n, -1, -1))
-        ctr[..., 1] -= self.sph_rad
-        return torch.einsum("ks,nsc->nkc", self.sph_w, ctr)
 
     # -- hooks ---------------------------------------------------------------------------------------------------
     def reset(self, s: Any, worlds: Any) -> None:
@@ -182,7 +197,7 @@ class PlanTracking(TerrainImitation):
         obs = super().observation(s)
         rq = s.body_quat[:, self.root]
         root = s.body_com_pos()[:, self.root]
-        com = self._com(s)
+        com = self.com(s)
         from sprint.recipes.imitation import _heading
         M = _heading(rq)
         last = self.clip_last[self.clip] + self.taps[-1]
@@ -199,15 +214,14 @@ class PlanTracking(TerrainImitation):
         c, pc, f = self.config, self.plan, self.frame
         from sprint.recipes.imitation import _heading
         down_ref = self.p_contact[f]                                                          # [N, 2]
-        fy = torch.einsum("kf,nf->nk", self.feet_w, s.contact_force()[:, self.feet, 1])
-        down = fy > pc.contact_bw * self.bw
+        down = self.foot_force(s) > pc.contact_bw * self.bw
         r_contact = (down == down_ref).float().mean(1)
-        d = (self._foot_points(s) - self.p_foothold[f])[..., [0, 2]].norm(dim=-1)              # [N, 2]
+        d = (self.foot_points(s) - self.p_foothold[f])[..., [0, 2]].norm(dim=-1)              # [N, 2]
         hit = torch.exp(-0.5 * (d / pc.tol_foothold).pow(2))
         n_ref = down_ref.float().sum(1)
         r_foothold = torch.where(n_ref > 0, (hit * down_ref).sum(1) / n_ref.clamp_min(1), torch.ones_like(n_ref))
         M = _heading(s.body_quat[:, self.root])
-        e = torch.einsum("nij,nj->ni", M, self._com(s) - self.p_com[f]).abs()
+        e = torch.einsum("nij,nj->ni", M, self.com(s) - self.p_com[f]).abs()
         r_com = torch.exp(-0.5 * ((e - self.band).clamp_min(0) / pc.tol_com).pow(2).sum(1))
         self.ring = torch.cat([self.ring[:, 1:], self.record(s)[:, None]], 1)
         r_style, sds = self.style(self.ring)

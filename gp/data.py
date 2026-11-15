@@ -72,6 +72,39 @@ def load_model(device: Any = "cpu") -> Any:
     return _load(MODEL, device, specific_tension=SPECIFIC_TENSION)[0]
 
 
+def coord_mirror_signs(model: Any, poses: int = 16) -> np.ndarray:
+    """Per coordinate, the sign ``s`` with mirror(q)[k] = s[k] * q[partner(k)], found by forward kinematics: the
+    mirrored pose must put every body origin at the reflection (z -> -z) of its partner's. SPRINT's ``coord_signs``
+    reads each axis in its own joint frame, which gets Rajagopal's hips (identical axes, mirrored joint frames) and its
+    coupled knee (one coordinate on three axes) wrong: hip adduction, hip rotation and knee come out -1, and that
+    "mirror" puts bodies up to 0.78 m off. Starts from coord_signs and flips a pair wherever that lowers the error;
+    coordinates that move no body origin (MTP) keep coord_signs' value. Raises if no choice mirrors the model."""
+    from sprint.recipes.imitation import coord_signs, mirrored
+    from sprint.recipes.motion import forward_kinematics_np, model_layout
+    L = model_layout(model)
+    names, bodies = list(model.coord_names), list(model.body_names)
+    signs = coord_signs(names, L.axes, L.is_rot).astype(np.float64)
+    part = [names.index(mirrored(n)) for n in names]
+    q = np.random.default_rng(0).uniform(-0.3, 0.3, (poses, len(names)))
+    ref = forward_kinematics_np(model, q.astype(np.float32))[0][:, [bodies.index(mirrored(b)) for b in bodies]] * [1, 1, -1]
+    # summed, not max: with several pairs wrong, fixing one leaves the max to the others and the search would stall
+    err = lambda s: float(np.abs(forward_kinematics_np(model, (q[:, part] * s).astype(np.float32))[0] - ref).sum())  # noqa: E731
+    best = err(signs)
+    for _ in range(2):
+        for k in range(len(names)):
+            if part[k] < k:
+                continue
+            trial = signs.copy()
+            trial[[k, part[k]]] *= -1
+            e = err(trial)
+            if e < best - 1e-9:
+                signs, best = trial, e
+    worst = float(np.abs(forward_kinematics_np(model, (q[:, part] * signs).astype(np.float32))[0] - ref).max())
+    if worst > 1e-4:
+        raise ValueError(f"{model.name}: no coordinate signs mirror the model (body error {worst:.3f} m)")
+    return signs.astype(np.float32)
+
+
 def record_layout(nt: int) -> dict[str, slice]:
     """Columns of a style record: root (pelvis origin) position and quaternion (x, y, z, w), the tracked
     coordinates, the key bodies' origins, and the terrain height under the root."""

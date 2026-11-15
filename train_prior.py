@@ -1,6 +1,7 @@
 """Train the style prior (SMP, gp/smp.py) on the train split's real clips, with MimicKit's settings: AdamW 2e-4,
 batch 512, gradient clip 1.0, 200k iterations, EMA 0.995 every 10 steps after 5k (copied before), normaliser from
-20k windows. Logs the held-out subjects' loss beside the training loss.
+20k windows. Half of every batch is mirrored left to right (gp.smp.mirror_records). Logs the held-out subjects' loss
+beside the training loss.
 
 Run: .venv/bin/python train_prior.py --out runs/prior_v1
 Out: <out>/prior.pt (latest; overwritten every 2k iterations), <out>/progress.csv
@@ -17,7 +18,7 @@ import numpy as np
 import torch
 
 from gp import data
-from gp.smp import Prior, W
+from gp.smp import Prior, W, mirror_maps, mirror_records
 
 
 def windows(D: dict, device: str) -> tuple[torch.Tensor, torch.Tensor]:
@@ -27,9 +28,15 @@ def windows(D: dict, device: str) -> tuple[torch.Tensor, torch.Tensor]:
     return rec, torch.as_tensor(ends, device=device)
 
 
-def batch(rec: torch.Tensor, ends: torch.Tensor, n: int, gen: torch.Generator | None = None) -> torch.Tensor:
+def batch(rec: torch.Tensor, ends: torch.Tensor, n: int, gen: torch.Generator | None = None,
+          mirror: dict | None = None) -> torch.Tensor:
+    """``n`` windows ``[n, W + 1, D]``; with ``mirror`` (gp.smp.mirror_maps) a random half reflected left to right."""
     i = ends[torch.randint(len(ends), (n,), device=ends.device, generator=gen)]
-    return rec[i[:, None] + torch.arange(-W, 1, device=ends.device)]
+    w = rec[i[:, None] + torch.arange(-W, 1, device=ends.device)]
+    if mirror is not None:
+        flip = torch.rand(n, device=w.device, generator=gen) < 0.5
+        w[flip] = mirror_records(w[flip], mirror)
+    return w
 
 
 def main() -> None:
@@ -48,15 +55,16 @@ def main() -> None:
     rec, ends = windows(D, a.device)
     rec_t, ends_t = windows(Dt, a.device)
     prior = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"]).to(a.device)
+    maps = mirror_maps(data.load_model(), D["tracked"])
     from gp.smp import window_features
-    prior.set_normaliser(window_features(batch(rec, ends, 20_000), prior.cfg["nt"], prior.cfg["dt"]))
+    prior.set_normaliser(window_features(batch(rec, ends, 20_000, mirror=maps), prior.cfg["nt"], prior.cfg["dt"]))
     opt = torch.optim.AdamW(prior.net.parameters(), lr=a.lr)
     gen = torch.Generator(device=a.device).manual_seed(1)
     log = csv.writer((out / "progress.csv").open("w", buffering=1))
     log.writerow(["iter", "seconds", "train_loss", "held_out_loss"])
     t0, run = time.time(), 0.0
     for it in range(1, a.iters + 1):
-        loss = prior.loss(prior.features(batch(rec, ends, a.batch)))
+        loss = prior.loss(prior.features(batch(rec, ends, a.batch, mirror=maps)))
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(prior.net.parameters(), 1.0)
@@ -65,14 +73,14 @@ def main() -> None:
             prior.ema.module.load_state_dict(prior.net.state_dict())
         elif it % 10 == 0:
             prior.ema.update_parameters(prior.net)
-        run = 0.99 * run + 0.01 * float(loss) if it > 1 else float(loss)
+        run = 0.99 * run + 0.01 * float(loss.detach()) if it > 1 else float(loss.detach())
         if it % 1000 == 0 or it == a.iters:
             with torch.no_grad():
                 held = float(prior.loss(prior.features(batch(rec_t, ends_t, 4096, gen))))
             log.writerow([it, round(time.time() - t0), round(run, 5), round(held, 5)])
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
         if it % 2000 == 0 or it == a.iters:
-            prior.save(out / "prior.pt", iters=it, data=str(a.src))
+            prior.save(out / "prior.pt", iters=it, data=str(a.src), mirrored=True)
 
 
 if __name__ == "__main__":

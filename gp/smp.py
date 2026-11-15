@@ -19,6 +19,8 @@ per-frame features relative to the window's last frame (AMP's ``compute_disc_obs
 - **Window**: 13 frames at 40 Hz (0.325 s; MimicKit: 10 at 30 Hz).
 - **Normaliser floor**: per-feature std floored at 0.05, not 0.2 (heights and positions here are in metres and
   vary by a few cm).
+- **Mirrored windows** (:func:`mirror_records`): half of every training batch is reflected left to right, so the
+  prior sees each motion and its mirror image and has no side preference.
 - Not ported: the class-conditional model, classifier-free guidance, generative state init (GSI; this body resets
   from clip states), DDPM sampling. ``diffusers`` is not needed: with epsilon prediction and no sample clipping,
   MimicKit's DDIM round trip returns the network's own epsilon.
@@ -35,7 +37,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sprint.recipes.imitation import _heading, _qconj, _qmul, _qrot, _rotvec
 
-from .data import record_layout
+from .data import KEY_BODIES, record_layout
 
 W = 13
 T_DIFF = 50
@@ -63,6 +65,37 @@ def window_features(rec: torch.Tensor, nt: int, dt: float) -> torch.Tensor:
     omega = torch.einsum("bij,bwj->bwi", M, _rotvec(_qmul(q[:, 1:], _qconj(q[:, :-1])))) / dt
     pose = torch.cat([root, tan, nrm, rec[..., lay["joints"]], key], -1)[:, 1:]
     return torch.cat([pose, vel, omega], -1)
+
+
+def mirror_maps(model: Any, tracked: list[str]) -> dict[str, Any]:
+    """What the sagittal reflection does to a style record: the tracked coordinates' partner and sign
+    (:func:`gp.data.coord_mirror_signs`, from forward kinematics) and the key bodies' partners."""
+    from sprint.recipes.imitation import mirrored
+
+    from .data import coord_mirror_signs
+    names = list(model.coord_names)
+    cs = coord_mirror_signs(model)
+    return dict(joint_perm=[tracked.index(mirrored(n)) for n in tracked],
+                joint_sign=[float(cs[names.index(n)]) for n in tracked],
+                key_perm=[list(KEY_BODIES).index(mirrored(b)) for b in KEY_BODIES])
+
+
+def mirror_records(rec: torch.Tensor, maps: dict[str, Any]) -> torch.Tensor:
+    """Style records ``[..., D]`` of the same motion reflected left to right (world z -> -z; the terrain profiles do not
+    vary along z): root and key-body z negated, the root quaternion reflected (x, y, z, w) -> (-x, -y, z, w), left and
+    right coordinates and key bodies swapped."""
+    nt = len(maps["joint_perm"])
+    lay = record_layout(nt)
+    out = rec.clone()
+    out[..., 2] = -rec[..., 2]
+    q = lay["root_quat"].start
+    out[..., q:q + 2] = -rec[..., q:q + 2]
+    sign = torch.as_tensor(maps["joint_sign"], dtype=rec.dtype, device=rec.device)
+    out[..., lay["joints"]] = rec[..., lay["joints"]][..., maps["joint_perm"]] * sign
+    kp = rec[..., lay["key_pos"]].unflatten(-1, (-1, 3))[..., maps["key_perm"], :].clone()
+    kp[..., 2] = -kp[..., 2]
+    out[..., lay["key_pos"]] = kp.flatten(-2)
+    return out
 
 
 def channels(nt: int, n_key: int = 5) -> int:
