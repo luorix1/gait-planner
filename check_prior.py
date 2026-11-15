@@ -10,6 +10,10 @@ Score = minus the prior's mean SDS loss (4 noise draws, fixed seed). Pass (the p
 copy in >= 95 % of pairs, and with the threshold at the degraded copies' 95th-percentile score, no held-out
 subject has more than 10 % of its real windows below it. Held-out terrain clips are reported beside it.
 
+Unseen skills (AB01 prior only): Camargo's stair clips are real motion the prior never saw. They are scored beside
+Camargo level walking (same subjects, same welded trunk), so the gap between the two is the new skill's cost alone.
+Stairs below the threshold about as often as Camargo level = a frozen walking prior can admit stairs in the loop.
+
 Run: .venv/bin/python check_prior.py runs/prior_v1/prior.pt
 Out: <prior folder>/g0.json
 """
@@ -73,6 +77,21 @@ def score(prior: Prior, rec: np.ndarray, draws: int = 4) -> np.ndarray:
     return -np.mean([prior.sds(x).mean(1).cpu().numpy() for _ in range(draws)], 0)
 
 
+def unseen_skills(prior: Prior, model: object, L: object, thr: float, rng: np.random.Generator) -> dict:
+    """Share of real Camargo windows below ``thr`` and median score, per class (empty for the v1 prior: it saw them)."""
+    src = data.ROOT / "data" / "v1"
+    if data.DATASET == "v1" or not (src / "clips.npz").exists():
+        return {}
+    D = data.load(("train", "test_subject", "test_terrain"), src)
+    out = {}
+    for cls in ("level", "stairs_up", "stairs_down"):
+        keep = np.flatnonzero((D["terrain_class"] == cls) & (D["source"] == "camargo2021"))
+        valid = np.concatenate([np.arange(D["start"][c] + W + 1, D["start"][c] + D["frames"][c]) for c in keep])
+        s = score(prior, degraded(D, model, L, rng.choice(valid, min(N_WINDOWS // 3, len(valid)), replace=False), "real"))
+        out[f"camargo_{cls}"] = {"below_threshold": float((s < thr).mean()), "score_median": float(np.median(s))}
+    return out
+
+
 def main() -> None:
     from sprint.recipes.motion import model_layout
     path = Path(sys.argv[1])
@@ -103,6 +122,9 @@ def main() -> None:
         r["pass"] = bool(r["win_overall"] >= 0.95 and max(r["below_threshold_by_subject"].values()) <= 0.10)
         report[split] = r
         print(split, json.dumps(r, indent=1), flush=True)
+    report["unseen_skills"] = unseen_skills(prior, model, L, report[data.HELD_OUT]["threshold"], rng)
+    if report["unseen_skills"]:
+        print("unseen skills", json.dumps(report["unseen_skills"], indent=1), flush=True)
     report["g0_pass"] = report[data.HELD_OUT]["pass"]
     (path.parent / "g0.json").write_text(json.dumps(report, indent=1))
     print("G0", "PASS" if report["g0_pass"] else "FAIL", "->", path.parent / "g0.json")
