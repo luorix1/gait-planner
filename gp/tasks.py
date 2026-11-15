@@ -9,6 +9,10 @@
   lookahead taps, never the full pose; the critic also reads the full reference (privileged). Reward: matching
   the planned contacts and footholds, staying in the centre-of-mass band, the frozen style prior's score, minus
   the recipe's effort terms. Falls stay the recipe's (pelvis 0.3 m from the clip's or tilted 60 deg from it).
+
+Free clips (gp.free: generated courses, no reference motion; ``D["free"]``) start at their first frame only. In
+:class:`PlanTracking` they fall by losing the plan's centre of mass (gp.free.FREE_FALL_M) or tilting 60 deg, and the
+critic reads a flag that the episode has no clip. The baseline has nothing to imitate on them: give it none.
 """
 
 from __future__ import annotations
@@ -21,8 +25,9 @@ import torch
 from sprint.recipes.imitation import _POLAR, Imitation, ImitationConfig, _heading, _qrot
 
 from . import data as gpdata
+from .free import FREE_FALL_M
 from .smp import Prior, StyleReward, W
-from .terrain import height, hf_height
+from .terrain import Ground
 
 #: Height scan: terrain height relative to the root at these offsets in the root's heading frame (m): forward x lateral,
 #: forward-major. Lateral offsets are symmetric, so the left/right mirror swaps them.
@@ -90,22 +95,18 @@ class TerrainImitation(Imitation):
         # clips on the shared heightfield (D["hf"]: gp.terrain.atlas; D["terrain_kind"] 1, D["hf_offset"] their tile)
         from sprint import _backend as B
         from sprint.terrain import HFIELD
-        kind = np.asarray(D.get("terrain_kind", np.zeros(len(self.motions), int)))
-        self.on_hf = torch.as_tensor(kind == 1, device=dev)
-        self.hf = None
-        if self.on_hf.any():
+        self.G = Ground.of(D, dev)
+        self.on_hf, self.hf = self.G.on_hf, self.G.hf
+        if self.hf is not None:
             hf = D["hf"]
             env.data.set_heightfield(hf["heights"], hf["cell"], hf["origin"], hf["block"])
-            self.hf = dict(heights=torch.as_tensor(hf["heights"], dtype=torch.float32, device=dev),
-                           block=torch.as_tensor(hf["block"], dtype=torch.float32, device=dev),
-                           cell=float(hf["cell"]), origin=tuple(float(v) for v in hf["origin"]))
-            self.hf_off = torch.as_tensor(D["hf_offset"], dtype=torch.float32, device=dev)
+            self.hf_off = self.G.off
             self._offset = B.to_torch(env.data.terrain_offset)
-        self.terrain_of_clip = torch.where(self.on_hf, torch.full((len(kind),), HFIELD, device=dev),
-                                           torch.arange(len(kind), device=dev)).to(torch.int32)
-        self.tX = torch.as_tensor(D["profile_x"], dtype=torch.float32, device=dev)
-        self.tY = torch.as_tensor(D["profile_y"], dtype=torch.float32, device=dev)
+        n = len(self.on_hf)
+        self.terrain_of_clip = torch.where(self.on_hf, torch.full((n,), HFIELD, device=dev),
+                                           torch.arange(n, device=dev)).to(torch.int32)
         self.lift = torch.as_tensor(D["lift"], dtype=torch.float32, device=dev)
+        self.free_clip = torch.as_tensor(np.asarray(D.get("free", np.zeros(len(self.motions), bool))), device=dev)
         g = torch.as_tensor([(f, k) for f in SCAN_FORWARD for k in SCAN_LATERAL], dtype=torch.float32, device=dev)
         self.scan_f, self.scan_l = g[:, 0], g[:, 1]
         self.key_b = torch.as_tensor(self.key, device=dev)
@@ -120,18 +121,17 @@ class TerrainImitation(Imitation):
     def ground(self, x: Any, z: Any) -> Any:
         """Terrain height under ``(x, z)`` ``[N, S]``, each world on its clip's terrain: its profile (which ignores z),
         or its tile of the shared heightfield."""
-        h = height(self.tX, self.tY, self.clip, x)
-        if self.hf is None:
-            return h
-        off = self.hf_off[self.clip]
-        f = self.hf
-        hh = hf_height(f["heights"], f["block"], f["cell"], f["origin"], x + off[:, :1], z + off[:, 1:2])
-        return torch.where(self.on_hf[self.clip][:, None], hh, h)
+        return self.G(self.clip, x, z)
 
     def reset(self, s: Any, worlds: Any) -> None:
         super().reset(s, worlds)
         idx = worlds.nonzero().squeeze(1)
         if idx.numel():
+            fr = idx[self.free_clip[self.clip[idx]]]
+            if fr.numel():                             # free clips start where they are placed: frame 0, no noise
+                self.frame[fr] = self.clip_start[self.clip[fr]]
+                self.start_frame[fr] = 0
+                s.qpos[fr], s.qvel[fr] = self.ref["qpos"][self.frame[fr]], self.ref["qvel"][self.frame[fr]]
             s.qpos[idx, self.L.vertical] += self.lift[self.frame[idx]]
             if self.hf is not None:                    # each heightfield clip stands on its own tile
                 self._offset[idx] = self.hf_off[self.clip[idx]]
@@ -189,7 +189,7 @@ class PlanTracking(TerrainImitation):
 
     #: The reference itself: the critic's alone (the actor reads the plan, not the pose).
     CRITIC_ONLY = (*Imitation.CRITIC_ONLY, "root_position_error", "root_orientation_error", "joint_angle_error",
-                   "joint_velocity_error", "root_velocity_error", "feet_position_error")
+                   "joint_velocity_error", "root_velocity_error", "feet_position_error", "free_episode")
 
     def __init__(self, D: dict[str, Any], config: ImitationConfig | None = None, plan: PlanConfig | None = None, *,
                  starts: list[Any] | None = None, seed: int = 0) -> None:
@@ -204,6 +204,8 @@ class PlanTracking(TerrainImitation):
             self.blocks += [(f"plan_feet[{t}]", 12, [*range(6, 12), *range(6)], foot * 2),
                             (f"plan_com[{t}]", 3, [0, 1, 2], list(_POLAR))]
             self._obs_dim += 15
+        self.blocks.append(("free_episode", 1, [0], [1.0]))
+        self._obs_dim += 1
 
     def setup(self, env: Any) -> None:
         super().setup(env)
@@ -215,12 +217,14 @@ class PlanTracking(TerrainImitation):
             raise ValueError("PlanConfig.prior: the style prior's file (train_prior.py)")
         self.style = StyleReward(Prior.load(self.plan.prior, dev))
         self.ring = torch.zeros(self.n, W + 1, self.p_record.shape[1], device=dev)
+        self.lost = torch.zeros(self.n, dtype=torch.long, device=dev)
 
     # -- hooks ---------------------------------------------------------------------------------------------------
     def reset(self, s: Any, worlds: Any) -> None:
         super().reset(s, worlds)
         idx = worlds.nonzero().squeeze(1)
         if idx.numel():                     # the window so far: the clip's own frames, clamped at its start
+            self.lost[idx] = 0
             f = self.frame[idx][:, None] + torch.arange(-W, 1, device=self.dev)
             f = torch.maximum(f, self.clip_start[self.clip[idx]][:, None])
             self.ring[idx] = self.p_record[f]
@@ -238,11 +242,17 @@ class PlanTracking(TerrainImitation):
             fh = torch.einsum("nij,nkj->nki", M, self.p_foothold[f] - root[:, None])
             feet = torch.cat([self.p_contact[f].float()[..., None], fh, self.p_td[f][..., None], self.p_lo[f][..., None]], -1)
             parts += [feet.flatten(1), torch.einsum("nij,nj->ni", M, self.p_com[f] - com)]
+        parts.append(self.free_clip[self.clip].float()[:, None])
         return torch.nan_to_num(torch.cat(parts, 1), 0.0, 0.0, 0.0)
 
     def reward(self, s: Any) -> Any:
         super().reward(s)                   # advances the frame; falls and the imitation metrics (logged, not paid)
         c, pc, f = self.config, self.plan, self.frame
+        free = self.free_clip[self.clip]
+        if free.any():                      # no clip pelvis to stay near: a free episode falls by losing the plan
+            lost = (self.com(s) - self.p_com[f])[:, [0, 2]].norm(dim=1) > FREE_FALL_M
+            self.lost = torch.where(lost, self.lost + 1, 0)
+            self._fell = torch.where(free, (self.lost >= c.fall_steps) | (self.tilted >= c.fall_steps), self._fell)
         down_ref = self.p_contact[f]                                                          # [N, 2]
         down = self.foot_force(s) > pc.contact_bw * self.bw
         r_contact = (down == down_ref).float().mean(1)

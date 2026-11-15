@@ -348,3 +348,108 @@ def test_parc_tile_matches_boxes() -> None:
     ref = hf[tuple(np.round(ij).astype(int).T)]
     got = hf_height(t["heights"], t["block"], t["cell"], t["origin"], xy[:, 0], -xy[:, 1])
     assert np.abs(got - ref).max() < 1e-9
+
+
+def test_courses_2d() -> None:
+    """2D courses: level ends, a landing (or a landing turn) between features, 90 deg turns only, every size inside its
+    difficulty's range, and the tile's surface under the centreline equal to the profile (but within a cell of a wall)."""
+    from gp.terrain import hf_height
+    from gp.terrain_gen import CourseSpec, course_tile, sample_course2d
+    spec, rng = CourseSpec(), np.random.default_rng(0)
+    seen = set()
+    for d in (0.0, 0.5, 1.0):
+        for _ in range(6):
+            segs = sample_course2d(rng, d)
+            assert segs[0]["kind"] == segs[-1]["kind"] == "level"
+            assert all({"level", "turn"} & {a["kind"], b["kind"]} for a, b in zip(segs[:-1], segs[1:], strict=True))
+            assert all(abs(abs(s["turn"]) - np.pi / 2) < 1e-9 for s in segs if s["turn"])     # grid-aligned turns only
+            for s in segs:
+                seen.add(s["kind"])
+                if "rise" in s:
+                    assert spec.rise_m[0] - 1e-9 <= s["rise"] <= spec.rise_m[0] + d * (spec.rise_m[1] - spec.rise_m[0]) + 1e-9
+                if s["kind"] == "gap":
+                    assert s["length"] <= spec.gap_m[0] + d * (spec.gap_m[1] - spec.gap_m[0]) + 1e-9
+            T = course_tile(segs)
+            p = T["path"]
+            err = np.abs(hf_height(T["heights"], T["block"], T["cell"], T["origin"], p["x"], p["z"]) - p["h"])
+            assert np.mean(err < 0.005) > 0.97 and err.max() <= spec.pit_m + 0.2     # ramps interpolate to < 2 mm
+    assert seen == {"level", "turn", "ramp", "stairs", "gap", "platform"}
+
+
+def test_free_episodes(tmp_path) -> None:
+    """Generated courses run beside real clips (gp.free): they start at frame 0 standing on the course, the critic
+    sees the free flag and the actor does not, rewards are finite, and leaving the plan's centre of mass is a fall."""
+    from gp.free import FREE_FALL_M, REFINE, course_clips, merge, stand_in_plan
+    from gp.tasks import PlanConfig, PlanTracking
+    from gp.terrain_gen import course_tile, sample_course2d
+    full = data.load("train")
+    cls = np.array(full["terrain_class"])
+    stand = next(i for i in range(len(cls)) if full["mode"][i] == "stand" and cls[i] == "level")
+    hfc = int(np.flatnonzero(np.asarray(full["terrain_kind"]) == 1)[0])
+    Ds = data.take(full, [stand, hfc])
+    tiles = [course_tile(sample_course2d(np.random.default_rng(k), 0.8), cell=full["hf"]["cell"] / REFINE) for k in (1, 2)]
+    for T in tiles:                                        # the stand-in plan walks: no flight, feet alternate
+        P = stand_in_plan(T, 0.98)
+        assert P["plan_contact"].any(1).all() and 0.15 < P["plan_contact"].all(1).mean() < 0.4
+    M = merge(Ds, course_clips(tiles, Ds, 0))
+    task = PlanTracking(M, plan=PlanConfig(prior=_prior(Ds, tmp_path)), starts=[(2, 0), (3, 0), (1, 10)])
+    env = _env(task, worlds=3)
+    env.reset()
+    assert (task.frame[:2] == task.clip_start[task.clip[:2]]).all()
+    tx, tz = M["coord_names"].index("pelvis_tx"), M["coord_names"].index("pelvis_tz")
+    q = env.state.qpos
+    assert torch.allclose(task.ground(q[:, tx:tx + 1], q[:, tz:tz + 1])[:2], torch.zeros(2, 1), atol=1e-6)
+    offsets = np.cumsum([0] + [b[1] for b in task.blocks])[:-1]
+    flag = int(offsets[[b[0] for b in task.blocks].index("free_episode")])
+    assert flag not in set(task.actor_columns().tolist())
+    env.state.qpos[0, tx] += FREE_FALL_M + 0.5               # world 0 jumps away from its plan; world 1 stays
+    for _ in range(task.config.fall_steps):
+        obs, r, *_ = env.step(torch.full((3, env.action_dim), 0.05))
+        assert torch.isfinite(torch.as_tensor(r)).all()
+    assert bool(task._fell[0]) and not bool(task._fell[1])
+    assert torch.as_tensor(obs)[:, flag].tolist() == [1.0, 1.0, 0.0]
+
+
+def test_planner(D: dict) -> None:
+    """The planner (gp.planner): windows round-trip to the world plan, mirror twice is the identity, the loss trains,
+    a real clip's 20 Hz plan decodes back to its 40 Hz plan, and a rollout on a course makes a free clip."""
+    from gp.free import REFINE, course_clips, stand_in_plan
+    from gp.planner import GOAL, HIST, STRIDE, Planner, Windows, features, mirror, plan_course, to_plan, world
+    from gp.terrain_gen import course_tile, sample_course2d
+    W = Windows(D)
+    a = W.anchors[torch.randperm(len(W.anchors), generator=torch.Generator().manual_seed(0))[:64]]
+    x, p, g = W(a)
+    assert torch.equal(g, x[:, -1, GOAL]) and x[:, HIST - 1, 6:9].abs().max() == 0
+    k = a[:, None] + W.k
+    d, h, c, ps = world(x, W.com[a], W.psi[a])
+    assert torch.equal(d, W.down[k]) and (h - W.hold[k]).abs().max() < 1e-5 and (c - W.com[k]).abs().max() < 1e-5
+    assert (features(d, h, c, ps, W.com[a], W.psi[a]) - x).abs().max() < 1e-5
+    xm, pm = mirror(*mirror(x, p))
+    assert torch.equal(xm, x) and torch.equal(pm, p)
+    torch.manual_seed(0)
+    P = Planner(T=5, layers=1, heads=2, head_dim=16)
+    P.set_normaliser(*W.batch(2000))
+    opt = torch.optim.AdamW(P.net.parameters(), lr=1e-3)
+    first = None
+    for _ in range(30):
+        loss = P.loss(x, p, g)
+        first = first if first is not None else float(loss.detach())
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    assert float(loss.detach()) < first
+    c0 = 0                                                  # decode a real clip's plan from every other frame
+    s, n = D["start"][c0], D["frames"][c0]
+    f = np.arange(s, s + n, STRIDE)
+    Pl = to_plan(D["plan_contact"][f], D["foothold"][f][..., [0, 2]], D["com"][f], W.psi[f].numpy(),
+                 lambda x_, z_: data.ground_under(D, c0, x_, z_))
+    m = len(Pl["plan_contact"])
+    assert (Pl["plan_contact"] == D["plan_contact"][s:s + m]).mean() > 0.97
+    assert np.abs(Pl["foothold"][..., [0, 2]] - D["foothold"][s:s + m][..., [0, 2]]).max() < 1e-4
+    full = data.load("train")
+    stand = next(i for i in range(len(full["name"])) if full["mode"][i] == "stand" and full["terrain_class"][i] == "level")
+    T = course_tile(sample_course2d(np.random.default_rng(3), 0.5), cell=full["hf"]["cell"] / REFINE)
+    plan = plan_course(P, [T], full, stand)[0]
+    assert set(plan) == set(stand_in_plan(T, 0.98)) - {"steps"} and len(plan["com"]) == len(plan["plan_contact"])
+    F = course_clips([T], data.take(full, [stand]), 0, plans=[plan])
+    assert F["frames"][0] == len(plan["com"]) and np.isfinite(F["qpos"]).all()

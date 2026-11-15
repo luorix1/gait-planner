@@ -100,6 +100,39 @@ def hf_height(heights: Any, block: Any, cell: float, origin: Any, x: Any, z: Any
     return where(finite(b), b, tri)
 
 
+class Ground:
+    """Terrain height ``[N, S]`` under ``(x, z)`` ``[N, S]`` for clips ``clip`` ``[N]`` (torch): each clip on its
+    profile (padded ``X``, ``Y``: :func:`pad`) or, where ``on_hf``, on its tile of heightfield ``hf`` (:func:`atlas`)
+    at ``offset``. :meth:`of` reads a loaded dataset (gp.data.load, gp.free.merge)."""
+
+    def __init__(self, X: Any, Y: Any, on_hf: Any, hf: dict[str, Any] | None = None, offset: Any = None,
+                 device: Any = "cpu") -> None:
+        import torch
+        T = lambda a: torch.as_tensor(np.asarray(a), dtype=torch.float32, device=device)  # noqa: E731
+        self.X, self.Y = T(X), T(Y)
+        self.on_hf = torch.as_tensor(np.asarray(on_hf, bool), device=device)
+        self.hf: dict[str, Any] | None = None
+        if bool(self.on_hf.any()):
+            assert hf is not None and offset is not None
+            self.hf = dict(heights=T(hf["heights"]), block=T(hf["block"]), cell=float(hf["cell"]),
+                           origin=tuple(float(v) for v in hf["origin"]))
+            self.off = T(offset)
+
+    @classmethod
+    def of(cls, D: dict[str, Any], device: Any = "cpu") -> Ground:
+        kind = np.asarray(D.get("terrain_kind", np.zeros(len(D["name"]), int)))
+        return cls(D["profile_x"], D["profile_y"], kind == 1, D.get("hf"), D.get("hf_offset"), device)
+
+    def __call__(self, clip: Any, x: Any, z: Any) -> Any:
+        import torch
+        h = height(self.X, self.Y, clip, x)
+        if self.hf is None:
+            return h
+        f, off = self.hf, self.off[clip]
+        hh = hf_height(f["heights"], f["block"], f["cell"], f["origin"], x + off[:, :1], z + off[:, 1:2])
+        return torch.where(self.on_hf[clip][:, None], hh, h)
+
+
 def atlas(tiles: list[dict[str, Any]], cell: float, gap: int = 4) -> dict[str, Any]:
     """Lay heightfield tiles side by side in one map. Each tile: ``heights`` ``[nz, nx]``, optional ``block``
     ``[nz-1, nx-1]`` (NaN = triangulated), ``origin`` (its own (x, z) of heights[0, 0]), all at ``cell``. Tiles go in rows

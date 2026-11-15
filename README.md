@@ -31,11 +31,13 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 | 5. evaluate | `python evaluate.py runs/<run> --prior runs/prior_v1/prior.pt` -> `eval.json` (with the filter) | GPU or CPU |
 | 6. gate G1 | `python g1.py runs/planner_v1 runs/baseline_v1` -> `g1.json` | CPU |
 | 7. EMG timing | `python emg_report.py runs/planner_v1 runs/baseline_v1` -> `emg_timing.json`, `emg_<class>.png` | CPU |
+| 8. planner network | `python train_planner.py --out runs/planner_net_v1` (200k iterations) | GPU |
+| 9. check it | `python check_planner.py runs/planner_net_v1/planner.pt` -> `check/check.json`, `check/course_*.png` | GPU or CPU |
 
 Launch training detached (`setsid nohup ... > runs/<name>.log 2>&1 < /dev/null &`), as the docstrings show.
 Baseline and planner share body, clips, physics, delays, effort and learner, so equal `--hours` is matched compute.
 
-Checks: `python -m pytest tests -q` (CPU, ~40 s). Terrain lookups match SPRINT; both tasks step with finite rewards
+Checks: `python -m pytest tests -q` (CPU, ~2 min). Terrain lookups match SPRINT; both tasks step with finite rewards
 and consistent observation layouts; the simulation's style record equals the data's; the actor never reads the full
 pose; the prior trains; PPO runs an iteration.
 
@@ -53,6 +55,8 @@ pose; the prior trains; PPO runs an iteration.
 | `gp/accept.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); gate G1 |
 | `camargo_emg.py`, `gp/emg.py`, `emg_report.py` | Camargo EMG envelopes; EMG timing of policies against held-out subjects |
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
+| `gp/free.py` | episodes without a clip: generated courses as free clips; the stand-in plan |
+| `gp/planner.py`, `train_planner.py`, `check_planner.py` | the planner network (diffusion over plan windows); train it; score it before physics |
 | `tests/test_smoke.py` | the CPU checks |
 
 ## Data (`data/<dataset>/split.json`)
@@ -167,10 +171,50 @@ percentiles (ramps 5-12.5 deg over 4.5-6 m, rises 0.10-0.175 m, treads 0.25-0.37
 `TerrainSpec.held_out()` samples the held-out range. Not used by v1 training (each episode replays a clip on its own
 terrain, because the plan belongs to it): it is for evaluating on new ground and for the planner's loop (G3).
 
+## 2D courses (`gp/terrain_gen.py`: `sample_course2d`, `course_tile`)
+
+Courses for the loop and for tests on new ground, on the heightfield, from (0, 0) heading +x: ramps, straight flights,
+turning flights (a flight, a square landing where the walker turns 90 deg, a second flight the same way, as on PARC's
+stairs), landing turns, gaps (1 m pits) and platforms; a level landing or a landing turn between every two features,
+level at both ends, within +-2.5 m of the start height. Every part runs along a grid axis: block cells are axis-aligned
+squares, so a riser or wall at any other angle is a sawtooth (winding stairs were dropped for that reason). The ground is
+painted as boxes, each stretch a 2.4 m-wide rectangle and each turn a 2.4 m square landing; elsewhere it is flat at the
+lowest landing, and pits reach 1 m past the causeway on each side. Ramps are triangulated, everything else block cells.
+`difficulty` (0-1) sets how far each size may go from its gentle end towards its hard end (`CourseSpec`: rises
+0.10-0.175 m, treads 0.37-0.25 m, grades 3-12.5 deg, gaps 0.15-0.8 m, platforms 0.1-0.6 m). A course whose centreline
+comes back within 3.4 m of itself is drawn again. `export_studio.py --courses N --difficulty D [--seed S]` writes them for
+SPRINT Studio (a standing pose at the start and carried along the course; no physics).
+
+## Episodes without a clip (`gp/free.py`)
+
+A generated course becomes a free clip the tasks run beside real ones: it starts from a real standing frame at the
+course start (frame 0 only, no noise); its "reference" is that pose carried along the plan's centre of mass, so the
+critic still sees where the plan expects the body; in `PlanTracking` it falls by losing the plan's centre of mass by
+0.5 m or tilting 60 deg, and the critic (not the actor) reads a flag that the episode has no clip. `merge` puts free
+clips beside a loaded dataset with one heightfield at the courses' cell (v2's PARC cell / 8 = 4.85 cm; the dataset's
+heightfield clips cut to their path +- 1.5 m and refined). Until the planner exists, `stand_in_plan` makes the plans:
+footholds on every tread, even steps of at most 0.6 m elsewhere, never on a riser's or pit's edge, feet 16 cm apart,
+0.55 s per step with 0.12 s of double support. It is a stand-in, not a model of footstep choice; `gp.planner.plan_course`
+makes the learned planner's plans in the same format (`course_clips(..., plans=...)`).
+
+## The planner network (`gp/planner.py`)
+
+A diffusion model of plan windows, like PARC's generator but over the plan instead of the pose. Plan frames at 20 Hz:
+each foot's down flag and the xz of its current or next foothold, the centre of mass, the heading. A window is 0.4 s
+given (the plan so far) and 1.2 s generated, in the heading frame of the last given frame. Conditions: the ground on a
+3.6 m x 1.6 m grid ahead (0.1 m spacing, relative to the centre of mass's height) and the goal (where the centre of
+mass is at the window's end). Network: the style prior's DiT blocks over 50 ground tokens and 32 plan tokens, 4 layers
+x 256, x0 prediction, 50-step DDIM; half of each batch mirrored. Trained on every window of the train split's plans
+(96k). Decoding: a contact's foothold is the mean of its frames' generated footholds, its height the ground's; times to
+touchdown and lift-off from the contacts (`gp.data.plan_targets`). Rollout on a course: generate 1.2 s, keep 0.5 s,
+re-anchor; the goal is the centreline `speed x 1.2 s` ahead, clamped before the end so the plan stops.
+`check_planner.py` scores held-out windows (contacts, next touchdown's time and place, centre of mass) and course
+rollouts (footholds on the course, in gaps, across edges; reaching the end) beside the stand-in plan.
+
 ## Known limits
 
-- Plans are copied from real clips; footholds are not predicted (plan doc, open question 2).
-- Generated 2D courses (turns, winding stairs) run in the tasks but are not built into the data yet; PARC's tiles are.
+- The muscle policy still trains on plans copied from real clips; the planner network is trained and checked on its
+  own (above), and `train.py` does not run free episodes yet: the loop's driver comes next.
 - Running and jumping have no kinetic reference; ceilings are still to be chosen.
 - `gp/tasks.py` patches SPRINT's reference kinematics to run in chunks for the duration of setup (1.5M frames in one
   Data would take ~18 GB of GPU memory). Upstream fix: chunk in SPRINT.
