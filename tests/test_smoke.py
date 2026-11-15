@@ -87,6 +87,7 @@ def test_terrain_imitation_steps(D: dict) -> None:
     _roll(env)
     perm, sign, act = env.task.mirror_maps()
     assert len(perm) == env.task.obs_dim and sorted(act.tolist()) == list(range(env.action_dim))
+    assert np.array_equal(env.task.csign, data.coord_mirror_signs(env.model))     # FK signs, not SPRINT's axis rule
 
 
 def test_plan_tracking_steps(D: dict, tmp_path) -> None:
@@ -154,3 +155,55 @@ def test_specific_tension(D: dict) -> None:
     (m25, f25), (m60, f60) = out[0.25e6], out[data.SPECIFIC_TENSION]
     assert np.array_equal(f25, f60)
     assert ((m60 < 0.9 * m25) & (m60 > m25 / 2.4)).all(), (m25, m60)
+
+
+def test_accept_check() -> None:
+    """The acceptance filter passes a clean episode and rejects a sliding foot, a missed contact and a fall."""
+    from gp import accept
+    T, S = 120, 18
+    foot = np.zeros((T, 2, 3))
+    clean = dict(sds=np.full(T, 0.2), plan_contact=np.ones((T, 2), bool), foothold_ref=foot.copy(), foot=foot.copy(),
+                 com_out=np.zeros(T, bool), fv=np.full((T, 2), 0.5), moment=np.full((T, 6), 0.3),
+                 act_sat=np.zeros((T, 90), bool), at_limit=np.zeros(T, bool), sphere=np.zeros((T, S, 3)),
+                 touching=np.ones((T, S), bool), fell=False, metabolic_j_per_kg_m=3.0)
+    thr = dict(grf_peak_bw=1.5, grf_loading_rate_bw_s=15.0, style_loss=1.0, band=None,
+               joint_peak_nm_per_kg=dict(hip_flexion=1.4, knee_angle=1.5, ankle_angle=2.0))
+    r = accept.check(clean, thr)
+    assert r["accepted"] and not r["failed"] and not r["unchecked"], r
+    slide = dict(clean, sphere=clean["sphere"] + np.linspace(0, 0.03, T)[:, None, None] * [1, 0, 0])
+    assert accept.check(slide, thr)["failed"] == ["contact"]
+    missed = dict(clean, fv=np.where(np.arange(T)[:, None] < 80, 0.0, 0.5) * [1, 1])
+    assert "plan" in accept.check(missed, thr)["failed"]
+    assert accept.check(dict(clean, fell=True), thr)["failed"] == ["fell"]
+    assert accept.check(clean, dict(thr, style_loss=None))["unchecked"] == ["style"]
+
+
+def test_mirror_records(D: dict) -> None:
+    """A mirrored style record equals the style record of the mirrored pose (coordinates reflected with SPRINT's
+    mirror signs, then forward kinematics); mirroring twice is the identity."""
+    from sprint.recipes.imitation import mirrored
+    from sprint.recipes.motion import forward_kinematics_np, model_layout
+
+    from gp.data import coord_mirror_signs, record_layout, style_records
+    from gp.smp import mirror_maps, mirror_records
+    model = data.load_model()
+    L, names = model_layout(model), list(model.coord_names)
+    cs = coord_mirror_signs(model)
+    legs = {n: float(cs[names.index(n)]) for n in names if n.endswith("_r")}
+    assert all(v == 1.0 for v in legs.values()), legs          # paired leg coordinates mirror with +1 on Rajagopal v3
+    maps = mirror_maps(model, D["tracked"])
+    for i in range(len(D["name"])):
+        rows = np.arange(int(D["start"][i]) + 5, int(D["start"][i]) + 45, 5)
+        q = D["qpos"][rows].astype(np.float64)
+        qm = q[:, [names.index(mirrored(n)) for n in names]] * cs
+        P = np.c_[D["profile_x"][i][: D["profile_n"][i]], D["profile_y"][i][: D["profile_n"][i]]]
+        xp, xq = forward_kinematics_np(model, qm.astype(np.float32))
+        key = [list(model.body_names).index(b) for b in data.KEY_BODIES]
+        ref = style_records(xp.astype(np.float64), xq.astype(np.float64), qm, L.tracked, key, P)
+        rec = torch.as_tensor(D["record"][rows])
+        got = mirror_records(rec, maps).numpy()
+        lay = record_layout(len(D["tracked"]))
+        assert np.abs(np.abs((got[:, lay["root_quat"]] * ref[:, lay["root_quat"]]).sum(1)) - 1).max() < 1e-5
+        for k in ("root_pos", "joints", "key_pos", "ground"):
+            assert np.abs(got[:, lay[k]] - ref[:, lay[k]]).max() < 1e-4, (D["name"][i], k)
+        assert torch.allclose(mirror_records(mirror_records(rec, maps), maps), rec)

@@ -37,8 +37,10 @@ def build(task_name: str, D: dict, worlds: int, seed: int, device: str, prior: s
     c = recipe_config()
     task = (PlanTracking(D, c, PlanConfig(prior=prior), starts=starts, seed=seed) if task_name == "planner"
             else TerrainImitation(D, c, starts=starts, seed=seed))
+    # average_fext: contact forces read as the control step's mean, not the last substep's (which carries a
+    # two-substep friction mode); a readout only, the physics is the same.
     opts = sprint.StepOptions(dt_ctrl=1.0 / data.HZ, n_sub=c.physics_steps, implicit_friction=True,
-                              implicit_normal=c.implicit_normal, strict=False)
+                              implicit_normal=c.implicit_normal, strict=False, average_fext=True)
     env = sprint.VecEnv(model, worlds, task=task, seed=seed, step_options=opts, device=device, delays=c.delays)
     return env, task
 

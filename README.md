@@ -21,11 +21,14 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 |---|---|---|
 | 0. data (done) | `python -m gp.data` -> `data/v1/` | CPU, 2 min |
 | 0b. kinetics (done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
+| 0c. filter thresholds (kinetic part done) | `python -m gp.accept` -> `data/v1/accept.json` | CPU |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
 | 4. planner | `python train.py --task planner --prior runs/prior_v1/prior.pt --out runs/planner_v1 --hours H` | GPU |
-| 5. evaluate | `python evaluate.py runs/<run> --prior runs/prior_v1/prior.pt` -> `eval.json` | GPU or CPU |
+| 2b. style threshold | `python -m gp.accept --prior runs/prior_v1/prior.pt` (adds the style check) | GPU or CPU |
+| 5. evaluate | `python evaluate.py runs/<run> --prior runs/prior_v1/prior.pt` -> `eval.json` (with the filter) | GPU or CPU |
+| 6. gate G1 | `python g1.py runs/planner_v1 runs/baseline_v1` -> `g1.json` | CPU |
 
 Launch training detached (`setsid nohup ... > runs/<name>.log 2>&1 < /dev/null &`), as the docstrings show.
 Baseline and planner share body, clips, physics, delays, effort and learner, so equal `--hours` is matched compute.
@@ -45,6 +48,7 @@ pose; the prior trains; PPO runs an iteration.
 | `train_prior.py`, `check_prior.py` | train the prior; gate G0 |
 | `train.py`, `evaluate.py` | train a policy (PPO); evaluate it on held-out clips |
 | `camargo_id.py` | Camargo inverse dynamics on Rajagopal v3 |
+| `gp/accept.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); gate G1 |
 | `tests/test_smoke.py` | the CPU checks |
 
 ## Data v1 (`data/v1/split.json`)
@@ -93,7 +97,18 @@ plate, and Camargo's own ID exists there). Against Camargo's own ID (their knee 
 | stairs_up | 0.993 | 0.996 | 0.997 | -1.14 to 0.35 (-1.13 to 0.37) |
 | stairs_down | 0.982 | 0.995 | 0.995 | -1.40 to 0.23 (-1.41 to 0.24) |
 
-Not yet built: the acceptance filter that uses these ranges (phase G1).
+## Acceptance filter and G1 (`gp/accept.py`, `g1.py`)
+
+The plan doc's six checks, each threshold the 5th or 95th percentile of the same measure on the real clips of the
+episode's split and terrain class: style (2 s windows), plan followed, ground reaction (peak force, loading rate),
+joint loads, muscle effort (saturation), contact (sliding spheres, joint limits). A fallen episode is rejected first.
+`evaluate.py` runs every episode through it. Two departures from the doc's drawing:
+- joint loads are **net joint moments**, not knee and hip reaction forces: SPRINT's reaction pass refuses wrapped
+  muscle paths, which Rajagopal v3 has, and real reaction forces would need muscle-force estimates;
+- metabolic cost per metre is **reported, not gated**: there is no human metabolic data in v1.
+
+G1's curve check compares the right stance (touchdown to lift-off), not the whole stride: a whole stride is almost
+never on plates throughout.
 
 ## Known limits
 
