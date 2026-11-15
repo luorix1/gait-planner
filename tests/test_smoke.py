@@ -15,7 +15,7 @@ from gp import data
 def D() -> dict:
     full = data.load("train")
     cls = np.array(full["terrain_class"])
-    pick = [int(np.flatnonzero(cls == c)[0]) for c in ("level", "ramp_up", "ramp_down", "stairs_up", "stairs_down")]
+    pick = [int(np.flatnonzero(cls == c)[0]) for c in sorted(set(cls))]          # one clip of each terrain class
     return data.take(full, pick)
 
 
@@ -280,18 +280,23 @@ def test_heightfield_lookup_and_atlas() -> None:
 
 
 def test_clip_on_heightfield(D: dict) -> None:
-    """A stairs clip on a heightfield tile of its own profile matches it on the profile (style record, height scan),
-    mixes with a profile clip in one env, and steps; the scan's mirror swaps left and right."""
+    """A clip on stairs (a level clip given a stairs profile), once as that profile and once on a heightfield tile of
+    it, has the same style record and height scan; a profile clip and a heightfield clip share one env and step; the
+    scan's mirror swaps left and right."""
     from sprint.terrain import HFIELD
+    from sprint.terrain import stairs as sprint_stairs
 
     from gp.data import heightfield_gap
     from gp.tasks import SCAN_LATERAL, TerrainImitation
-    from gp.terrain import atlas, tile_from_profile
+    from gp.terrain import atlas, pad, tile_from_profile
     cls = list(D["terrain_class"])
-    i = cls.index("stairs_up")
-    two = data.take(D, [cls.index("level"), i])
-    P = np.c_[D["profile_x"][i][: D["profile_n"][i]], D["profile_y"][i][: D["profile_n"][i]]]
+    i = cls.index("level")
+    two = data.take(D, [i, i])
     s, n = int(D["start"][i]), int(D["frames"][i])
+    P = np.asarray(sprint_stairs(x0=float(D["qpos"][s + 10, 3]) + 0.4, n=6, run=0.30, rise=0.17,
+                                 y0=float(D["profile_y"][i][0])), np.float64)
+    X2, Y2 = pad([P, P])                                           # both clips stand on these stairs, as profiles
+    two.update(profile_x=X2, profile_y=Y2, profile_n=np.array([len(P), len(P)]))
     xr = (D["qpos"][s:s + n, 3].min() - 3, D["qpos"][s:s + n, 3].max() + 3)
     zr = (D["qpos"][s:s + n, 5].min() - 3, D["qpos"][s:s + n, 5].max() + 3)
     A = atlas([tile_from_profile(P, xr, zr, 0.02)], 0.02)

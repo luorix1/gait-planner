@@ -19,10 +19,10 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 
 | Step | Command | Device |
 |---|---|---|
-| 0. data (done) | `python -m gp.data` -> `data/v1/` | CPU, 2 min |
-| 0b. kinetics (done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
-| 0c. filter thresholds (kinetic part done) | `python -m gp.accept` -> `data/v1/accept.json` | CPU |
-| 0d. EMG envelopes (done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
+| 0. data (done) | `python -m gp.data` -> `data/ab01/` (the active dataset; `python -m gp.data v1` rebuilds v1) | CPU, 15 s |
+| 0b. kinetics (v1 only, done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
+| 0c. filter thresholds (v1 only, done) | `python -m gp.accept` -> `data/v1/accept.json` | CPU |
+| 0d. EMG envelopes (v1 only, done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
@@ -55,17 +55,28 @@ pose; the prior trains; PPO runs an iteration.
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `tests/test_smoke.py` | the CPU checks |
 
-## Data v1 (`data/v1/split.json`)
+## Data (`data/<dataset>/split.json`)
 
-- AB01 + Camargo 2021: 6,533 clips, 13.8 h at 40 Hz. PARC obstacle clips are out of v1 (heightfield-only terrain).
-- **Split:** `train` 4,944 clips (10.5 h); `test_subject` 3 Camargo subjects (AB06, AB09, AB24; drawn with seed
-  2026), all their clips; `test_terrain` Camargo's 18 deg ramps and 178 mm stairs (stair_4) for everyone else.
-  The held-out terrain is the steepest and tallest, so the terrain test is extrapolation.
-- **Dropped:** 11 clips whose joint speed passes 20 rad/s anywhere (source IK spikes up to 132 rad/s).
+**ab01, the active dataset (2026-11-14).** Our AB01 pilot alone: 291 clips, 46 min at 40 Hz, one subject.
+- Treadmill standing (7 grades) and locomotion (-15 to 15 deg, 0.4-2.8 m/s; the belt travel integrated, so the lab frame
+  climbs or descends), and all 12 overground walks with turns (mc_047-058, 188 windows, 30 min).
+- **Split by trial** (one subject, so there are no held-out subjects): `train` 213 clips (34 min); `test_trial` 56
+  (9 min): trial 4 of each overground speed and the 1.2 m/s treadmill trials at 0, +5 and -10 deg; `test_terrain` 22
+  (4 min): every +-15 deg trial. `data.HELD_OUT` names the held-out-motion split the gate and the evaluation use.
+- AB01 has no stairs: the stairs machinery stays tested, on synthetic stairs.
+
+**v1 (`data/v1`), set aside.** AB01 + Camargo 2021: 6,533 clips, 13.8 h; split by three held-out Camargo subjects and
+the steepest/tallest Camargo terrain. Camargo is out for now: its IK welds the lumbar (the trunk never moves) and some
+stair clips' heels never reach the ground (unclear whether theirs or our processing). The Camargo kinetics and EMG below
+are built on v1 and do not apply to ab01; AB01 has its own (treadmill force plates for 47 trials, EMG for all 59), not
+yet processed.
+
+Both:
+- **Dropped:** clips whose joint speed passes 20 rad/s anywhere (source IK spikes; 1 AB01 window, 10 Camargo clips).
 - **Plans** (`plans.npz`): per frame and foot, down or not, the foothold of its current or next contact, time to
-  touchdown and lift-off (capped at 1 s), and the whole-body centre of mass. Copied from the clips (v1).
+  touchdown and lift-off (capped at 1 s), and the whole-body centre of mass. Copied from the clips.
 - **Reset lift:** per frame, the root raise that takes every contact sphere out of the terrain (signed distance to
-  the profile, as SPRINT's contact sees it): median 0.3 cm, p99 3 cm, max 9.6 cm.
+  the profile, as SPRINT's contact sees it).
 
 ## Choices (defaults; each is one constant)
 

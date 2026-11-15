@@ -149,7 +149,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
     ap.add_argument("--prior", default="")
-    ap.add_argument("--splits", nargs="+", default=["test_subject", "test_terrain"])
+    ap.add_argument("--splits", nargs="+", default=[data.HELD_OUT, "test_terrain"])
     ap.add_argument("--per-class", type=int, default=64)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()

@@ -19,14 +19,17 @@ from pathlib import Path
 
 import numpy as np
 
+from gp import data
+
 LEVEL_RAMP = ("level", "ramp_up", "ramp_down")
+HELD = data.HELD_OUT                    # held-out motion: Camargo subjects (v1), AB01 trials (ab01)
 MIN_ACCEPT, MIN_SPS = 0.5, 10_000
 
 
 def main() -> None:
     planner, baseline = Path(sys.argv[1]), Path(sys.argv[2])
     ep, eb = (json.loads((r / "eval.json").read_text()) for r in (planner, baseline))
-    rows = [r for r in ep["test_subject"] if r["terrain_class"] in LEVEL_RAMP]
+    rows = [r for r in ep[HELD] if r["terrain_class"] in LEVEL_RAMP]
     acc = float(np.mean([r["accepted"] for r in rows])) if rows else float("nan")
     unchecked = sorted({c for r in rows for c in r.get("unchecked", [])})
     fails: dict[str, int] = {}
@@ -36,7 +39,7 @@ def main() -> None:
     band = {}
     for name, e in (("planner", ep), ("baseline", eb)):
         band[name] = {sp: float(np.nanmean([r.get("in_band_mean", np.nan) for r in e[sp]]))
-                      for sp in ("test_subject", "test_terrain") if sp in e}
+                      for sp in (HELD, "test_terrain") if sp in e}
     both = [sp for sp in band["planner"] if sp in band["baseline"]]
     kin_pass = all(band["planner"][sp] >= band["baseline"][sp] for sp in both) if both else None
     prog = list(csv.DictReader((planner / "progress.csv").open()))

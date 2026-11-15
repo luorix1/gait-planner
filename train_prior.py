@@ -51,7 +51,7 @@ def main() -> None:
     out = Path(a.out)
     out.mkdir(parents=True)                      # a fresh folder per run, never overwrite one
     torch.manual_seed(0)
-    D, Dt = data.load("train", Path(a.src)), data.load("test_subject", Path(a.src))
+    D, Dt = data.load("train", Path(a.src)), data.load(data.HELD_OUT, Path(a.src))
     rec, ends = windows(D, a.device)
     rec_t, ends_t = windows(Dt, a.device)
     prior = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"]).to(a.device)

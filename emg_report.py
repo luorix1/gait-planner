@@ -17,13 +17,13 @@ from pathlib import Path
 
 import numpy as np
 
-from gp import emg
+from gp import data, emg
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+")
-    ap.add_argument("--split", default="test_subject")
+    ap.add_argument("--split", default=data.HELD_OUT)
     a = ap.parse_args()
     runs = [Path(r) for r in a.runs]
     _, channels, _, unreliable = emg.load_emg()

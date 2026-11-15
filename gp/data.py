@@ -1,10 +1,16 @@
-"""The v1 training data, built once from the seed library's Rajagopal v3 export.
+"""The training data, built once from the seed library's Rajagopal v3 export. Two datasets (``DATASETS``):
 
-- **Clips**: AB01 and Camargo 2021 (PARC obstacle clips are dropped in v1: their terrain is heightfield-only).
-- **Split** (``split`` per clip): ``test_subject`` = every clip of three Camargo subjects; ``test_terrain`` = the
-  steepest ramps (|grade| >= 16 deg, Camargo's 18 deg) and the tallest stairs (Camargo stair_4, 178 mm) of every
-  other subject, for the held-out-terrain tests; ``train`` = the rest.
-- **Dropped**: clips with a joint speed over 20 rad/s anywhere (``MAX_JOINT_SPEED``; source IK glitches).
+- **ab01** (the default, ``data/ab01``): our AB01 pilot alone, one subject: treadmill standing and locomotion at -15 to
+  15 deg (the belt travel integrated, so the lab frame climbs or descends) and the 12 overground walks with turns.
+  Split by trial: ``test_terrain`` = every +-15 deg trial (locomotion and standing); ``test_trial`` = trial 4 of each
+  overground speed and the 1.2 m/s treadmill trials at 0, +5 and -10 deg; ``train`` = the rest.
+- **v1** (``data/v1``): AB01 and Camargo 2021, split by held-out Camargo subjects and terrain. Camargo is set aside
+  since 2026-11-14 (its IK welds the lumbar, so the trunk never moves, and some stair clips' heels never reach the
+  ground); kept for reproduction and for the Camargo kinetics and EMG built on it.
+
+Both:
+- **Dropped**: clips with a joint speed over 20 rad/s anywhere (``MAX_JOINT_SPEED``; source IK glitches). PARC
+  obstacle clips are not used (heightfield-only terrain and not measured human motion).
 - **Motion**: coordinates low-passed at 6 Hz and differentiated as SPRINT's ``load_motion`` does, resampled from
   30 Hz to the 40 Hz control step SPRINT's imitation recipe is tuned at. Each clip is moved so it starts at
   x = z = 0, its terrain profile with it.
@@ -16,8 +22,8 @@
 - **Style records** (``plans.npz`` ``record``): the per-frame quantities the style prior's windows are built from
   (:func:`gp.smp.window_features`), from the same forward kinematics the simulation uses.
 
-Run (CPU, ~10 min): ``.venv/bin/python -m gp.data``
-Out: ``data/v1/clips.npz``, ``data/v1/plans.npz``, ``data/v1/split.json``
+Run (CPU, ~1 min for ab01): ``.venv/bin/python -m gp.data [ab01|v1]``
+Out: ``data/<dataset>/clips.npz``, ``plans.npz``, ``split.json``
 """
 
 from __future__ import annotations
@@ -32,7 +38,8 @@ import numpy as np
 from .terrain import height, pad, profile
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "v1"
+DATASET = "ab01"                         # the active dataset; data/v1 is kept for reproduction
+OUT = ROOT / "data" / DATASET
 SEED = Path.home() / "Jinwoo/seed_library/data/osim_export"
 #: Byte-identical to the model the seed library's IK used (STC/assets/models/gait/Rajagopal_lower_collision_v3.osim).
 MODEL = Path.home() / "Jinwoo/neural_test/models/Rajagopal_lower_collision_v3.osim"
@@ -49,6 +56,17 @@ SIDES = ("l", "r")
 TEST_SUBJECTS = ("camargo_AB06", "camargo_AB09", "camargo_AB24")
 
 
+#: AB01, by trial number (mc_NNN; MC_TRIAL_INDEX.md): every +-15 deg trial is held-out terrain; trial 4 of each overground
+#: speed and the 1.2 m/s treadmill trials at 0, +5 and -10 deg are held-out trials.
+AB01_TEST_TERRAIN = {0, 6, 7, 8, 9, 35, 36, 37}
+AB01_TEST_TRIAL = {12, 21, 28, 50, 54, 58}
+
+
+def split_ab01(r: dict[str, Any]) -> str:
+    mc = int(r["name"].split("_mc")[1][:3])
+    return "test_terrain" if mc in AB01_TEST_TERRAIN else "test_trial" if mc in AB01_TEST_TRIAL else "train"
+
+
 def split_of(r: dict[str, Any]) -> str:
     if r["subject"] in TEST_SUBJECTS:
         return "test_subject"
@@ -63,6 +81,17 @@ def split_of(r: dict[str, Any]) -> str:
 #: need 0.6 MPa; SPRINT's default, OpenSim's 0.25 MPa, makes every muscle 2.4x heavy and heat 2.4x high. Needs
 #: the gait-planner-engine SPRINT (setup_env.sh). Metabolics only: forces and the compile hash are unchanged.
 SPECIFIC_TENSION = 0.6e6
+
+
+DATASETS: dict[str, dict[str, Any]] = {
+    "ab01": dict(sources=("ab01",), split=split_ab01, splits=("train", "test_trial", "test_terrain"),
+                 held_out="test_terrain: AB01 +-15 deg trials; test_trial: overground trial 4 per speed, treadmill "
+                          "1.2 m/s at 0/+5/-10 deg"),
+    "v1": dict(sources=("ab01", "camargo2021"), split=split_of, splits=("train", "test_subject", "test_terrain"),
+               held_out="test_subject: Camargo AB06/AB09/AB24; test_terrain: ramps |grade| >= 16 deg, Camargo stair_4"),
+}
+#: The active dataset's held-out-motion split (the one the prior's gate and the evaluation use).
+HELD_OUT = DATASETS[DATASET]["splits"][1]
 
 
 def load_model(device: Any = "cpu") -> Any:
@@ -171,7 +200,7 @@ def heightfield_gap(hf: dict[str, Any], offset: Any, ctr: np.ndarray, r: np.ndar
     return ctr[..., 1] - r - h
 
 
-def build(limit: int | None = None, out: Path = OUT) -> None:
+def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = None) -> None:
     """``limit``: the first clips only (smoke tests), written to ``out``."""
     from sprint.recipes.motion import _lowpass, _rotate, forward_kinematics_np, model_layout
 
@@ -189,8 +218,10 @@ def build(limit: int | None = None, out: Path = OUT) -> None:
     sph_side = np.array([model.body_names[b][-1] for b in sph_body])
     rad = np.asarray(h["geom_size"][sph][:, 0], np.float64)
 
+    ds = DATASETS[dataset]
+    out = out or ROOT / "data" / dataset
     rows = [r for f in sorted(SEED.glob("manifest_*.json")) for r in json.loads(f.read_text())
-            if r["exported"] and r["source"] != "parc_seed" and not r.get("uses_hands")][:limit]
+            if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")][:limit]
     meta: dict[str, list[Any]] = {k: [] for k in ("name", "subject", "source", "terrain_class", "mode", "split",
                                                   "grade_deg", "stair_rise_m", "speed_mps", "frames")}
     arrays: dict[str, list[np.ndarray]] = {k: [] for k in ("qpos", "qvel", "contact", "lift", "plan_contact", "foothold",
@@ -238,7 +269,7 @@ def build(limit: int | None = None, out: Path = OUT) -> None:
         profiles.append(P)
         horiz = qvel[:, [tx, tz]]
         for k, v in (("name", r["name"]), ("subject", r["subject"]), ("source", r["source"]),
-                     ("terrain_class", r["terrain_class"]), ("mode", r["mode"]), ("split", split_of(r)),
+                     ("terrain_class", r["terrain_class"]), ("mode", r["mode"]), ("split", ds["split"](r)),
                      ("grade_deg", float(r.get("grade_deg") or 0.0)), ("stair_rise_m", float(r.get("stair_rise_m") or 0.0)),
                      ("speed_mps", float(np.median(np.linalg.norm(horiz, axis=1)))), ("frames", len(grid))):
             meta[k].append(v)
@@ -257,8 +288,8 @@ def build(limit: int | None = None, out: Path = OUT) -> None:
              tracked=np.array([names[k] for k in L.tracked]))
     split = np.array(meta["split"])
     summary = {s: dict(clips=int((split == s).sum()), hours=round(float(frames[split == s].sum()) / HZ / 3600, 2))
-               for s in ("train", "test_subject", "test_terrain")}
-    summary.update(dropped_joint_speed=glitched, test_subjects=list(TEST_SUBJECTS), held_out_terrain="ramps |grade| >= 16 deg, Camargo stair_4",
+               for s in ds["splits"]}
+    summary.update(dataset=dataset, sources=list(ds["sources"]), held_out=ds["held_out"], dropped_joint_speed=glitched,
                    hz=HZ, frames=int(frames.sum()), built=time.strftime("%Y-%m-%d %H:%M"))
     (out / "split.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary, indent=1), f"\n{time.time() - t0:.0f} s")
@@ -309,4 +340,5 @@ def motions(D: dict[str, Any]) -> list[Any]:
 
 
 if __name__ == "__main__":
-    build()
+    import sys
+    build(sys.argv[1] if len(sys.argv) > 1 else DATASET)

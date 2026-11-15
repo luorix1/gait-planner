@@ -82,7 +82,7 @@ def main() -> None:
     L = model_layout(model)
     rng = np.random.default_rng(0)
     report: dict = {}
-    for split in ("test_subject", "test_terrain"):
+    for split in (data.HELD_OUT, "test_terrain"):
         D = data.load(split)
         margin = int(np.ceil(W * WARP)) + 1
         valid = np.concatenate([np.arange(s + margin, s + n) for s, n in zip(D["start"], D["frames"], strict=True)])
@@ -103,7 +103,7 @@ def main() -> None:
         r["pass"] = bool(r["win_overall"] >= 0.95 and max(r["below_threshold_by_subject"].values()) <= 0.10)
         report[split] = r
         print(split, json.dumps(r, indent=1), flush=True)
-    report["g0_pass"] = report["test_subject"]["pass"]
+    report["g0_pass"] = report[data.HELD_OUT]["pass"]
     (path.parent / "g0.json").write_text(json.dumps(report, indent=1))
     print("G0", "PASS" if report["g0_pass"] else "FAIL", "->", path.parent / "g0.json")
 

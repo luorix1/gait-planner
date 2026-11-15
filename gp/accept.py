@@ -38,7 +38,7 @@ import numpy as np
 
 from . import data
 
-SPLITS = ("test_subject", "test_terrain")
+SPLITS = (data.HELD_OUT, "test_terrain")
 JOINTS = tuple(f"{j}_{s}" for j in ("hip_flexion", "knee_angle", "ankle_angle") for s in ("l", "r"))
 CURVES = ("hip_flexion_r", "knee_angle_r", "ankle_angle_r", "grf_r")
 CUTOFF_HZ = 6.0
