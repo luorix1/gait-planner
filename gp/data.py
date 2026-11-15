@@ -3,8 +3,7 @@
 - **v2** (the default, ``data/v2``, user 2026-11-15): AB01 as below plus PARC's capture (running, platforms, gaps, a
   few stairs; one performer, already passed through PARC's physics tracker), so the loop starts with every skill it
   is meant to combine. PARC terrain is a box grid, built into one shared heightfield (``hf_*`` in ``clips.npz``,
-  ``terrain_kind`` 1). PARC clips named ``_mdm_`` (likely PARC generator output) and clips that use the hands are
-  left out. PARC is split by motion (a motion's tracked, untracked, straightened and terrain-jittered copies
+  ``terrain_kind`` 1). PARC clips that use the hands and those named in ``EXCLUDE`` are left out. PARC is split by motion (a motion's tracked, untracked, straightened and terrain-jittered copies
   together, by its last ``<word>_<NNN>`` tag): ``crc32(tag) % 10 == 0`` goes to ``test_trial``.
 - **ab01** (``data/ab01``): our AB01 pilot alone, one subject: treadmill standing and locomotion at -15 to
   15 deg (the belt travel integrated, so the lab frame climbs or descends) and the 12 overground walks with turns.
@@ -61,6 +60,10 @@ PLAN_CAP_S = 1.0
 #: A clip whose low-passed joint speed passes this anywhere is dropped (source IK glitches: 7 Camargo clips at
 #: 25-132 rad/s; real gait peaks near 10, the 99.9th percentile of every joint here is under 8).
 MAX_JOINT_SPEED = 20.0
+#: Clips left out by name (substring): ``_mdm_`` likely PARC generator output; ``mid_climbing`` hand-assisted (PARC
+#: labels a hand down in 3-5 % of frames, under the seed library's 5 % cut); ``parc_dm_platform_024_dm`` swing toe
+#: 7.5 cm into a platform face for 0.33 s (its untracked twin is clean). User 2026-11-15.
+EXCLUDE = ("_mdm_", "mid_climbing", "parc_dm_platform_024_dm")
 KEY_BODIES = ("calcn_l", "calcn_r", "toes_l", "toes_r", "torso")
 SIDES = ("l", "r")
 #: Drawn once: np.random.default_rng(2026).choice(sorted Camargo subjects, 3, replace=False).
@@ -253,7 +256,7 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
     out = out or ROOT / "data" / dataset
     rows = [r for f in sorted(SEED.glob("manifest_*.json")) for r in json.loads(f.read_text())
             if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")
-            and "_mdm_" not in r["name"]][:limit]
+            and not any(x in r["name"] for x in EXCLUDE)][:limit]
     meta: dict[str, list[Any]] = {k: [] for k in ("name", "subject", "source", "terrain_class", "mode", "split",
                                                   "grade_deg", "stair_rise_m", "speed_mps", "frames")}
     arrays: dict[str, list[np.ndarray]] = {k: [] for k in ("qpos", "qvel", "contact", "lift", "plan_contact", "foothold",

@@ -58,13 +58,15 @@ pose; the prior trains; PPO runs an iteration.
 ## Data (`data/<dataset>/split.json`)
 
 **v2, the active dataset (2026-11-15).** AB01 (below) plus PARC's capture, so the loop starts with every skill it is
-meant to combine: 504 clips, 1.08 h. PARC adds 213 clips (18 min, one performer, already passed through PARC's physics
+meant to combine: 498 clips, 1.07 h. PARC adds 207 clips (18 min, one performer, already passed through PARC's physics
 tracker): level running (3.3 m/s median), platforms, gap jumps, 5 stair clips and 2 walks. Its terrain is a box grid
-(0.39 m cells), built into one shared heightfield; each clip stands on its own tile. Left out: clips that use the hands
-and 3 `_mdm_` clips (likely PARC generator output). PARC is split by motion (tracked, untracked, straightened and
-jittered copies together): `train` 412 clips (51 min), `test_trial` 70 (10 min), `test_terrain` 22 (AB01's). Seen in
-the Studio exports: swing toes clip a stair riser for 0.1 s (`stairs_001`, up to 18 cm) and landing toes sink 3-6 cm
-for a few frames in the jumps.
+(0.39 m cells), built into one shared heightfield; each clip stands on its own tile. Left out (`gp.data.EXCLUDE`):
+clips that use the hands, 3 `_mdm_` clips (likely PARC generator output), the 5 `mid_climbing` clips (PARC labels a
+hand down in 3-5 % of frames) and `parc_dm_platform_024_dm` (swing toe 7.5 cm into a platform face). PARC is split by
+motion (tracked, untracked, straightened and jittered copies together): `train` 406 clips (51 min), `test_trial` 70
+(10 min), `test_terrain` 22 (AB01's). Kept: `stairs_001`'s swing toe enters a riser by 3.5 cm for 0.15 s, and
+landing toes sink 5-6 cm for a few frames in the jumps. Our toes reach past PARC's foot box, so toes that pass close
+to a face in PARC's data poke into it here.
 
 **ab01 (`data/ab01`).** Our AB01 pilot alone: 291 clips, 46 min at 40 Hz, one subject.
 - Treadmill standing (7 grades) and locomotion (-15 to 15 deg, 0.4-2.8 m/s; the belt travel integrated, so the lab frame
@@ -92,8 +94,8 @@ Both:
   imitation recipe without EMG. The clips are resampled from 30 Hz.
 - **Style prior:** MimicKit's settings (2 DiT blocks, T = 50, diffusion steps 22/15/8, scale 6, AdamW 2e-4, batch
   512, 200k iterations, EMA 0.995). Window 13 frames (0.325 s, MimicKit's 10 at 30 Hz), scored every step. Features
-  are this body's own (see `gp/smp.py`): root height above the terrain under it, not above a flat floor. Not
-  mirror-augmented.
+  are this body's own (see `gp/smp.py`): root height above the terrain under it, not above a flat floor. Half of
+  every batch is mirrored left to right.
 - **Planner reward:** contact 0.15, foothold 0.15 (10 cm), centre-of-mass band 0.20 (+-10 cm forward, +-5 cm up and
   sideways, 5 cm tolerance beyond), style 0.50 (MimicKit's 50/50), minus the recipe's effort (metabolic 0.02, summed
   cubed activation 0.02, compartment balance 0.02); the same effort in the baseline.
