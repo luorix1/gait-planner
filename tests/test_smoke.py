@@ -230,3 +230,19 @@ def test_terrain_courses() -> None:
            dict(kind="ramp", run=5.0, grade_deg=8.0, dir=-1), dict(kind="level", run=4.0)]
     with pytest.raises(ValueError, match="straight into"):
         check_course(bad)
+
+
+def test_emg_scores() -> None:
+    """Stride profiles cut touchdown to touchdown; a profile set scored against itself reaches r 1 and full agreement;
+    rectus femoris is left out of the summary."""
+    from gp import emg
+    T = 400
+    down = (np.arange(T) % 44) < 26                                   # 1.1 s strides, 60 % stance
+    x = np.stack([np.sin(np.arange(T) / 44 * 2 * np.pi + k) + 1.5 for k in range(3)], 1)
+    pr = emg.stride_profiles(down, x)
+    assert pr.shape == (8, 3, 101)
+    s = emg.summarise(pr)
+    ref = dict(channels=["soleus", "rectusfemoris", "gracilis"], **s)
+    out = emg.compare(ref, s, unreliable=("rectusfemoris",))
+    assert abs(out["soleus"]["r"] - 1) < 1e-9 and out["soleus"]["on_off_agreement"] == 1.0
+    assert not out["rectusfemoris"]["scored"] and abs(out["mean_r"] - 1) < 1e-9

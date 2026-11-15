@@ -7,10 +7,11 @@ same style prior (SDS loss of the simulated motion, from its 14th step), so the 
 
 Each episode also runs through the acceptance filter (gp/accept.py, thresholds from ``data/v1/accept.json``): the
 six checks, accepted or not, the numbers behind each, and G1's share of the right-stance moment and force curves
-inside the real band. The style check needs ``accept.json`` calibrated with the same prior.
+inside the real band. The style check needs ``accept.json`` calibrated with the same prior. The activations of the
+muscles Camargo's EMG measured are saved per right stride (``emg_strides.npz``) for ``emg_report.py``.
 
 Run: .venv/bin/python evaluate.py runs/planner_v1 [--prior runs/prior_v1/prior.pt]
-Out: <run>/eval.json, and a table per split and terrain class
+Out: <run>/eval.json, <run>/emg_strides.npz, and a table per split and terrain class
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ import numpy as np
 import torch
 from sprint.recipes.ppo import ActorCritic, PPOConfig, env_action_bounds
 
-from gp import accept, data
+from camargo_emg import CHANNELS, MUSCLES
+from gp import accept, data, emg
 from gp.smp import Prior, W
 from gp.tasks import PlanConfig
 from train import build
@@ -46,7 +48,7 @@ def policy(env, path: Path):
 
 
 def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | None, device: str,
-              thresholds: dict | None) -> list[dict]:
+              thresholds: dict | None) -> tuple[list[dict], list[tuple[np.ndarray, str]]]:
     full = data.load(split)
     rng = np.random.default_rng(0)
     cls = np.array(full["terrain_class"])
@@ -79,6 +81,11 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
     lim_lo = torch.as_tensor(m.host["limit_lo"][: len(lim)], dtype=torch.float32, device=dev) + accept.LIMIT_MARGIN
     lim_hi = torch.as_tensor(m.host["limit_hi"][: len(lim)], dtype=torch.float32, device=dev) - accept.LIMIT_MARGIN
     band = torch.as_tensor(PlanConfig().com_band, device=dev)
+    mn = list(m.muscle_names)
+    emg_w = torch.zeros(m.nmus, len(CHANNELS), device=dev)               # channel = mean of its muscles' activations
+    for k, ch in enumerate(CHANNELS):
+        for mus in MUSCLES[ch]:
+            emg_w[mn.index(mus), k] = 1.0 / len(MUSCLES[ch])
     trace: dict[str, list] = defaultdict(list)
     path_len, metab_j = torch.zeros(n, device=dev), torch.zeros(n, device=dev)
     last_root = s.body_com_pos()[:, task.root, [0, 2]].clone()
@@ -107,7 +114,8 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
                     moment=B.to_torch(env.data.qfrc_total)[: nv * n].view(nv, n).T[:, jcol] / mass,
                     act_sat=s.activation > accept.SAT,
                     at_limit=((q[:, lim_dof] < lim_lo) | (q[:, lim_dof] > lim_hi)).any(1),
-                    sphere=sph, touching=sph[..., 1] - task.ground(sph[..., 0]) < accept.TOUCH_M)
+                    sphere=sph, touching=sph[..., 1] - task.ground(sph[..., 0]) < accept.TOUCH_M,
+                    emg_act=s.activation @ emg_w)
         for k, v in step.items():
             trace[k].append(v.cpu())
         path_len += torch.where(live, (root[:, [0, 2]] - last_root).norm(dim=1), torch.zeros_like(path_len))
@@ -118,7 +126,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
         done |= term | trunc
         if bool(done.all()):
             break
-    out = []
+    out, strides = [], []
     for i in range(n):
         row = dict(clip=str(D["name"][i]), terrain_class=str(D["terrain_class"][i]), subject=str(D["subject"][i]),
                    completed=not bool(fell[i]), survived=float(steps[i] / possible[i].clamp_min(1)),
@@ -130,8 +138,11 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
         tr.update(fell=bool(fell[i]), metabolic_j_per_kg_m=float(metab_j[i] / mass / path_len[i].clamp_min(1e-3)))
         thr = (thresholds or {}).get(split, {}).get(row["terrain_class"])
         row.update(accept.check(tr, thr))
+        pr = emg.stride_profiles(tr["fv"][:, 1] > accept.DOWN_BW, tr["emg_act"])
+        row["emg_strides"] = len(pr)
+        strides += [(x, row["terrain_class"]) for x in pr]
         out.append(row)
-    return out
+    return out, strides
 
 
 def main() -> None:
@@ -154,8 +165,12 @@ def main() -> None:
             for t in thresholds.get(sp, {}).values():
                 t["style_loss"] = None
     report = {}
+    prof, prof_split, prof_cls = [], [], []
     for split in a.splits:
-        rows = run_split(run, rec, split, a.per_class, scorer, a.device, thresholds)
+        rows, strides = run_split(run, rec, split, a.per_class, scorer, a.device, thresholds)
+        prof += [x for x, _ in strides]
+        prof_split += [split] * len(strides)
+        prof_cls += [c for _, c in strides]
         report[split] = rows
         for r in rows:                                   # G1 reads the curves' mean share in band
             ib = [v for v in (r.get("in_band") or {}).values() if v is not None]
@@ -168,6 +183,8 @@ def main() -> None:
             rs = [r for r in rows if r["terrain_class"] == c]
             print(f"{c:12s} {len(rs):3d} " + " ".join(f"{np.nanmean([r[k] for r in rs]):15.3f}" for k in keys))
     report.update(prior=prior, accept_json=str(acc_path) if thresholds else None)
+    np.savez(run / "emg_strides.npz", profiles=np.array(prof, np.float32).reshape(-1, len(CHANNELS), 101),
+             split=np.array(prof_split), terrain_class=np.array(prof_cls), channels=np.array(CHANNELS))
     (run / "eval.json").write_text(json.dumps(report, indent=1))
     print("->", run / "eval.json")
 

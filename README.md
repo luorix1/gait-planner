@@ -22,6 +22,7 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 | 0. data (done) | `python -m gp.data` -> `data/v1/` | CPU, 2 min |
 | 0b. kinetics (done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
 | 0c. filter thresholds (kinetic part done) | `python -m gp.accept` -> `data/v1/accept.json` | CPU |
+| 0d. EMG envelopes (done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
@@ -29,6 +30,7 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 | 2b. style threshold | `python -m gp.accept --prior runs/prior_v1/prior.pt` (adds the style check) | GPU or CPU |
 | 5. evaluate | `python evaluate.py runs/<run> --prior runs/prior_v1/prior.pt` -> `eval.json` (with the filter) | GPU or CPU |
 | 6. gate G1 | `python g1.py runs/planner_v1 runs/baseline_v1` -> `g1.json` | CPU |
+| 7. EMG timing | `python emg_report.py runs/planner_v1 runs/baseline_v1` -> `emg_timing.json`, `emg_<class>.png` | CPU |
 
 Launch training detached (`setsid nohup ... > runs/<name>.log 2>&1 < /dev/null &`), as the docstrings show.
 Baseline and planner share body, clips, physics, delays, effort and learner, so equal `--hours` is matched compute.
@@ -49,6 +51,7 @@ pose; the prior trains; PPO runs an iteration.
 | `train.py`, `evaluate.py` | train a policy (PPO); evaluate it on held-out clips |
 | `camargo_id.py` | Camargo inverse dynamics on Rajagopal v3 |
 | `gp/accept.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); gate G1 |
+| `camargo_emg.py`, `gp/emg.py`, `emg_report.py` | Camargo EMG envelopes; EMG timing of policies against held-out subjects |
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `tests/test_smoke.py` | the CPU checks |
 
@@ -110,6 +113,16 @@ joint loads, muscle effort (saturation), contact (sliding spheres, joint limits)
 
 G1's curve check compares the right stance (touchdown to lift-off), not the whole stride: a whole stride is almost
 never on plates throughout.
+
+## EMG timing (`camargo_emg.py`, `gp/emg.py`, `emg_report.py`)
+
+Camargo's 11 right-side EMG channels (band-pass 20-400 Hz, rectified, 6 Hz low-pass) on v1's frames, mapped to
+Rajagopal muscles (gluteus medius = its three compartments). Real and simulated signals become right-stride profiles
+(touchdown to touchdown, 101 points), normalised per subject and channel (real) or per run, class and muscle
+(simulation), with on/off relative to each muscle's own 10th-95th percentile range. Scores per class and muscle:
+Pearson r of the mean profiles and on/off agreement; rectus femoris is shown, not scored (its surface signal is
+mostly vasti crosstalk outside its swing burst). The ceiling, training subjects' real EMG against the held-out
+subjects', is r 0.87-0.92 and agreement 0.86-0.89 by class.
 
 ## Random terrain (`gp/terrain_gen.py`)
 
