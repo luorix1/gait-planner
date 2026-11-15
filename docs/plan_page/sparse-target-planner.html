@@ -1,0 +1,473 @@
+<title>Sparse-Target Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a wide lab notebook. One thesis, then full-width diagram panels, each with a short caption column; details fold away at the end. */
+:root {
+  --paper:#F4F6F9; --panel:#FFFFFF; --ink:#1B2633; --muted:#55606D; --line:#D5DDE7; --wire:#7C8895;
+  --blue:#2F6FB0; --blue-2:#8FB3DA; --blue-soft:#E6EEF8; --amber:#E3A33B; --amber-soft:rgba(227,163,59,.26);
+  --rock:#33465E; --good:#2E8B57; --good-soft:#E3F2EA; --grey-soft:#EEF1F5;
+  --display:"Space Grotesk", "Segoe UI", system-ui, sans-serif; --body:"Inter", system-ui, -apple-system, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-2:#3E6A99; --blue-soft:#1C2C40; --amber:#F0B65A; --amber-soft:rgba(240,182,90,.22);
+  --rock:#4B6380; --good:#5CC08A; --good-soft:#163024; --grey-soft:#1C2530; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-2:#3E6A99; --blue-soft:#1C2C40; --amber:#F0B65A; --amber-soft:rgba(240,182,90,.22);
+  --rock:#4B6380; --good:#5CC08A; --good-soft:#163024; --grey-soft:#1C2530; color-scheme:dark }
+body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 64px }
+.wrap { max-width:1320px; margin:0 auto; display:grid; gap:56px }
+h1, h2, h3 { font-family:var(--display); margin:0; text-wrap:balance; letter-spacing:-0.01em }
+h1 { font-size:clamp(34px, 5vw, 56px); line-height:1.05 }
+h2 { font-size:clamp(24px, 3vw, 32px); line-height:1.15 }
+h3 { font-size:19px; line-height:1.25 }
+p { margin:0 }
+a { color:var(--blue) }
+a:focus-visible, summary:focus-visible { outline:3px solid var(--blue); outline-offset:3px; border-radius:4px }
+.eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
+.muted { color:var(--muted) }
+code, .mono { font-family:var(--mono); font-size:.88em }
+
+header { display:grid; gap:18px; max-width:980px }
+.lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:72ch }
+.chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; font-size:14px; font-weight:500; border:1px solid var(--line); background:var(--panel) }
+.chip i { width:9px; height:9px; border-radius:50%; background:var(--wire) }
+.chip.done i { background:var(--good) } .chip.next i { background:var(--blue) } .chip.todo i { background:transparent; border:2px solid var(--wire); width:7px; height:7px }
+.links { font-size:14px; display:flex; flex-wrap:wrap; gap:6px 18px }
+
+section { display:grid; gap:20px }
+.sec-head { display:grid; gap:8px; max-width:900px }
+.sec-head p { color:var(--muted); max-width:75ch }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px }
+.split { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(0, 1fr); gap:28px; align-items:center }
+.split > * { min-width:0 }
+.scroll { overflow-x:auto }
+.scroll svg { min-width:760px }
+svg.dia { width:100%; height:auto; display:block }
+
+/* svg vocabulary */
+.n rect { fill:var(--panel); stroke:var(--line); stroke-width:2 }
+.n.hot rect { fill:var(--blue-soft); stroke:var(--blue); stroke-width:2.5 }
+.n.off rect { fill:none; stroke:var(--wire); stroke-dasharray:8 7 }
+.n.store rect { fill:var(--grey-soft) }
+.tt { fill:var(--ink); font:600 19px var(--body) }
+.ts { fill:var(--muted); font:400 15px var(--body) }
+.tl { fill:var(--muted); font:500 14px var(--body) }
+.ta { fill:var(--ink); font:600 15px var(--body) }
+.w { fill:none; stroke:var(--wire); stroke-width:2.5; stroke-linejoin:round }
+.w.dash { stroke-dasharray:9 8 }
+.w.blue { stroke:var(--blue) }
+.head { fill:var(--wire) }
+.rock { fill:var(--rock) }
+.band { fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.5; stroke-dasharray:5 5 }
+.fR { fill:var(--blue) } .fL { fill:var(--blue-2) }
+.dot { fill:var(--amber); stroke:var(--panel); stroke-width:3 }
+.call { fill:none; stroke:var(--muted); stroke-width:1.5 }
+.grid { stroke:var(--line); stroke-width:1 }
+
+.gif { width:100%; border-radius:12px; border:1px solid var(--line); display:block; background:#F4F6F9 }
+.parts { display:grid; gap:18px }
+.part { display:grid; grid-template-columns:44px 1fr; gap:14px; align-items:start }
+.part .ic { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; background:var(--blue-soft); color:var(--blue); font:700 18px var(--display) }
+.part p { color:var(--muted); font-size:15px }
+
+.two { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:24px }
+.two > * { min-width:0 }
+.cap { display:grid; gap:6px; margin-bottom:12px }
+.cap p { color:var(--muted); font-size:15px }
+.note { border-left:4px solid var(--amber); background:var(--grey-soft); padding:12px 16px; border-radius:0 10px 10px 0; font-size:15px }
+
+.checks { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px }
+.check { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; display:grid; gap:8px; align-content:start }
+.check .k { display:flex; gap:10px; align-items:center }
+.check .k b { font:700 15px var(--display); width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--blue); color:var(--panel); flex:none }
+.check p { font-size:15px; color:var(--muted) }
+.check .src { font-size:13px; font-weight:600; color:var(--ink); background:var(--grey-soft); border-radius:6px; padding:3px 8px; justify-self:start }
+
+.datagrid { display:grid; grid-template-columns:minmax(0, 1.7fr) minmax(0, 1fr); gap:24px; align-items:stretch }
+.datagrid > * { min-width:0 }
+.legend { display:flex; gap:18px; font-size:14px; color:var(--muted); flex-wrap:wrap }
+.legend span::before { content:""; display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; background:var(--c) }
+.body { display:grid; grid-template-columns:150px 1fr; gap:20px; align-items:center }
+.body .plate { background:#FFFFFF; border-radius:10px; padding:6px; border:1px solid var(--line) }
+.body img { display:block; width:100%; height:auto }
+.datagrid { align-items:start }
+dl.spec { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0; font-size:15px }
+dl.spec dt { color:var(--muted) } dl.spec dd { margin:0; font-weight:500 }
+
+.road { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:14px }
+.phase { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:16px; display:grid; gap:10px; align-content:start; position:relative }
+.phase .st { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted) }
+.phase.done { border-color:var(--good); } .phase.done .st { color:var(--good) }
+.phase.now { border-color:var(--blue); box-shadow:0 0 0 3px var(--blue-soft) } .phase.now .st { color:var(--blue) }
+.phase p { font-size:14px; color:var(--muted) }
+.gate { border-top:1px dashed var(--line); padding-top:10px; font-size:13.5px; color:var(--ink) }
+.gate b { font-family:var(--display); color:var(--blue); margin-right:4px }
+
+.claims { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px }
+.claim { border-top:3px solid var(--blue); padding-top:12px; display:grid; gap:6px }
+.claim p { font-size:15px; color:var(--muted) }
+
+details { background:var(--panel); border:1px solid var(--line); border-radius:12px }
+details + details { margin-top:10px }
+summary { cursor:pointer; padding:14px 18px; font:600 17px var(--display); list-style:none; display:flex; justify-content:space-between; gap:12px }
+summary::-webkit-details-marker { display:none }
+summary::after { content:"+"; color:var(--blue); font-size:22px; line-height:1 }
+details[open] summary::after { content:"–" }
+details > div { padding:0 18px 18px; overflow-x:auto }
+table { border-collapse:collapse; width:100%; font-size:14.5px }
+th, td { text-align:left; vertical-align:top; padding:9px 10px; border-bottom:1px solid var(--line) }
+th { font-weight:600; color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.06em }
+td.num { font-variant-numeric:tabular-nums; white-space:nowrap }
+ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
+
+@media (max-width:1000px) {
+  .split, .datagrid, .two { grid-template-columns:1fr }
+  .checks { grid-template-columns:repeat(2, minmax(0, 1fr)) }
+  .road { grid-template-columns:repeat(2, minmax(0, 1fr)) }
+  .claims { grid-template-columns:repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width:560px) {
+  .checks, .road, .claims { grid-template-columns:1fr }
+  .body { grid-template-columns:110px 1fr }
+  .panel { padding:16px }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker>
+</defs></svg>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">gait_planner · plan · updated 15 Nov 2026</p>
+  <h1>Sparse-target planner</h1>
+  <p class="lede">A planner says where and when each foot lands and where the body's centre of mass should be. A muscle policy works out the rest. A style prior and six checks against human data decide which new episodes are kept, so new skills come out of the loop instead of from new recordings.</p>
+  <div class="chips">
+    <span class="chip done"><i></i>Data, training code, planner network: built</span>
+    <span class="chip next"><i></i>First GPU runs: next</span>
+    <span class="chip todo"><i></i>Loop rounds: not built yet</span>
+  </div>
+  <div class="links">
+    <a href="https://claude.ai/artifact/YJ7mWiaU6MGNBwGPcLYPn5">Animation with sound</a>
+    <a href="https://claude.ai/artifact/Mv4JnEM6LDP3fDAusVAAan">Earlier working doc (archive)</a>
+    <span class="muted">Code: <code>~/Jinwoo/gait_planner</code></span>
+  </div>
+</header>
+
+<section aria-labelledby="s-glance">
+  <div class="sec-head"><h2 id="s-glance">At a glance</h2></div>
+  <div class="split">
+    <img class="gif" src="flow.gif" alt="30-second animation: real motion trains the planner, muscle policy and style prior; each loop round tries new ground and keeps only episodes that pass six checks; when running, the planner hands plans to the muscle policy at 40 Hz." width="640" height="360">
+    <div class="parts">
+      <div class="part"><div class="ic">P</div><div><h3>Planner</h3><p>Given the ground ahead and a goal, it proposes footholds, when each foot is down, and a band for the centre of mass. It is learned from the start, as in PARC.</p></div></div>
+      <div class="part"><div class="ic">M</div><div><h3>Muscle policy</h3><p>Drives 90 muscles at 40 Hz in our GPU simulator to follow the plan. Joint angles are left free; nothing tells it the full pose.</p></div></div>
+      <div class="part"><div class="ic">✓</div><div><h3>Gatekeepers</h3><p>A style prior scores how human the motion looks. Six checks compare forces, loads and effort with human data. Only episodes that pass become new training data.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-plan">
+  <div class="sec-head">
+    <h2 id="s-plan">What a plan looks like</h2>
+    <p>Feet get a place and a time. The body gets a band. The joints are free. Overlapping foot intervals mean walking, and a gap between them means flight, so the plan sets the gait without dictating the swing.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 440" role="img" aria-label="A plan on stairs: alternating footholds on each tread, a centre-of-mass band above them, and per-foot contact timing below with short double-support overlaps.">
+      <!-- terrain: level, five treads up, level -->
+      <path class="rock" d="M160 300 H480 V266 H570 V232 H660 V198 H750 V164 H840 V130 H1180 V330 H160 Z"/>
+      <!-- centre-of-mass band -->
+      <path class="band" d="M180 196 L480 196 L930 26 L1170 26 L1170 62 L930 62 L480 232 L180 232 Z"/>
+      <!-- footholds: R dark, L light -->
+      <g>
+        <path class="fR" d="M200 300 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fL" d="M300 300 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fR" d="M400 300 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fL" d="M505 266 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fR" d="M595 232 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fL" d="M685 198 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fR" d="M775 164 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fL" d="M865 130 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fR" d="M960 130 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+        <path class="fL" d="M1060 130 q-2 -11 10 -11 h26 q10 0 10 9 v2 z"/>
+      </g>
+      <!-- timing lanes -->
+      <line class="grid" x1="160" y1="364" x2="1180" y2="364"/><line class="grid" x1="160" y1="404" x2="1180" y2="404"/>
+      <text class="tl" x="150" y="369" text-anchor="end">Right foot down</text>
+      <text class="tl" x="150" y="409" text-anchor="end">Left foot down</text>
+      <g class="fR"><rect x="196" y="356" width="124" height="16" rx="8"/><rect x="396" y="356" width="124" height="16" rx="8"/><rect x="591" y="356" width="124" height="16" rx="8"/><rect x="771" y="356" width="124" height="16" rx="8"/><rect x="956" y="356" width="124" height="16" rx="8"/></g>
+      <g class="fL"><rect x="296" y="396" width="124" height="16" rx="8"/><rect x="501" y="396" width="124" height="16" rx="8"/><rect x="681" y="396" width="124" height="16" rx="8"/><rect x="861" y="396" width="124" height="16" rx="8"/><rect x="1056" y="396" width="114" height="16" rx="8"/></g>
+      <rect x="396" y="350" width="24" height="68" rx="4" style="fill:var(--amber-soft)"/>
+      <!-- callouts -->
+      <path class="call" d="M218 286 V112 H230"/><text class="ta" x="236" y="117">Foothold: where, and which foot</text>
+      <path class="call" d="M330 196 V158 H342"/><text class="ta" x="348" y="163">Centre-of-mass band</text>
+      <path class="call" d="M408 420 L408 432 L440 432"/><text class="ta" x="446" y="436">Both feet down (walking)</text>
+      <text class="ts" x="1180" y="436" text-anchor="end">time runs left to right</text>
+    </svg>
+  </div>
+  <p class="muted" style="font-size:15px">The policy sees its own body, a 17 × 3 height scan of the ground ahead and the next second of the plan. It is rewarded for contacts (0.15), footholds within 10 cm (0.15), staying in the band (0.20) and the style score (0.50), minus muscle effort.</p>
+</section>
+
+<section aria-labelledby="s-train">
+  <div class="sec-head">
+    <h2 id="s-train">How training works</h2>
+    <p>First every part learns from real motion. Then the loop grows the data: new ground, new plans, and only the human-looking results are kept.</p>
+  </div>
+  <div class="two">
+    <div class="panel">
+      <div class="cap"><p class="eyebrow">Phase 1 · built, runs next</p><h3>Learn from real motion</h3><p>The policy follows plans copied from real clips, so a failure is the policy's, not the planner's. A full-pose tracker on the same clips, for the same hours, is the baseline.</p></div>
+      <svg class="dia" viewBox="0 0 600 400" role="img" aria-label="Human motion feeds real plans and the style prior; real plans train the planner and the muscle policy; the style prior scores the muscle policy; a full-pose baseline trains on the same motion.">
+        <g class="n store"><rect x="20" y="150" width="170" height="92" rx="14"/><text class="tt" x="105" y="188" text-anchor="middle">Human motion</text><text class="ts" x="105" y="212" text-anchor="middle">AB01 + PARC, 64 min</text></g>
+        <g class="n"><rect x="250" y="70" width="160" height="80" rx="14"/><text class="tt" x="330" y="106" text-anchor="middle">Real plans</text><text class="ts" x="330" y="129" text-anchor="middle">copied from clips</text></g>
+        <g class="n"><rect x="250" y="240" width="160" height="80" rx="14"/><text class="tt" x="330" y="276" text-anchor="middle">Style prior</text><text class="ts" x="330" y="299" text-anchor="middle">learns human motion</text></g>
+        <g class="n"><rect x="460" y="20" width="125" height="70" rx="14"/><text class="tt" x="522" y="61" text-anchor="middle">Planner</text></g>
+        <g class="n hot"><rect x="460" y="150" width="125" height="92" rx="14"/><text class="tt" x="522" y="190" text-anchor="middle">Muscle</text><text class="tt" x="522" y="214" text-anchor="middle">policy</text></g>
+        <g class="n off"><rect x="430" y="310" width="155" height="70" rx="14"/><text class="ts" x="507" y="341" text-anchor="middle">Baseline:</text><text class="ts" x="507" y="362" text-anchor="middle">full-pose tracking</text></g>
+        <path class="w" d="M190 180 H220 V110 H244" marker-end="url(#ah)"/>
+        <path class="w" d="M190 212 H220 V280 H244" marker-end="url(#ah)"/>
+        <path class="w" d="M410 98 H435 V55 H454" marker-end="url(#ah)"/>
+        <path class="w" d="M410 122 H435 V180 H454" marker-end="url(#ah)"/>
+        <path class="w" d="M410 280 H435 V214 H454" marker-end="url(#ah)"/>
+        <path class="w dash" d="M105 242 V345 H424" marker-end="url(#ah)"/>
+        <text class="tl" x="200" y="365">same clips, same hours</text>
+      </svg>
+    </div>
+    <div class="panel">
+      <div class="cap"><p class="eyebrow">Phase 3 · each round · parts built</p><h3>The loop</h3><p>New ground gets a little harder each round. Kept episodes join the planner's data next to the starting clips, and the planner and policy retrain on all of it. Built: the course generator, the planner, and episodes on generated ground. Not built: the code that runs the rounds.</p></div>
+      <svg class="dia" id="loop" viewBox="0 0 600 400" role="img" aria-label="Loop: course generator to planner to muscle policy to six checks; kept episodes go to the planner's data, which retrains the planner and slowly feeds the style prior; failed episodes are dropped.">
+        <g class="n"><rect x="10" y="30" width="196" height="80" rx="14"/><text class="tt" x="108" y="66" text-anchor="middle">Course generator</text><text class="ts" x="108" y="89" text-anchor="middle">harder each round</text></g>
+        <g class="n hot"><rect x="230" y="30" width="140" height="80" rx="14"/><text class="tt" x="300" y="77" text-anchor="middle">Planner</text></g>
+        <g class="n hot"><rect x="420" y="30" width="170" height="80" rx="14"/><text class="tt" x="505" y="66" text-anchor="middle">Muscle policy</text><text class="ts" x="505" y="89" text-anchor="middle">tries it in physics</text></g>
+        <g class="n"><rect x="420" y="180" width="170" height="80" rx="14"/><text class="tt" x="505" y="216" text-anchor="middle">Six checks</text><text class="ts" x="505" y="239" text-anchor="middle">fail one: dropped</text></g>
+        <g class="n store"><rect x="208" y="180" width="184" height="80" rx="14"/><text class="tt" x="300" y="216" text-anchor="middle">Planner data</text><text class="ts" x="300" y="239" text-anchor="middle">clips + kept episodes</text></g>
+        <g class="n"><rect x="10" y="180" width="160" height="80" rx="14"/><text class="tt" x="90" y="216" text-anchor="middle">Style prior</text><text class="ts" x="90" y="239" text-anchor="middle">grows slowly</text></g>
+        <g class="n off"><rect x="440" y="320" width="130" height="56" rx="14"/><text class="ts" x="505" y="353" text-anchor="middle">dropped</text></g>
+        <path class="w" d="M206 70 H224" marker-end="url(#ah)"/>
+        <path class="w" d="M370 70 H414" marker-end="url(#ah)"/>
+        <path class="w" d="M505 110 V174" marker-end="url(#ah)"/>
+        <path class="w blue" d="M420 220 H398" marker-end="url(#ah)"/>
+        <path class="w" d="M300 180 V116" marker-end="url(#ah)"/>
+        <path class="w" d="M208 220 H176" marker-end="url(#ah)"/>
+        <path class="w dash" d="M505 260 V314" marker-end="url(#ah)"/>
+        <text class="tl" x="409" y="206" text-anchor="middle">kept</text>
+        <text class="tl" x="308" y="152">retrain</text>
+        <circle class="dot" r="8"><animateMotion dur="5s" repeatCount="indefinite" path="M300 70 H505 V220 H300 Z"/></circle>
+        <circle class="dot" r="8"><animateMotion dur="5s" begin="-2.5s" repeatCount="indefinite" path="M300 70 H505 V220 H300 Z"/></circle>
+      </svg>
+      <p class="note">The prior grows conservatively: every batch is at least three-quarters real clips; a kept window joins only if the last prior already scores it as human; the first prior stays frozen as a guard, and a round is undone if its scores on known ground drop.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-gen">
+  <div class="sec-head">
+    <h2 id="s-gen">The planner on generated ground</h2>
+    <p>The course generator joins flights, landing turns, ramps, gaps and platforms, harder as one difficulty setting rises. The planner, trained on the real clips' plans, plans across a course from a standing start.</p>
+  </div>
+  <div class="split">
+    <div class="panel" style="padding:12px; background:#FFFFFF">
+      <img class="gif" style="border:0" src="course.png" alt="Overhead view of a generated course: a level start, a five-step flight down, a square landing where the path turns left, two more flights, a gap, and level ground to the end. Light and dark blue dots mark left and right footholds; an amber line traces the centre of mass." width="1100" height="730">
+    </div>
+    <div style="display:grid; gap:16px">
+      <p class="muted" style="font-size:15px">Seen from above, lighter is higher. Start at top left: down a flight, a landing turn, two more flights, a gap, then stop. Footholds: left light blue, right dark blue; amber is the centre of mass.</p>
+      <dl class="spec">
+        <dt>Reads</dt><dd>the ground 3.6 m ahead and 1.6 m across, and a goal</dd>
+        <dt>Writes</dt><dd>the next 1.2 s of plan; keeps 0.5 s, then plans again</dd>
+        <dt>Courses finished</dt><dd>12 of 12</dd>
+        <dt>Footholds on the course</dt><dd>99 %</dd>
+        <dt>Across a stair edge</dt><dd>8 % (it often skips a tread)</dd>
+        <dt>Held-out clips</dt><dd>next touchdown 0.05 s and 12 cm off (median)</dd>
+      </dl>
+      <p class="note">These numbers come from a small model trained for 29 minutes on the CPU, a check that the pieces fit. The full model trains on the GPU. Stairs are weak because they are half a minute of the data; the loop is meant to fix that.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-checks">
+  <div class="sec-head">
+    <h2 id="s-checks">The six checks</h2>
+    <p>An episode that falls is dropped first. Then it must pass all six. Each limit is the 5th or 95th percentile of the same measure on real clips.</p>
+  </div>
+  <div class="checks">
+    <div class="check"><div class="k"><b>1</b><h3>Looks human</h3></div><p>Style prior score over 2 s windows.</p><span class="src">vs real clips, same terrain</span></div>
+    <div class="check"><div class="k"><b>2</b><h3>Follows the plan</h3></div><p>Contacts at the planned times, feet on the footholds.</p><span class="src">vs the plan</span></div>
+    <div class="check"><div class="k"><b>3</b><h3>Ground force</h3></div><p>Peak force and loading rate.</p><span class="src">vs Camargo, walking</span></div>
+    <div class="check"><div class="k"><b>4</b><h3>Joint loads</h3></div><p>Hip, knee and ankle net moments.</p><span class="src">vs Camargo, walking</span></div>
+    <div class="check"><div class="k"><b>5</b><h3>Muscle effort</h3></div><p>No muscle stuck at full activation.</p><span class="src">saturation limit</span></div>
+    <div class="check"><div class="k"><b>6</b><h3>Clean contact</h3></div><p>No sliding feet, no joints driven into their limits.</p><span class="src">sliding and limit hits</span></div>
+  </div>
+  <p class="muted" style="font-size:15px">Camargo 2021 (22 subjects; inverse dynamics redone on our body, matching their own at r 0.88–0.997) is the human reference for forces, moments and EMG. It is all walking, so running and jumping skip checks 3 and 4 until limits for them are chosen. AB01's 2.5 minutes of treadmill running on force plates can supply running's.</p>
+</section>
+
+<section aria-labelledby="s-run">
+  <div class="sec-head">
+    <h2 id="s-run">Running it after training</h2>
+    <p>Only the planner and the muscle policy are needed. The prior, the checks and the human reference ranges stay behind.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 250" role="img" aria-label="Deployment: new ground and a goal go to the planner, whose plan goes to the muscle policy, which drives the body at 40 Hz; the body's state returns to the policy. Style prior, six checks and Camargo ranges are training only.">
+      <g class="n"><rect x="20" y="100" width="210" height="90" rx="14"/><text class="tt" x="125" y="140" text-anchor="middle">New ground</text><text class="ts" x="125" y="164" text-anchor="middle">+ a goal</text></g>
+      <g class="n hot"><rect x="320" y="100" width="190" height="90" rx="14"/><text class="tt" x="415" y="152" text-anchor="middle">Planner</text></g>
+      <g class="n hot"><rect x="640" y="100" width="230" height="90" rx="14"/><text class="tt" x="755" y="140" text-anchor="middle">Muscle policy</text><text class="ts" x="755" y="164" text-anchor="middle">40 times a second</text></g>
+      <g class="n"><rect x="980" y="100" width="190" height="90" rx="14"/><text class="tt" x="1075" y="140" text-anchor="middle">Body</text><text class="ts" x="1075" y="164" text-anchor="middle">in physics</text></g>
+      <path class="w" d="M230 145 H314" marker-end="url(#ah)"/>
+      <path class="w" d="M510 145 H634" marker-end="url(#ah)"/>
+      <path class="w" d="M870 135 H974" marker-end="url(#ah)"/>
+      <path class="w dash" d="M1075 190 V226 H755 V196" marker-end="url(#ah)"/>
+      <text class="tl" x="572" y="134" text-anchor="middle">plan</text>
+      <text class="tl" x="922" y="124" text-anchor="middle">muscles</text>
+      <text class="tl" x="915" y="243" text-anchor="middle">its body and the ground ahead</text>
+      <g class="n off"><rect x="320" y="14" width="550" height="56" rx="14"/><text class="ts" x="595" y="48" text-anchor="middle">Training only: style prior · six checks · human reference ranges</text></g>
+    </svg>
+  </div>
+</section>
+
+<section aria-labelledby="s-data">
+  <div class="sec-head">
+    <h2 id="s-data">What it starts from</h2>
+    <p>498 clips, 64 minutes, retargeted onto one body. AB01 is our pilot subject on treadmill and overground; PARC is published motion capture of running, platforms, gaps and a few stairs.</p>
+  </div>
+  <div class="datagrid">
+    <div class="panel">
+      <div class="cap"><h3>Minutes of training data by skill</h3><div class="legend"><span style="--c:var(--blue)">AB01</span><span style="--c:var(--amber)">PARC</span></div></div>
+      <svg class="dia" id="chart" viewBox="0 0 760 330" role="img" aria-label="Minutes by skill: level walking 32.5, running 14.8, ramps 10.3, platforms and gaps 4.7, standing 1.3, stairs 0.5."></svg>
+      <p class="muted" style="font-size:14.5px">Stairs are the thinnest skill: half a minute. Scherpereel 2023 stair data comes next. Held out: 70 clips (10 min) of unseen trials and 22 clips (3 min) of the steepest ramps, ±15°. Five hand-assisted climbs and one clip whose toe passes through a platform were dropped.</p>
+    </div>
+    <div class="panel body">
+      <div class="plate"><img src="body.png" alt="Rajagopal v3 model, front and three-quarter views: bones, muscle paths in red, heel and toe contact spheres in teal." width="577" height="1106"></div>
+      <div style="display:grid; gap:12px">
+        <h3>One body for everything</h3>
+        <dl class="spec">
+          <dt>Model</dt><dd>Rajagopal v3, no arms</dd>
+          <dt>Joints</dt><dd>23 degrees of freedom</dd>
+          <dt>Muscles</dt><dd>90</dd>
+          <dt>Contact</dt><dd>18 heel and toe spheres</dd>
+          <dt>Mass</dt><dd>75.3 kg</dd>
+        </dl>
+        <p class="muted" style="font-size:14px">The clips, the policy and the reference ranges all use this model.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-road">
+  <div class="sec-head"><h2 id="s-road">Roadmap and gates</h2><p>Each phase ends at a gate. Phase 1 decides whether sparse targets can match full-pose tracking at all.</p></div>
+  <div class="road">
+    <div class="phase done"><span class="st">Done</span><h3>0 · Data</h3><p>Dataset, plans, references, filter limits, CPU checks.</p><div class="gate"><b>G0</b>The prior ranks real motion above 95 % of degraded copies, for every subject.</div></div>
+    <div class="phase now"><span class="st">Next</span><h3>1 · Feasibility</h3><p>Level and ramps: sparse plan + style vs full-pose tracking.</p><div class="gate"><b>G1</b>Half of episodes accepted; kinetics in the human band at least as often as the baseline; 10k steps/s.</div></div>
+    <div class="phase"><span class="st">Later</span><h3>2 · Stairs</h3><p>Footholds on treads, up and down.</p><div class="gate"><b>G2</b>Stairs accepted at least half as often as level ground, both directions.</div></div>
+    <div class="phase"><span class="st">Parts built</span><h3>3 · Planner loop</h3><p>Learned planner on generated ground, PARC-style rounds. Generator, planner and clip-free episodes are built; the rounds are next.</p><div class="gate"><b>G3</b>Each round adds coverage; acceptance stays within 10 points; the frozen prior's scores hold.</div></div>
+    <div class="phase"><span class="st">Later</span><h3>4 · Evaluation</h3><p>Held-out terrain, human kinetics and EMG, changed dynamics.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-claims">
+  <div class="sec-head"><h2 id="s-claims">What we can claim</h2><p>The style prior makes the kinematics human by construction, so claims rest on forces, muscles and responses to change.</p></div>
+  <div class="claims">
+    <div class="claim"><h3>New ground</h3><p>Stair heights and ramp grades outside the training set.</p></div>
+    <div class="claim"><h3>Human kinetics and EMG</h3><p>Forces, joint moments and muscle on/off timing against Camargo's 22 subjects (EMG ceiling r 0.87–0.92).</p></div>
+    <div class="claim"><h3>Changed dynamics</h3><p>Added load, ankle weakness and exo assistance, against published human responses.</p></div>
+    <div class="claim"><h3>Fair baseline</h3><p>Full-pose tracking on the same clips and body, with the same training time.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-details">
+  <div class="sec-head"><h2 id="s-details">Details</h2></div>
+  <div>
+    <details><summary>Run order (your GPU runs)</summary><div>
+      <table><thead><tr><th>Step</th><th>Command</th><th>Gives</th></tr></thead><tbody>
+        <tr><td class="num">1</td><td><code>train_prior.py --out runs/prior_v1</code></td><td>the style prior (200k iterations)</td></tr>
+        <tr><td class="num">2</td><td><code>check_prior.py runs/prior_v1/prior.pt</code>, then <code>python -m gp.accept --prior …</code></td><td>gate G0; the style limit for check 1</td></tr>
+        <tr><td class="num">3</td><td><code>train.py --task baseline</code> and <code>--task planner</code>, equal <code>--hours</code></td><td>the two Phase 1 policies</td></tr>
+        <tr><td class="num">4</td><td><code>evaluate.py</code>, then <code>g1.py</code> and <code>emg_report.py</code></td><td>gate G1 and EMG timing</td></tr>
+        <tr><td class="num">5</td><td><code>train_planner.py --out runs/planner_net_v1</code>, then <code>check_planner.py runs/planner_net_v1/planner.pt</code></td><td>the planner network (200k iterations) and its score before physics</td></tr>
+      </tbody></table>
+      <p class="muted" style="font-size:14px; margin-top:10px">Every step before these is done and checked on the CPU (16 tests pass). In the code, <code>--task planner</code> trains the muscle policy on plans copied from clips; the planner network trains on its own (step 5) and drives the policy once the loop runs.</p>
+    </div></details>
+    <details><summary>Settings</summary><div>
+      <ul class="tight">
+        <li>Control at 40 Hz with 75 physics steps each (3 kHz), implicit contact, human motor delays.</li>
+        <li>Style prior: 13-frame windows (0.325 s), scored every step; half of each batch mirrored left to right; 200k iterations.</li>
+        <li>Muscle effort is metabolic, at Rajagopal's own 0.6 MPa specific tension (the default 0.25 MPa made muscles 2.4× too heavy).</li>
+        <li>A fall: pelvis more than 0.3 m from the clip's, or tilted over 60°, for 3 steps. On generated ground there is no clip: the centre of mass more than 0.5 m from the plan's, or the tilt.</li>
+        <li>Planner: a diffusion model over plan frames at 20 Hz (0.4 s given, 1.2 s generated), reading the ground on a 0.1 m grid ahead and a goal; 4 layers × 256; half of each batch mirrored; 200k iterations.</li>
+        <li>Generated courses: every part runs along the grid so walls stay straight; turns are 90° on a square landing; turning stairs are a flight, a landing turn and a flight.</li>
+        <li>The critic also sees the full reference pose; the policy never does.</li>
+      </ul>
+    </div></details>
+    <details><summary>Risks and what we do about them</summary><div>
+      <table><thead><tr><th>Risk</th><th>Response</th></tr></thead><tbody>
+        <tr><td>Sparse targets allow a crouch, stiff knee or shuffle (acceptance under 20 %)</td><td>Raise the style weight; add a coarse pelvis target; curriculum from full pose to sparse</td></tr>
+        <tr><td>The prior penalises the armless body</td><td>Train the prior on armless clips only</td></tr>
+        <tr><td>Style reward too slow (under 10k steps/s)</td><td>Score every few steps, or distil it into a small network</td></tr>
+        <tr><td>The loop narrows to easy plans</td><td>Sample plans by coverage; make coverage a gate</td></tr>
+        <tr><td>Limits too strict on rare terrain</td><td>Per-class limits; the 2nd percentile where real data is thin</td></tr>
+        <tr><td>Terrain errors in the clips leak into plans</td><td>Plans only from clips that pass the seed library's checks</td></tr>
+        <tr><td>The growing prior drifts away from human motion</td><td>Three-quarters real per batch; only already-accepted windows join; frozen first prior with rollback</td></tr>
+        <tr><td>Style rests on two people</td><td>Add Scherpereel 2023's subjects; G0 checks each subject</td></tr>
+        <tr><td>Clips carry small contact errors (our toes reach past PARC's foot)</td><td>All PARC clips scanned; the worst six dropped; the rest are a few cm for a fraction of a second</td></tr>
+        <tr><td>The planner skips stair treads (half a minute of stair data)</td><td>The planner check counts footholds across an edge; stairs grow through the loop and Scherpereel 2023</td></tr>
+      </tbody></table>
+    </div></details>
+    <details><summary>Decisions and open question</summary><div>
+      <table><thead><tr><th>Date</th><th>Decision</th></tr></thead><tbody>
+        <tr><td class="num">15 Nov</td><td>The planner is a diffusion model over the plan (not the pose), reading the ground ahead and a goal.</td></tr>
+        <tr><td class="num">15 Nov</td><td>Generated courses run along the grid; winding stairs dropped (their walls come out jagged on square cells); PARC-style turning stairs added.</td></tr>
+        <tr><td class="num">15 Nov</td><td>Dropped the 5 hand-assisted climbs and one toe-through-platform clip from PARC.</td></tr>
+        <tr><td class="num">15 Nov</td><td>The planner is learned from the start, as PARC's generator is.</td></tr>
+        <tr><td class="num">15 Nov</td><td>Seed is AB01 + PARC (no new recordings per skill); Camargo stays the reference; the prior grows slowly.</td></tr>
+        <tr><td class="num">14 Nov</td><td>Policy at 40 Hz; prior windows of 13 frames scored every step.</td></tr>
+        <tr><td class="num">14 Nov</td><td>Muscle effort is metabolic at 0.6 MPa.</td></tr>
+        <tr><td class="num">14 Nov</td><td>A separate track from the tiered controller, run first.</td></tr>
+      </tbody></table>
+      <p style="margin-top:12px"><b>Open:</b> which held-out human data serves the changed-dynamics tests (load carriage, ankle weakness, exo)?</p>
+      <p style="margin-top:8px"><b>Open:</b> winding stairs. Clean ones need rotated boxes (exact, but the same staircase in every world) or a small SPRINT change letting a ground cell hold an angled wall.</p>
+    </div></details>
+    <details><summary>References</summary><div>
+      <ul class="tight">
+        <li><a href="https://xbpeng.github.io/projects/SMP/index.html">SMP</a> (Mu et al.): a frozen diffusion prior used as a reward.</li>
+        <li><a href="https://arxiv.org/abs/2505.04002">PARC</a> (Xu et al., SIGGRAPH 2025): generator and tracker trained together, with physics-corrected data added each round.</li>
+        <li><a href="https://arxiv.org/html/2409.14393v1">MaskedMimic</a> (Tessler et al., SIGGRAPH Asia 2024): one controller from partial targets, learned from full motion capture.</li>
+        <li>Seed library: <code>~/Jinwoo/seed_library</code>, the source of the clips and their terrain.</li>
+      </ul>
+    </div></details>
+  </div>
+</section>
+
+</div>
+
+<script>
+// Minutes of training data by skill (data/v2/clips.npz, 15 Nov 2026), drawn to one scale.
+(function () {
+  const rows = [
+    { skill: 'Level walking', ab01: 32.15, parc: 0.33 },
+    { skill: 'Running', ab01: 2.50, parc: 12.27 },
+    { skill: 'Ramps', ab01: 10.31, parc: 0 },
+    { skill: 'Platforms and gaps', ab01: 0, parc: 4.73 },
+    { skill: 'Standing', ab01: 1.32, parc: 0 },
+    { skill: 'Stairs', ab01: 0, parc: 0.49 },
+  ];
+  const svg = document.getElementById('chart'), NS = 'http://www.w3.org/2000/svg';
+  const x0 = 190, x1 = 720, max = 35, X = (m) => x0 + (x1 - x0) * m / max, rowH = 46, y0 = 24;
+  const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
+  for (let m = 0; m <= 30; m += 10) {
+    el('line', { x1: X(m), x2: X(m), y1: y0 - 6, y2: y0 + rows.length * rowH, class: 'grid' });
+    el('text', { x: X(m), y: y0 + rows.length * rowH + 22, 'text-anchor': 'middle', class: 'tl' }, m + (m === 30 ? ' min' : ''));
+  }
+  rows.forEach((r, i) => {
+    const y = y0 + i * rowH + 8, h = 26, tot = r.ab01 + r.parc;
+    el('text', { x: x0 - 14, y: y + 18, 'text-anchor': 'end', class: 'ta' }, r.skill);
+    if (r.ab01) el('rect', { x: X(0), y, width: X(r.ab01) - X(0), height: h, rx: 4, style: 'fill:var(--blue)' });
+    if (r.parc) el('rect', { x: X(r.ab01), y, width: Math.max(2, X(r.parc) - X(0)), height: h, rx: 4, style: 'fill:var(--amber)' });
+    el('text', { x: X(tot) + 8, y: y + 18, class: 'ta' }, tot.toFixed(1));
+  });
+  // the loop's moving dots are decoration: stop them for anyone who asked for less motion
+  try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('loop').pauseAnimations(); } catch (e) {}
+})();
+</script>
