@@ -125,6 +125,17 @@ def test_terrain_imitation_steps(D: dict) -> None:
     want = root[:, 1] - t.ground(root[:, :1], root[:, 2:3])[:, 0]
     assert torch.allclose(t.observation(s)[:, t.root_height_col], want, atol=1e-5)
     assert float(want.min()) > 0.3 and float(want.max()) < 1.5                      # a pelvis above its ground
+    w = np.zeros(len(D["name"]))                # weighted starts: all weight on one clip puts every world in it
+    w[3] = 1.0
+    e2 = _env(TerrainImitation(D, start_weights=w))
+    e2.reset()
+    assert (e2.task.clip == 3).all() and torch.allclose(e2.state.qpos[:, 6:], e2.task.ref["qpos"][e2.task.frame][:, 6:], atol=0.2)
+    cw = data.clip_weights(D, "sqrt")           # clip weights: each source by the square root of its length
+    fr = np.asarray(D["frames"], float)
+    src = np.asarray(D["source"]).astype(str)
+    shares = {s: cw[src == s].sum() for s in set(src)}
+    assert abs(sum(shares.values()) - 1) < 1e-9 and all(
+        abs(shares[s] - np.sqrt(fr[src == s].sum()) / sum(np.sqrt(fr[src == t].sum()) for t in shares)) < 1e-9 for s in shares)
 
 
 def test_plan_tracking_steps(D: dict, tmp_path) -> None:

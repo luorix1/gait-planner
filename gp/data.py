@@ -100,11 +100,39 @@ def split_v2(r: dict[str, Any]) -> str:
     return "test_trial" if zlib.crc32(tag.encode()) % 10 == 0 else "train"
 
 
+def clip_weights(D: dict[str, Any], sources: str = "recordings", lengths: Any = None) -> np.ndarray:
+    """A sampling weight per clip, summing to 1: every recording (:func:`motion_group`) gets the same total, split among
+    its clips by length (``lengths``, default the clips' frames); with ``sources="sqrt"`` each source (dataset) first
+    gets a share by the square root of its total length, split equally among its recordings (Bones SEED's 13,000
+    takes would otherwise drown AB01 and PARC). The style prior's batches and the tasks' episode starts both use it."""
+    ln = np.asarray(D["frames"] if lengths is None else lengths, float)
+    _, inv = np.unique([motion_group(str(n)) for n in D["name"]], return_inverse=True)
+    tot = np.bincount(inv, ln)[inv]
+    w = np.divide(ln, tot, out=np.zeros_like(ln), where=tot > 0)
+    if sources == "sqrt":
+        src = np.asarray(D["source"]).astype(str)
+        for name in np.unique(src):
+            m = src == name
+            if w[m].sum() > 0:
+                w[m] *= np.sqrt(ln[m].sum()) / w[m].sum()
+    return w / w.sum()
+
+
+def split_v4(r: dict[str, Any]) -> str:
+    """AB01 and PARC as v2; Bones SEED by actor (a tenth of the actors held out, as unseen people)."""
+    if r["source"] == "seed_bones":
+        return "test_trial" if zlib.crc32(r["subject"].encode()) % 10 == 0 else "train"
+    return split_v2(r)
+
+
 def motion_group(name: str) -> str:
-    """The recording a clip comes from: an AB01 trial (``ab01_mc019``), or a PARC motion with all its copies (its last
-    ``<word>_<NNN>`` tag, as :func:`split_v2`). Folds of the data keep a group together."""
+    """The recording a clip comes from: an AB01 trial (``ab01_mc019``), a Bones SEED take (the name without its window,
+    ``seed_<take>__A<actor>``), or a PARC motion with all its copies (its last ``<word>_<NNN>`` tag, as
+    :func:`split_v2`). Folds of the data keep a group together."""
     if name.startswith("ab01_"):
         return name.split("_w")[0]
+    if name.startswith("seed_"):
+        return name.rsplit("_w", 1)[0]
     tags = re.findall(r"([a-z]+_\d{3})", name)
     return tags[-1] if tags else name
 
@@ -126,6 +154,8 @@ SPECIFIC_TENSION = 0.6e6
 
 
 DATASETS: dict[str, dict[str, Any]] = {
+    "v4": dict(sources=("ab01", "parc_seed", "seed_bones"), split=split_v4, splits=("train", "test_trial", "test_terrain"),
+               no_replays=True, held_out="as v3; Bones SEED: actors with crc32(subject) % 10 == 0 (unseen people)"),
     "v3": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"), no_replays=True,
                held_out="as v2, without PARC's physics-tracker replays (SIM_REPLAY)"),
     "v2": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"),

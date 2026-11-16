@@ -42,11 +42,15 @@ def windows(D: dict, device: str) -> tuple[torch.Tensor, torch.Tensor]:
     return rec, torch.as_tensor(ends, device=device)
 
 
-def recording_weights(D: dict, device: str) -> torch.Tensor:
-    """A sampling weight per window end (as :func:`windows` lists them): each recording's ends sum to 1."""
-    g = np.concatenate([[data.motion_group(str(c))] * max(0, n - W) for c, n in zip(D["name"], D["frames"], strict=True)])
-    _, inv, cnt = np.unique(g, return_inverse=True, return_counts=True)
-    return torch.as_tensor(1.0 / cnt[inv], device=device, dtype=torch.float32)
+def recording_weights(D: dict, device: str, sources: str = "recordings") -> torch.Tensor:
+    """A sampling weight per window end (as :func:`windows` lists them): each recording's ends sum to 1
+    (``sources="recordings"``), or each source (dataset) gets a share by the square root of its windows, split equally
+    among its recordings (``"sqrt"``: SEED's 13,000 takes would otherwise drown AB01 and PARC)."""
+    per = np.array([max(0, n - W) for n in D["frames"]])
+    wc = data.clip_weights(D, sources, per)                       # per clip, by its window ends
+    w = np.repeat(np.divide(wc, per, out=np.zeros_like(wc), where=per > 0), per)
+    groups = len({data.motion_group(str(c)) for c, k in zip(D["name"], per, strict=True) if k > 0})
+    return torch.as_tensor(w * groups, device=device, dtype=torch.float32)
 
 
 def frame_labels(D: dict, device: str) -> torch.Tensor:
@@ -80,6 +84,8 @@ def main() -> None:
     ap.add_argument("--fold", default="", help="K/N: train on the K-th of N motion-group folds")
     ap.add_argument("--max-grade", type=float, default=None, help="drop clips on ground steeper than this (deg)")
     ap.add_argument("--balance", action="store_true", help="every recording equally likely, however long")
+    ap.add_argument("--sources", choices=("recordings", "sqrt"), default="recordings",
+                    help="with --balance: sqrt = each dataset's share by the square root of its windows")
     ap.add_argument("--drop-grade", default="", help="LO,HI: drop clips with LO < |grade| <= HI deg")
     ap.add_argument("--cond", action="store_true", help="conditional prior (gp.smp.conditions)")
     ap.add_argument("--min-std", type=float, default=None, help="normaliser std floor (default gp.smp.MIN_STD; MimicKit 0.2)")
@@ -102,7 +108,7 @@ def main() -> None:
     print(f"{int(keep.sum())} of {len(keep)} training clips", flush=True)
     rec, ends = windows(D, a.device)
     rec_t, ends_t = windows(Dt, a.device)
-    wts = recording_weights(D, a.device) if a.balance else None
+    wts = recording_weights(D, a.device, a.sources) if a.balance else None
     lab, lab_t = (frame_labels(D, a.device), frame_labels(Dt, a.device)) if a.cond else (None, None)
     prior = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"], n_cond=N_COND if a.cond else 0).to(a.device)
     maps = mirror_maps(data.load_model(), D["tracked"])
@@ -139,7 +145,7 @@ def main() -> None:
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
         if it % 2000 == 0 or it == a.iters:
             prior.save(out / "prior.pt", iters=it, data=str(a.src), mirrored=True, fold=a.fold, max_grade=a.max_grade,
-                       balance=a.balance, drop_grade=a.drop_grade, cond=a.cond, min_std=min_std)
+                       balance=a.balance, sources=a.sources, drop_grade=a.drop_grade, cond=a.cond, min_std=min_std)
     tb.close()
 
 

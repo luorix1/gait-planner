@@ -34,13 +34,16 @@ from gp.tasks import PlanConfig, PlanTracking, TerrainImitation, recipe_config
 
 
 def build(task_name: str, D: dict, worlds: int, seed: int, device: str, prior: str = "", starts: list | None = None,
-          plan: dict | None = None):
-    """``plan``: a run's recorded PlanConfig (record.json), so evaluation scores with the bands the run trained on."""
+          plan: dict | None = None, start_by: str = "uniform"):
+    """``plan``: a run's recorded PlanConfig (record.json), so evaluation scores with the bands the run trained on.
+    ``start_by``: ``uniform`` over clips (the recipe's), or ``sqrt`` (gp.data.clip_weights: each dataset by the square
+    root of its length, every recording equal within it)."""
     model = data.load_model(device)
     c = recipe_config()
     kept = {k: v for k, v in (plan or {}).items() if k in PlanConfig.__dataclass_fields__}
-    task = (PlanTracking(D, c, PlanConfig(**{**kept, "prior": prior}), starts=starts, seed=seed) if task_name == "planner"
-            else TerrainImitation(D, c, starts=starts, seed=seed))
+    sw = None if start_by == "uniform" else data.clip_weights(D, start_by)
+    task = (PlanTracking(D, c, PlanConfig(**{**kept, "prior": prior}), starts=starts, seed=seed, start_weights=sw)
+            if task_name == "planner" else TerrainImitation(D, c, starts=starts, seed=seed, start_weights=sw))
     # average_fext: contact forces read as the control step's mean, not the last substep's (which carries a
     # two-substep friction mode); a readout only, the physics is the same.
     opts = sprint.StepOptions(dt_ctrl=1.0 / data.HZ, n_sub=c.physics_steps, implicit_friction=True,
@@ -58,12 +61,14 @@ def main() -> None:
     ap.add_argument("--worlds", type=int, default=4096)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--starts", choices=("uniform", "sqrt"), default="uniform",
+                    help="episode start clips: uniform (the recipe's) or sqrt (gp.data.clip_weights; for mixed datasets)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
     torch.manual_seed(a.seed)
     D = data.load("train")
-    env, task = build(a.task, D, a.worlds, a.seed, a.device, a.prior)
+    env, task = build(a.task, D, a.worlds, a.seed, a.device, a.prior, start_by=a.starts)
     cfg = default_ppo()
     cfg = replace(cfg, symmetry_coef=cfg.symmetry_coef if task.symmetric else 0.0)
     agent = PPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")

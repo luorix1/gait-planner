@@ -60,9 +60,11 @@ class TerrainImitation(Imitation):
     """The full-pose baseline on each clip's own terrain. ``D``: :func:`gp.data.load`."""
 
     def __init__(self, D: dict[str, Any], config: ImitationConfig | None = None, *, starts: list[Any] | None = None,
-                 seed: int = 0) -> None:
+                 seed: int = 0, start_weights: Any = None) -> None:
         super().__init__(gpdata.motions(D), config or recipe_config(), starts=starts, seed=seed)
         self.D = D
+        #: Random episode starts draw their clip by these weights (gp.data.clip_weights) instead of uniformly over clips.
+        self.start_weights = None if start_weights is None else np.asarray(start_weights, np.float64)
 
     def bind(self, model: Any) -> None:
         super().bind(model)
@@ -120,6 +122,7 @@ class TerrainImitation(Imitation):
         self.terrain_of_clip = torch.where(self.on_hf, torch.full((n,), HFIELD, device=dev),
                                            torch.arange(n, device=dev)).to(torch.int32)
         self.lift = torch.as_tensor(D["lift"], dtype=torch.float32, device=dev)
+        self.start_w = None if self.start_weights is None else torch.as_tensor(self.start_weights, dtype=torch.float32, device=dev)
         self.free_clip = torch.as_tensor(np.asarray(D.get("free", np.zeros(len(self.motions), bool))), device=dev)
         g = torch.as_tensor([(f, k) for f in SCAN_FORWARD for k in SCAN_LATERAL], dtype=torch.float32, device=dev)
         self.scan_f, self.scan_l = g[:, 0], g[:, 1]
@@ -140,6 +143,22 @@ class TerrainImitation(Imitation):
     def reset(self, s: Any, worlds: Any) -> None:
         super().reset(s, worlds)
         idx = worlds.nonzero().squeeze(1)
+        if idx.numel() and self.start_w is not None and self.fixed is None:
+            # ponytail: the recipe draws random starts uniformly over clips and has no weights; redraw the clip here and
+            # redo what its reset derives from it (frame, grade, terrain, the noisy reference state). Upstream: weights
+            # in Imitation.reset.
+            from sprint import _backend as B
+            k = idx.numel()
+            clip = torch.multinomial(self.start_w, k, replacement=True, generator=self.gen)
+            frame = self.clip_start[clip] + (torch.rand(k, device=self.dev, generator=self.gen) * self.clip_span[clip]).long()
+            self.clip[idx], self.frame[idx], self.start_frame[idx] = clip, frame, frame - self.clip_start[clip]
+            self.grade[idx] = self.clip_grade[clip].float() + self.extra_grade[idx]
+            B.to_torch(self.env.data.terrain_id)[idx] = self.terrain_of_clip[clip]
+            q, qd = self.ref["qpos"][frame].clone(), self.ref["qvel"][frame].clone()
+            sh = (k, len(self.L.tracked))
+            q[:, self.tracked] += self.config.noise_position * torch.randn(sh, device=self.dev, generator=self.gen)
+            qd[:, self.tracked] += self.config.noise_velocity * torch.randn(sh, device=self.dev, generator=self.gen)
+            s.qpos[idx], s.qvel[idx] = q, qd
         if idx.numel():
             fr = idx[self.free_clip[self.clip[idx]]]
             if fr.numel():                             # free clips start where they are placed: frame 0, no noise
@@ -215,8 +234,8 @@ class PlanTracking(TerrainImitation):
                    "joint_velocity_error", "root_velocity_error", "feet_position_error", "free_episode")
 
     def __init__(self, D: dict[str, Any], config: ImitationConfig | None = None, plan: PlanConfig | None = None, *,
-                 starts: list[Any] | None = None, seed: int = 0) -> None:
-        super().__init__(D, config, starts=starts, seed=seed)
+                 starts: list[Any] | None = None, seed: int = 0, start_weights: Any = None) -> None:
+        super().__init__(D, config, starts=starts, seed=seed, start_weights=start_weights)
         self.plan = plan or PlanConfig()
         self.name = "plan_tracking"
         if not self.plan.actor_strip:                   # the actor sees the terrain through the foothold patches
