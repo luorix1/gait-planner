@@ -149,8 +149,12 @@ def check_course(segs: list[dict[str, Any]], spec: TerrainSpec = TerrainSpec()) 
 # counts as one, and a course whose centreline comes back near itself is drawn again.
 #
 # ``difficulty`` (0-1) sets how far each size may go: a size is drawn between its gentle end and
-# gentle + difficulty * (hard - gentle). The defaults are mine: ramps and rises span the training range (AB01 to 10 deg
-# in training, 15 deg held out; stair rises 0.10-0.175 m), platforms reach PARC's 0.6 m, gaps are guesses.
+# gentle + difficulty * (hard - gentle).
+#
+# The defaults stay inside what the seed data (data/v2 train) holds, for the proof of concept: level ground, landing
+# turns (AB01's walks turn round), ramps up to its 10 deg, and gaps one ordinary step clears (AB01's median level step,
+# 0.58 m, less a 0.25 m foot). No stairs (5 PARC clips) and no platforms (PARC's are all 0.58 m, jumped onto at a run)
+# until data with them arrives; ``CourseSpec.full()`` has them.
 
 KINDS_2D = ("turn", "ramp", "stairs", "turning_stairs", "gap", "platform")
 TURN_RADIUS_M = 0.6          # the centreline's arc inside a landing turn (the ground there is the landing's square)
@@ -159,22 +163,28 @@ TURN_RADIUS_M = 0.6          # the centreline's arc inside a landing turn (the g
 @dataclass(frozen=True)
 class CourseSpec:
     """Each pair is (gentle, hard); difficulty 0 keeps every size at its gentle end."""
-    grade_deg: tuple[float, float] = (3.0, 12.5)
+    grade_deg: tuple[float, float] = (3.0, 10.0)
     ramp_run_m: tuple[float, float] = (2.0, 5.0)
     rise_m: tuple[float, float] = (0.10, 0.175)
     tread_m: tuple[float, float] = (0.37, 0.25)
     steps: tuple[int, int] = (3, 8)
-    gap_m: tuple[float, float] = (0.15, 0.8)
+    gap_m: tuple[float, float] = (0.10, 0.35)
     platform_m: tuple[float, float] = (0.10, 0.60)
     platform_top_m: tuple[float, float] = (2.0, 1.2)
-    landing_m: tuple[float, float] = (2.0, 1.5)
-    features: tuple[int, int] = (2, 6)
+    landing_m: tuple[float, float] = (3.0, 2.0)
+    features: tuple[int, int] = (1, 3)
     start_m: float = 3.0
     end_m: float = 3.0
     causeway_m: float = 2.4              # width of every stretch, and the side of a landing turn
     pit_m: float = 1.0                   # gap depth
     max_height_m: float = 2.5
-    kinds: tuple[str, ...] = KINDS_2D
+    kinds: tuple[str, ...] = ("turn", "ramp", "gap")
+
+    @classmethod
+    def full(cls) -> CourseSpec:
+        """Every kind, steeper ramps, wider gaps, more features: for when stairs and jump data are in the seed."""
+        return replace(cls(), grade_deg=(3.0, 12.5), gap_m=(0.15, 0.8), landing_m=(2.0, 1.5), features=(2, 6),
+                       kinds=KINDS_2D)
 
 
 def _size(rng: np.random.Generator, pair: tuple[float, float], d: float) -> float:

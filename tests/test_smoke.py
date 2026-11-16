@@ -379,11 +379,12 @@ def test_courses_2d() -> None:
     difficulty's range, and the tile's surface under the centreline equal to the profile (but within a cell of a wall)."""
     from gp.terrain import hf_height
     from gp.terrain_gen import CourseSpec, course_tile, sample_course2d
-    spec, rng = CourseSpec(), np.random.default_rng(0)
+    spec, rng = CourseSpec.full(), np.random.default_rng(0)
+    assert {s["kind"] for k in range(20) for s in sample_course2d(np.random.default_rng(k), 1.0)} == {"level", *CourseSpec().kinds}
     seen = set()
     for d in (0.0, 0.5, 1.0):
         for _ in range(6):
-            segs = sample_course2d(rng, d)
+            segs = sample_course2d(rng, d, spec)
             assert segs[0]["kind"] == segs[-1]["kind"] == "level"
             assert all({"level", "turn"} & {a["kind"], b["kind"]} for a, b in zip(segs[:-1], segs[1:], strict=True))
             assert all(abs(abs(s["turn"]) - np.pi / 2) < 1e-9 for s in segs if s["turn"])     # grid-aligned turns only
