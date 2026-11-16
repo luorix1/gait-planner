@@ -50,8 +50,8 @@ import numpy as np
 from .terrain import atlas, height, hf_height, pad, profile, tile_from_boxes
 
 ROOT = Path(__file__).resolve().parents[1]
-#: The active dataset (data/ab01, data/v1 and data/v2 are kept for reproduction); GP_DATASET picks another per process.
-DATASET = os.environ.get("GP_DATASET", "v2")
+#: The active dataset (data/ab01, v1, v2 and v3 are kept for reproduction); GP_DATASET picks another per process.
+DATASET = os.environ.get("GP_DATASET", "v4")
 OUT = ROOT / "data" / DATASET
 #: Camargo's inverse dynamics, plates and EMG (built on v1): the human reference ranges for every dataset.
 REF = ROOT / "data" / "v1"

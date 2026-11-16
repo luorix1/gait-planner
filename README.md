@@ -64,7 +64,14 @@ pose; the prior trains; PPO runs an iteration.
 
 ## Data (`data/<dataset>/split.json`)
 
-**v3 (2026-11-16; active once today's v2 prior exams finish).** v2 without PARC's physics-tracker replays
+**v4, the active dataset (2026-11-16).** v3 plus the seed library's Bones SEED clips (the frozen-prior route: the style
+prior trains once on all the human data and stays frozen). 13,346 clips, 17 h: `train` 12,121 (15.4 h), `test_trial`
+1,203 (1.5 h: AB01 and PARC held-out trials, and a tenth of SEED's actors, unseen people), `test_terrain` 22. Train with
+`--balance --sources sqrt` (prior) and `--starts sqrt` (policies): each dataset by the square root of its length, every
+recording equal within it (`gp.data.clip_weights`), or SEED's takes drown AB01's ramps. SEED is confidential (Motion
+Data by Bones Studio): `data/` stays on this machine.
+
+**v3 (2026-11-16).** v2 without PARC's physics-tracker replays
 (`gp.data.SIM_REPLAY`): PARC's `dm_motion_recorder` appends `_dm` to the motion its torque-driven humanoid produced
 while tracking a clip, and those were 16.0 of v2's 17.9 PARC minutes (all running, gap jumps, jump strides, stairs and
 walking, half the platforms). Only PARC's 31 untracked platform clips stay (1.9 min). 322 clips, 48 min: `train` 243
