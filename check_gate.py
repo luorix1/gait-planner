@@ -3,9 +3,10 @@ loop keeps episodes by this gate, so it must work per kind of motion, not on ave
 
 Windows: held-out real windows (test_trial + test_terrain) and five bad copies of each (check_prior.degraded):
 time warp and stiff knee (moving windows only: a still window played fast, or with its knees capped, is the same
-window), foot skate, crouch, jitter. Every window and its copies take the real window's situation (root horizontal
-speed, turning rate, vertical speed, change of speed), as an episode takes its plan's, so moving faster or slower than
-asked earns nothing.
+window), foot skate, crouch, jitter. Every window and its copies take the real window's plan as their situation
+(:func:`plan_features`: the planned centre-of-mass path and height, turning, contact pattern and pelvis tilt), as an
+episode takes its own plan's, so moving faster, lower or differently than asked earns nothing, and motions that are
+not locomotion (squats, lunges) would be told apart by what their plans ask for.
 
 Every limit comes from one recipe, the same for each measure (no per-measure rules): a straight-line trend of the
 measure against the situation over all real training windows (so limits extend to situations never seen, such as
@@ -20,14 +21,20 @@ Per group (split, terrain class / mode): the share of real windows rejected (fal
 accepted (false accepts). Target (``TARGET``): at most 10 % each, in every group. test_trial holds familiar situations;
 test_terrain the +-15 deg ramps, steeper than any training ground.
 
-Run: .venv/bin/python check_gate.py runs/prior_v1/prior.pt   (CPU is fine: CUDA_VISIBLE_DEVICES= ...)
-Out: <prior folder>/gate.json
+Style limits are in-sample unless ``--oos`` gives two fold priors (train_prior.py --fold): the prior scores motion it
+was trained on higher than new real motion, so limits from its own training windows reject new real motion.
+``--exclude-steep G`` is the one-step-beyond test: a prior trained without ground steeper than G (train_prior.py
+--max-grade), the reference without it, and those steeper real clips as a test group.
+
+Run: .venv/bin/python check_gate.py runs/prior_v1/prior.pt [--oos runs/prior_fold0/prior.pt,runs/prior_fold1/prior.pt]
+     .venv/bin/python check_gate.py runs/prior_le5/prior.pt --exclude-steep 7.5   (CPU is fine: CUDA_VISIBLE_DEVICES=)
+Out: <prior folder>/gate.json (or --out)
 """
 
 from __future__ import annotations
 
 import json
-import sys
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -107,9 +114,50 @@ class Limits:
         return trend + np.stack([np.percentile(self.res[nn, j], p, axis=1) for j, p in enumerate(pct)], 1)
 
 
+def plan_features(D: dict, ends: np.ndarray, F: int) -> np.ndarray:
+    """Per window of ``F`` frames ending at ``ends``, what its plan asks for (gp.data plans; the pelvis orientation is
+    the clip's, as PlanTracking's plan): the centre of mass's horizontal speed, vertical speed and change of speed; the
+    planned pelvis's turning rate (either way); the centre of mass's mean height above the ground under it, and its
+    range; the shares of frames with both feet down and with neither; the planned pelvis's mean sideways and forward
+    tilt (its orientation less its heading)."""
+    from scipy.spatial.transform import Rotation
+    idx = ends[:, None] + np.arange(1 - F, 1)
+    com = np.asarray(D["com"])[idx].astype(np.float64)
+    pc = np.asarray(D["plan_contact"])[idx]
+    q = np.asarray(D["record"])[idx][..., data.record_layout(len(D["tracked"]))["root_quat"]].astype(np.float64)
+    dt, m = (F - 1) / data.HZ, F // 2
+    v = lambda a, b: np.linalg.norm((com[:, b] - com[:, a])[:, [0, 2]], axis=1) / ((b - a) / data.HZ)  # noqa: E731
+    x, y, z, w = (q[..., i] for i in range(4))
+    psi = np.arctan2(-2 * (x * z - w * y), 1 - 2 * (y * y + z * z))
+    turn = np.abs(np.angle(np.exp(1j * (psi[:, -1] - psi[:, 0])))) / dt
+    yaw = Rotation.from_rotvec(np.c_[np.zeros(psi.size), psi.ravel(), np.zeros(psi.size)])
+    tilt = (yaw.inv() * Rotation.from_quat(q.reshape(-1, 4))).as_rotvec().reshape(*psi.shape, 3)
+    clips = np.searchsorted(D["start"], ends, side="right") - 1
+    h = np.stack([com[i, :, 1] - data.ground_under(D, int(c), com[i, :, 0], com[i, :, 2]) for i, c in enumerate(clips)])
+    return np.stack([v(0, F - 1), (com[:, -1, 1] - com[:, 0, 1]) / dt, (v(m, F - 1) - v(0, m)) / (dt / 2), turn,
+                     h.mean(1), h.max(1) - h.min(1), pc.all(-1).mean(1), (~pc.any(-1)).mean(1),
+                     tilt[..., 0].mean(1), tilt[..., 2].mean(1)], 1)
+
+
+def sample_ends(D: dict, n: int, before: int, rng: np.random.Generator) -> np.ndarray:
+    """``n`` window ends with at least ``before`` frames of the same clip before them."""
+    valid = np.concatenate([np.arange(s + before, s + k) for s, k in zip(D["start"], D["frames"], strict=True) if k > before])
+    return rng.choice(valid, min(n, len(valid)), replace=False)
+
+
 def main() -> None:
+    import argparse
+
     from sprint.recipes.motion import model_layout
-    path = Path(sys.argv[1])
+    ap = argparse.ArgumentParser()
+    ap.add_argument("prior", help="the gate's prior")
+    ap.add_argument("--oos", default="", help="F0,F1: priors trained on the two motion-group folds (train_prior.py "
+                                              "--fold); the reference windows are scored by the one that never saw them")
+    ap.add_argument("--exclude-steep", type=float, default=None, help="G: reference without ground steeper than G deg, "
+                                                                       "and those steeper training clips as a test group")
+    ap.add_argument("--out", default="")
+    a = ap.parse_args()
+    path = Path(a.prior)
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     prior = Prior.load(path, dev)
     model = data.load_model()
@@ -117,40 +165,51 @@ def main() -> None:
     rng = np.random.default_rng(0)
     # reference: real training windows (style: the last W + 1 frames; kinematics: the last KIN frames)
     Dr = data.load("train")
-    ends = np.concatenate([np.arange(s + KIN - 1, s + n) for s, n in zip(Dr["start"], Dr["frames"], strict=True)])
-    ends = rng.choice(ends, min(N_REF, len(ends)), replace=False)
+    steep = np.abs(np.asarray(Dr["grade_deg"])) > (a.exclude_steep if a.exclude_steep is not None else np.inf)
+    Ds, Dr = data.take(Dr, np.flatnonzero(steep)) if steep.any() else None, data.take(Dr, np.flatnonzero(~steep))
+    ends = sample_ends(Dr, N_REF, KIN - 1, rng)
     rclip = np.searchsorted(Dr["start"], ends, side="right") - 1
     rec_s, rec_k = Dr["record"][ends[:, None] + np.arange(-W, 1)], Dr["record"][ends[:, None] + np.arange(1 - KIN, 1)]
-    ref_s = score(prior, rec_s)
-    style_lim = Limits(context(rec_s), ref_s[:, None])
-    kin_lim = Limits(context(rec_k), kinematics(rec_k, rclip, Dr))
+    if a.oos:
+        folds = [Prior.load(f, dev) for f in a.oos.split(",")]
+        assert len(folds) == 2, "--oos takes the two fold priors"
+        fold = np.array([zlib.crc32(data.motion_group(str(Dr["name"][c])).encode()) % 2 for c in rclip])
+        ref_s = np.empty(len(ends))
+        for j in (0, 1):                                   # fold j's windows, scored by the prior trained on the other
+            ref_s[fold == j] = score(folds[1 - j], rec_s[fold == j])
+    else:
+        ref_s = score(prior, rec_s)
+    style_lim = Limits(plan_features(Dr, ends, W + 1), ref_s[:, None])
+    kin_lim = Limits(plan_features(Dr, ends, KIN), kinematics(rec_k, rclip, Dr))
     ref_cls = np.asarray(Dr["terrain_class"])[rclip]
     lim_cls = {c: float(np.percentile(ref_s[ref_cls == c], PCT)) for c in sorted(set(ref_cls))}
-    # held-out windows and their bad copies
-    D = data.load((data.HELD_OUT, "test_terrain"))
+    # test windows and their bad copies: held-out splits, and the steep training clips when excluded from the reference
+    sets = [(None, data.load((data.HELD_OUT, "test_terrain")))]
+    if Ds is not None:
+        sets.append((f"steeper than {a.exclude_steep:g} deg (unseen)", Ds))
     margin = int(np.ceil(KIN * WARP)) + 1
-    valid = np.concatenate([np.arange(s + margin, s + n) for s, n in zip(D["start"], D["frames"], strict=True)])
-    ends = rng.choice(valid, min(N_TEST, len(valid)), replace=False)
-    ci = np.searchsorted(D["start"], ends, side="right") - 1
-    cls = np.asarray(D["terrain_class"])[ci]
-    grp = np.array([f"{D['split'][c]}: {D['terrain_class'][c]}/{D['mode'][c]}" for c in ci])
-    real_s, real_k = degraded(D, model, L, ends, "real"), degraded(D, model, L, ends, "real", KIN)
-    lim_s = style_lim.limit(context(real_s), [PCT])[:, 0]
-    kin_lo, kin_hi1, kin_hi2 = kin_lim.limit(context(real_k), [KIN_PCT, 100 - KIN_PCT, 100 - KIN_PCT]).T
-    lim_c = np.array([lim_cls.get(c, np.nan) for c in cls])
-    moving = context(real_k)[:, 0] > 0.3
-
-    def verdicts(rs: np.ndarray, rk: np.ndarray) -> dict:
-        s, k = score(prior, rs), kinematics(rk, ci, D)
-        kin_ok = (k[:, 0] >= kin_lo) & (k[:, 1] <= kin_hi1) & (k[:, 2] <= kin_hi2)
-        return dict(**{"class": s >= lim_c, "style": s >= lim_s}, kin=kin_ok, combined=(s >= lim_s) & kin_ok)
-
-    acc = {"real": verdicts(real_s, real_k)}
-    for kind in KINDS:
-        acc[kind] = verdicts(degraded(D, model, L, ends, kind), degraded(D, model, L, ends, kind, KIN))
-        print(f"scored {kind}", flush=True)
-    out: dict = {"prior": str(path), "n_ref": len(ref_s), "k": K, "pct": PCT, "kin_pct": KIN_PCT, "target": TARGET,
-                 "groups": {}}
+    grp, moving = [], []
+    acc: dict = {k: {g: [] for g in GATES} for k in ("real", *KINDS)}
+    for label, D in sets:
+        te = sample_ends(D, N_TEST, margin, rng)
+        ci = np.searchsorted(D["start"], te, side="right") - 1
+        grp += [f"{label or D['split'][c]}: {D['terrain_class'][c]}/{D['mode'][c]}" for c in ci]
+        lim_s = style_lim.limit(plan_features(D, te, W + 1), [PCT])[:, 0]
+        lo, hi1, hi2 = kin_lim.limit(plan_features(D, te, KIN), [KIN_PCT, 100 - KIN_PCT, 100 - KIN_PCT]).T
+        lim_c = np.array([lim_cls.get(str(D["terrain_class"][c]), np.nan) for c in ci])
+        real_k = degraded(D, model, L, te, "real", KIN)
+        moving.append(context(real_k)[:, 0] > 0.3)
+        for kind in ("real", *KINDS):
+            rs, rk = degraded(D, model, L, te, kind), (real_k if kind == "real" else degraded(D, model, L, te, kind, KIN))
+            sc, k = score(prior, rs), kinematics(rk, ci, D)
+            kin_ok = (k[:, 0] >= lo) & (k[:, 1] <= hi1) & (k[:, 2] <= hi2)
+            for g, ok in (("class", sc >= lim_c), ("style", sc >= lim_s), ("kin", kin_ok), ("combined", (sc >= lim_s) & kin_ok)):
+                acc[kind][g].append(ok)
+        print(f"scored {label or 'held-out'}", flush=True)
+    grp, moving = np.array(grp), np.concatenate(moving)
+    acc = {k: {g: np.concatenate(v) for g, v in d.items()} for k, d in acc.items()}
+    out: dict = {"prior": str(path), "oos": a.oos, "exclude_steep": a.exclude_steep, "n_ref": len(ref_s), "k": K,
+                 "pct": PCT, "kin_pct": KIN_PCT, "target": TARGET, "situation": "plan features", "groups": {}}
     for g in sorted(set(grp)):
         m = grp == g
         row: dict = {"windows": int(m.sum())}
@@ -169,10 +228,11 @@ def main() -> None:
               + " ".join(k.split("_")[0][:6] for k in KINDS))
         for g, r in out["groups"].items():
             x = r[gate]
-            print(f"  {g:34s} n {r['windows']:4d}  {x['false_reject']:.2f} | " + " ".join(
+            print(f"  {g:48s} n {r['windows']:4d}  {x['false_reject']:.2f} | " + " ".join(
                 f"{x[f'accept_{k}']:6.2f}" if x[f"accept_{k}"] is not None else "     -" for k in KINDS))
-    (path.parent / "gate.json").write_text(json.dumps(out, indent=1))
-    print("->", path.parent / "gate.json")
+    dest = Path(a.out) if a.out else path.parent / "gate.json"
+    dest.write_text(json.dumps(out, indent=1))
+    print("->", dest)
 
 
 if __name__ == "__main__":
