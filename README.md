@@ -24,6 +24,7 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 | 0c. filter thresholds (done) | `python -m gp.accept` -> `data/<dataset>/accept.json` (Camargo kinetics per class) | CPU |
 | 0d. Camargo EMG (done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
 | 0e. AB01 running kinetics (done) | `ab01_id.py` (bolt env) -> `data/<dataset>/kinetics_ab01.npz`, then `python -m gp.accept` | CPU, 2 min |
+| 0f. filter exam | `python check_filter.py` -> `data/<dataset>/filter_exam.json` (real held-out clips pass, bad copies fail) | CPU, 1 min |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
@@ -53,7 +54,7 @@ pose; the prior trains; PPO runs an iteration.
 | `train_prior.py`, `check_prior.py` | train the prior; gate G0 |
 | `train.py`, `evaluate.py` | train a policy (PPO); evaluate it on held-out clips |
 | `camargo_id.py`, `ab01_id.py` | inverse dynamics on Rajagopal v3: Camargo (walking references), AB01 treadmill (running) |
-| `gp/accept.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); gate G1 |
+| `gp/accept.py`, `check_filter.py`, `g1.py` | the acceptance filter (six checks, thresholds from real clips); its exam; gate G1 |
 | `camargo_emg.py`, `gp/emg.py`, `emg_report.py` | Camargo EMG envelopes; EMG timing of policies against held-out subjects |
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `gp/free.py` | episodes without a clip: generated courses as free clips; the stand-in plan |
@@ -153,7 +154,8 @@ sat ahead of the foot in proportion to speed (+3.2 cm of it at 2.4 m/s). Each tr
 After that the centre of pressure sits 1.3 cm from the foot's line sideways and 2-5 cm ahead of its midpoint under load
 (walking, running), and the belts carry 1.02 body weights on average. 89 clips, 97-100 % of leg-frames valid.
 
-95th percentile of per-clip peaks (GRF in BW, moments in N m/kg; the filter's numbers):
+95th percentile of per-clip peaks (GRF in BW, moments in N m/kg; `ab01_id.py`'s whole-clip maxima, not the filter's
+per-stance medians, which `python -m gp.accept` prints):
 
 | | GRF | hip | knee | ankle |
 |---|---|---|---|---|
@@ -166,26 +168,52 @@ AB01 walking falls inside Camargo's limits (the pipeline check); only running fe
 **Running limits rise with speed.** The dataset's running is faster than AB01's (PARC: median 3.4 m/s in train, 4.0 held
 out, up to 4.5), and AB01's peaks rise with speed (per m/s: GRF +0.22 BW, as ~0.2 in Nilsson & Thorstensson 1989; ankle
 +0.45, hip +0.87 N m/kg; knee flat, as Schache et al. 2011 found for knee stance work). Each running limit is the larger
-of the pooled 95th percentile above and the 95 % prediction bound of a line through AB01's level clips' peaks against
-speed, at the episode's target speed (the reference clip's or the plan's, so running faster than asked earns nothing);
-the bound widens away from AB01's speeds, which is the headroom for extrapolating. Tabulated to the fastest running
-clip (4.5 m/s); faster holds that limit.
+of the pooled 95th percentile and the 95 % prediction bound of a line through AB01's level clips' values against
+speed (both of the filter's statistic, the median stance peak), at the episode's target speed (the reference clip's or
+the plan's, so running faster than asked earns nothing); the bound widens away from AB01's speeds, which is the headroom
+for extrapolating. Tabulated to the fastest running clip (v3: 4.4 m/s); faster holds that limit. v3 (stance peaks only,
+so running's large swing-phase hip moments no longer set the hip limit):
 
 | Target speed | GRF (BW) | loading (BW/s) | hip | knee | ankle |
 |---|---|---|---|---|---|
-| 2.0 m/s | 2.36 | 33.5 | 2.46 | 2.39 | 2.35 |
-| 3.5 m/s | 2.51 | 46.2 | 3.87 | 2.56 | 2.83 |
-| 4.5 m/s | 2.75 | 58.4 | 5.13 | 2.83 | 3.38 |
+| 2.0 m/s | 2.24 | 19.8 | 1.26 | 1.81 | 2.18 |
+| 3.5 m/s | 2.37 | 20.4 | 1.71 | 1.92 | 2.57 |
+| 4.4 m/s | 2.58 | 22.3 | 2.17 | 2.03 | 3.03 |
 
 ## Acceptance filter and G1 (`gp/accept.py`, `g1.py`)
 
 The plan doc's six checks, each threshold the 5th or 95th percentile of the same measure on real clips: kinetics on
-all 22 Camargo subjects per terrain class, style on the active dataset's clips of the episode's split and class. Camargo
-is all walking, so running on level ground and ramps takes AB01's running limits instead (one entry, `kinetics_run`;
-running stances 0.12-0.45 s for the G1 curves), PARC's obstacles (jumps, drops, platforms) leave the GRF and joint
-checks unchecked, and G1 and the EMG report use walking episodes only. The checks: style (2 s windows), plan followed, ground reaction (peak force, loading rate),
-joint loads, muscle effort (saturation), contact (sliding spheres, joint limits). A fallen episode is rejected first.
-`evaluate.py` runs every episode through it. Two departures from the doc's drawing:
+all 22 Camargo subjects per terrain class, style on the active dataset's clips of the episode's split and class, contact
+on its training clips of the episode's mode and class (`walk/level`; else its mode, else all, whichever has 20 clips).
+Camargo is all walking, so running on level ground and ramps takes AB01's running limits instead (one entry,
+`kinetics_run`; running stances 0.12-0.45 s for the G1 curves), and G1 and the EMG report use walking episodes only.
+The checks: style (2 s windows), plan followed, ground reaction (peak force, loading rate), joint loads, muscle effort
+(saturation), contact (slide under load, time at joint limits). A fallen episode is rejected first; an episode is
+accepted only when every check passed, so a check without a threshold (style before the prior is calibrated; GRF and
+joints on PARC's obstacles and on generated courses, whose class has no kinetic reference) is pending and blocks it.
+`evaluate.py` runs every episode through it.
+
+- **Kinetics, like with like (2026-11-16):** per stance and per leg on both sides; an episode's value is the median over
+  its stances (a real clip's: over its valid stances), the limit the 95th percentile of that value over real clips. The
+  old real side took single-leg clip peaks over valid frames, the simulation's side the maximum over both legs and every
+  stance in up to 10 s (~11 % higher on AB01 walking).
+- **Contact (2026-11-16):** per foot and stance under load (simulation: vertical force above 5 % BW; real clips: their
+  contact labels), the median horizontal speed of the foot's slowest contact sphere times the stance's duration; the
+  worst stance counts. The slowest sphere is the point the foot rolls over, so heel-to-toe roll and forefoot pivots read
+  as still and IK height dips do not matter (no heights are used). The old measure (any sphere within 5 mm of the ground,
+  over 2 cm) failed every real held-out clip. Time at joint limits: AB01 never comes within 1 deg of a limit (the
+  walking limit is 0 %); PARC's platform clips do 21 % of the time (trunk flexion past -45 deg); Camargo's IK sits on the
+  subtalar limit 10-15 % of the time.
+- **The exam** (`check_filter.py`, v3, 2026-11-16): real held-out clips through `accept.check` per group. Contact passes
+  92-100 % of every judged held-out group (10+ clips) on known terrain (Camargo's held-out subjects against limits from
+  its training subjects; AB01 and PARC against v3's), 72-89 % on Camargo's steeper held-out terrain. A 0.5 m/s foot
+  skate and knees locked at their limit in stance fail it 100 %. GRF passes 85-100 % of Camargo's held-out subjects,
+  joints 63-94 %: one held-out subject (AB06) lies outside all 19 training subjects' range (ramp descent ankle, stair
+  descent hip and ankle, stair ascent knee); without AB06 joints pass 87-100 %. Kinetics x1.3 fail GRF or joints
+  82-100 % (level walking 86 %: 1.3x is inside healthy subjects' spread of hip and knee moments, +-40 %). AB01 running, one
+  trial held out: GRF 80 %, joints 53 %, all within 1-5 % of the limit (5 trials of one subject); x1.3 fail 100 %.
+
+Two departures from the doc's drawing:
 - joint loads are **net joint moments**, not knee and hip reaction forces: SPRINT's reaction pass refuses wrapped
   muscle paths, which Rajagopal v3 has, and real reaction forces would need muscle-force estimates;
 - metabolic cost per metre is **reported, not gated**: there is no human metabolic data in the references.

@@ -116,8 +116,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
                     moment=B.to_torch(env.data.qfrc_total)[: nv * n].view(nv, n).T[:, jcol] / mass,
                     act_sat=s.activation > accept.SAT,
                     at_limit=((q[:, lim_dof] < lim_lo) | (q[:, lim_dof] > lim_hi)).any(1),
-                    sphere=sph, touching=sph[..., 1] - task.ground(sph[..., 0], sph[..., 2]) < accept.TOUCH_M,
-                    emg_act=s.activation @ emg_w)
+                    sphere=sph, emg_act=s.activation @ emg_w)
         for k, v in step.items():
             trace[k].append(v.cpu())
         path_len += torch.where(live, (root[:, [0, 2]] - last_root).norm(dim=1), torch.zeros_like(path_len))
@@ -138,7 +137,8 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
             row["style_sds_loss"] = float(sds[i] / sds_n[i]) if sds_n[i] > 0 else float("nan")
         k = int(steps[i])
         tr = {key: torch.stack(v)[:k, i].numpy() for key, v in trace.items()}
-        tr.update(fell=bool(fell[i]), metabolic_j_per_kg_m=float(metab_j[i] / mass / path_len[i].clamp_min(1e-3)))
+        tr.update(fell=bool(fell[i]), metabolic_j_per_kg_m=float(metab_j[i] / mass / path_len[i].clamp_min(1e-3)),
+                  sphere_side=task.sph_side)
         row.update(accept.check(tr, accept.thresholds(thresholds, split, row["terrain_class"], row["mode"],
                                                       float(D["speed_mps"][i]))))
         pr = emg.stride_profiles(tr["fv"][:, 1] > accept.DOWN_BW, tr["emg_act"])

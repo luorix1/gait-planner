@@ -221,29 +221,47 @@ def test_specific_tension(D: dict) -> None:
 
 
 def test_accept_check() -> None:
-    """The acceptance filter passes a clean episode and rejects a sliding foot, a missed contact and a fall."""
+    """The acceptance filter passes a clean episode and rejects a sliding foot, a missed contact and a fall; a foot
+    rolling over a still point is not sliding; a check without a threshold is pending and blocks acceptance."""
     from gp import accept
     T, S = 120, 18
     foot = np.zeros((T, 2, 3))
     clean = dict(sds=np.full(T, 0.2), plan_contact=np.ones((T, 2), bool), foothold_ref=foot.copy(), foot=foot.copy(),
                  com_out=np.zeros(T, bool), fv=np.full((T, 2), 0.5), moment=np.full((T, 6), 0.3),
                  act_sat=np.zeros((T, 90), bool), at_limit=np.zeros(T, bool), sphere=np.zeros((T, S, 3)),
-                 touching=np.ones((T, S), bool), fell=False, metabolic_j_per_kg_m=3.0)
+                 sphere_side=np.repeat([0, 1], S // 2), fell=False, metabolic_j_per_kg_m=3.0)
     thr = dict(grf_peak_bw=1.5, grf_loading_rate_bw_s=15.0, style_loss=1.0, band=None,
-               joint_peak_nm_per_kg=dict(hip_flexion=1.4, knee_angle=1.5, ankle_angle=2.0))
+               joint_peak_nm_per_kg=dict(hip_flexion=1.4, knee_angle=1.5, ankle_angle=2.0), slide_m=0.05,
+               at_limit_frac=0.0)
     r = accept.check(clean, thr)
     assert r["accepted"] and not r["failed"] and not r["unchecked"], r
-    slide = dict(clean, sphere=clean["sphere"] + np.linspace(0, 0.03, T)[:, None, None] * [1, 0, 0])
-    assert accept.check(slide, thr)["failed"] == ["contact"]
+    ramp = np.linspace(0, 0.3, T)[:, None, None] * [1, 0, 0]
+    assert accept.check(dict(clean, sphere=clean["sphere"] + ramp), thr)["failed"] == ["contact"]
+    roll = clean["sphere"] + ramp * (np.arange(S) % (S // 2) > 0)[None, :, None]     # one sphere per foot stays put
+    assert accept.check(dict(clean, sphere=roll), thr)["contact"]
+    assert accept.check(dict(clean, at_limit=np.arange(T) == 5), thr)["failed"] == ["contact"]
     missed = dict(clean, fv=np.where(np.arange(T)[:, None] < 80, 0.0, 0.5) * [1, 1])
     assert "plan" in accept.check(missed, thr)["failed"]
     assert accept.check(dict(clean, fell=True), thr)["failed"] == ["fell"]
-    assert accept.check(clean, dict(thr, style_loss=None))["unchecked"] == ["style"]
-    acc = dict(kinetics=dict(level={k: v for k, v in thr.items() if k != "style_loss"}), style=dict(test_trial=dict(level=1.0)))
+    r = accept.check(clean, dict(thr, style_loss=None))
+    assert r["unchecked"] == ["style"] and not r["accepted"] and not r["failed"]
+    acc = dict(kinetics=dict(level={k: v for k, v in thr.items() if k not in ("style_loss", "slide_m", "at_limit_frac")}),
+               style=dict(test_trial=dict(level=1.0)), contact=dict(all=dict(slide_m=0.05, at_limit_frac=0.0)))
     assert accept.thresholds(acc, "test_trial", "level", "walk") == thr                # Camargo kinetics + our style
     assert accept.check(clean, accept.thresholds(acc, "test_trial", "level", "run"))["unchecked"] == ["grf", "joints"]
     assert accept.check(clean, accept.thresholds(acc, "test_trial", "obstacles", "run"))["unchecked"] == [
         "style", "grf", "joints"]
+    acc["contact"].update(walk=dict(slide_m=0.2, at_limit_frac=0.1), **{"walk/level": dict(slide_m=0.3, at_limit_frac=0.0)})
+    assert accept.thresholds(acc, "test_trial", "level", "walk")["slide_m"] == 0.3     # most specific contact limits
+    assert accept.thresholds(acc, "test_trial", "ramp_up", "walk")["slide_m"] == 0.2
+    assert accept.thresholds(acc, "test_trial", "level", "stand")["slide_m"] == 0.05
+    # like with like: a stance's peaks, per leg, medians over stances; real traces skip invalid stances
+    down = np.zeros((T, 2), bool)
+    down[10:30, 1] = down[50:70, 1] = down[90:110, 1] = True
+    fv = np.where(down, 1.0, 0.0) * [1, 1]
+    fv[60, 1], fv[100, 1] = 3.0, np.nan
+    k = accept.kinetics(fv, np.zeros((T, 6)), down)
+    assert k["stances"] == 2 and k["grf_peak_bw"] == 2.0, k
     # running takes AB01's running limits on level ground and ramps, still none on obstacles
     run_thr = dict(grf_peak_bw=0.4, grf_loading_rate_bw_s=40.0, band=None, stance_s=list(accept.RUN_STANCE_S),
                    joint_peak_nm_per_kg=dict(hip_flexion=2.5, knee_angle=2.2, ankle_angle=2.4))
@@ -265,6 +283,25 @@ def test_accept_check() -> None:
     assert accept.thresholds(acc, "test_trial", "level", "walk", speed=3.0)["grf_peak_bw"] == 1.5  # walking unaffected
     run = np.r_[np.zeros(5), np.ones(10), np.zeros(10), np.ones(10), np.zeros(5)].astype(bool)   # 0.25 s stances
     assert len(accept.stances(run, accept.RUN_STANCE_S)) == 2 and not accept.stances(run)
+
+
+def test_contact_check_keeps_real_motion() -> None:
+    """The contact check, calibrated on real training clips, passes real held-out walking (slide is measured under load
+    at the point the foot rolls over, so heel-to-toe roll, pivots and IK dips do not count) and fails it slid at
+    0.5 m/s. check_filter.py is the full exam."""
+    from check_prior import skate
+    from gp import accept
+    rng = np.random.default_rng(0)
+    train = accept.real_clips(data.OUT, None, ("train",), source=None, mode="walk")
+    test = accept.real_clips(data.OUT, None, (data.HELD_OUT, "test_terrain"), source=None, mode="walk")
+    lim = accept.contact_limits([train[i] for i in rng.choice(len(train), 30, replace=False)])["walk"]
+    names = list(accept._body()["model"].coord_names)
+    real, slid = [], []
+    for r in (test[i] for i in rng.choice(len(test), 8, replace=False)):
+        real.append(accept.check(accept.real_trace(r["q"], r["down"]), lim)["contact"])
+        q = skate(r["q"], names, np.arange(len(r["q"])) / data.HZ)
+        slid.append(accept.check(accept.real_trace(q, r["down"]), lim)["contact"])
+    assert np.mean(real) >= 0.75 and not any(slid), (real, slid)
 
 
 def test_mirror_records(D: dict) -> None:

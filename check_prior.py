@@ -40,6 +40,16 @@ STIFF_KNEE_DEG = 15.0
 JITTER_DEG = 3.0
 
 
+def skate(q: np.ndarray, names: list, t: np.ndarray) -> np.ndarray:
+    """Coordinates ``q`` with the whole body slid forward (along the pelvis heading) at an extra ``SKATE_MPS`` from time
+    ``t`` (s) 0, joints unchanged."""
+    q = q.copy()
+    rot = q[:, names.index("pelvis_rotation")]
+    q[:, names.index("pelvis_tx")] += SKATE_MPS * t * np.cos(rot)
+    q[:, names.index("pelvis_tz")] -= SKATE_MPS * t * np.sin(rot)
+    return q
+
+
 def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str, frames: int = W + 1) -> np.ndarray:
     """Style records ``[n, frames, D]`` of the windows ending at frames ``ends`` (``kind`` = real or a degradation)."""
     from sprint.recipes.motion import forward_kinematics_np
@@ -56,10 +66,7 @@ def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str, fra
         hi = np.minimum(lo + 1, s0 + D["frames"][c] - 1)
         q = D["qpos"][lo] + (idx - lo)[:, None] * (D["qpos"][hi] - D["qpos"][lo])
         if kind == "foot_skate":
-            rot = q[:, names.index("pelvis_rotation")]
-            t = (k - k[0]) / data.HZ
-            q[:, names.index("pelvis_tx")] += SKATE_MPS * t * np.cos(rot)
-            q[:, names.index("pelvis_tz")] -= SKATE_MPS * t * np.sin(rot)
+            q = skate(q, names, (k - k[0]) / data.HZ)
         if kind == "stiff_knee":
             for side in ("_l", "_r"):
                 j = names.index("knee_angle" + side)
