@@ -90,6 +90,15 @@ def split_v2(r: dict[str, Any]) -> str:
     return "test_trial" if zlib.crc32(tag.encode()) % 10 == 0 else "train"
 
 
+def motion_group(name: str) -> str:
+    """The recording a clip comes from: an AB01 trial (``ab01_mc019``), or a PARC motion with all its copies (its last
+    ``<word>_<NNN>`` tag, as :func:`split_v2`). Folds of the data keep a group together."""
+    if name.startswith("ab01_"):
+        return name.split("_w")[0]
+    tags = re.findall(r"([a-z]+_\d{3})", name)
+    return tags[-1] if tags else name
+
+
 def split_of(r: dict[str, Any]) -> str:
     if r["subject"] in TEST_SUBJECTS:
         return "test_subject"

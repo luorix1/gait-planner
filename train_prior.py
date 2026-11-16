@@ -3,6 +3,9 @@ batch 512, gradient clip 1.0, 200k iterations, EMA 0.995 every 10 steps after 5k
 20k windows. Half of every batch is mirrored left to right (gp.smp.mirror_records). Logs the held-out subjects' loss
 beside the training loss.
 
+Subsets (the gate's checks, check_gate.py): ``--fold K/N`` keeps the motion groups (gp.data.motion_group) whose crc32 is
+K mod N, so a clip's score can come from a prior that never saw it; ``--max-grade G`` drops ramp clips steeper than G deg.
+
 Run: .venv/bin/python train_prior.py --out runs/prior_v1
 Out: <out>/prior.pt (latest; overwritten every 2k iterations), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
 """
@@ -12,6 +15,7 @@ from __future__ import annotations
 import argparse
 import csv
 import time
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -48,11 +52,21 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--src", default=str(data.OUT))
+    ap.add_argument("--fold", default="", help="K/N: train on the K-th of N motion-group folds")
+    ap.add_argument("--max-grade", type=float, default=None, help="drop clips on ground steeper than this (deg)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                      # a fresh folder per run, never overwrite one
     torch.manual_seed(0)
     D, Dt = data.load("train", Path(a.src)), data.load(data.HELD_OUT, Path(a.src))
+    keep = np.ones(len(D["name"]), bool)
+    if a.fold:
+        k, n = (int(v) for v in a.fold.split("/"))
+        keep &= np.array([zlib.crc32(data.motion_group(str(x)).encode()) % n == k for x in D["name"]])
+    if a.max_grade is not None:
+        keep &= np.abs(np.asarray(D["grade_deg"])) <= a.max_grade
+    D = data.take(D, np.flatnonzero(keep))
+    print(f"{int(keep.sum())} of {len(keep)} training clips", flush=True)
     rec, ends = windows(D, a.device)
     rec_t, ends_t = windows(Dt, a.device)
     prior = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"]).to(a.device)
@@ -85,7 +99,7 @@ def main() -> None:
             tb.add_scalar("loss/held_out", held, it)
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
         if it % 2000 == 0 or it == a.iters:
-            prior.save(out / "prior.pt", iters=it, data=str(a.src), mirrored=True)
+            prior.save(out / "prior.pt", iters=it, data=str(a.src), mirrored=True, fold=a.fold, max_grade=a.max_grade)
     tb.close()
 
 

@@ -40,8 +40,8 @@ STIFF_KNEE_DEG = 15.0
 JITTER_DEG = 3.0
 
 
-def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str) -> np.ndarray:
-    """Style records ``[n, W + 1, D]`` of the windows ending at frames ``ends`` (``kind`` = real or a degradation)."""
+def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str, frames: int = W + 1) -> np.ndarray:
+    """Style records ``[n, frames, D]`` of the windows ending at frames ``ends`` (``kind`` = real or a degradation)."""
     from sprint.recipes.motion import forward_kinematics_np
     names = D["coord_names"]
     key = [list(model.body_names).index(b) for b in data.KEY_BODIES]
@@ -49,7 +49,7 @@ def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str) -> 
     out = []
     for e, c in zip(ends, clip, strict=True):
         s0 = D["start"][c]
-        k = np.arange(-W, 1, dtype=float)
+        k = np.arange(1 - frames, 1, dtype=float)
         idx = e + (k * WARP if kind == "time_warp" else k)
         idx = np.clip(idx, s0, None)
         lo = np.floor(idx).astype(int)
