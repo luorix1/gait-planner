@@ -12,6 +12,9 @@
 - **v1** (``data/v1``): AB01 and Camargo 2021, split by held-out Camargo subjects and terrain. Camargo is set aside
   since 2026-11-14 (its IK welds the lumbar, so the trunk never moves, and some stair clips' heels never reach the
   ground); kept for reproduction and for the Camargo kinetics and EMG built on it.
+- **hard** (``data/hard``, 2026-11-16): only the clips named (``build("hard", clips=[...])``) from AB01, PARC and
+  Bones SEED, for single-clip feasibility runs (``imitate_clip.py``); all ``train``. SEED is confidential: its take
+  names live in the git-ignored ``runs/hard_clips_chain.sh``, and ``data/`` stays on this machine.
 
 Both:
 - **Dropped**: clips with a joint speed over 20 rad/s anywhere (``MAX_JOINT_SPEED``; source IK glitches).
@@ -132,6 +135,8 @@ DATASETS: dict[str, dict[str, Any]] = {
                           "1.2 m/s at 0/+5/-10 deg"),
     "v1": dict(sources=("ab01", "camargo2021"), split=split_of, splits=("train", "test_subject", "test_terrain"),
                held_out="test_subject: Camargo AB06/AB09/AB24; test_terrain: ramps |grade| >= 16 deg, Camargo stair_4"),
+    "hard": dict(sources=("ab01", "parc_seed", "seed_bones"), clips_required=True, split=lambda r: "train",
+                 splits=("train",), held_out="none: single-clip feasibility runs"),
 }
 #: The active dataset's held-out-motion split (the one the prior's gate and the evaluation use).
 HELD_OUT = DATASETS[DATASET]["splits"][1]
@@ -274,8 +279,10 @@ def resample(q: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return qpos, qvel, grid
 
 
-def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = None) -> None:
-    """``limit``: the first clips only (smoke tests), written to ``out``."""
+def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = None,
+          clips: Any = None) -> None:
+    """``limit``: the first clips only (smoke tests), written to ``out``. ``clips``: only these names (``hard`` needs
+    them; the other datasets default to all)."""
     from sprint.recipes.motion import _rotate, forward_kinematics_np, model_layout
 
     t0 = time.time()
@@ -294,9 +301,12 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
 
     ds = DATASETS[dataset]
     out = out or ROOT / "data" / dataset
+    keep = clips
+    if ds.get("clips_required") and not keep:
+        raise ValueError(f"{dataset}: name its clips, build({dataset!r}, clips=[...])")
     rows = [r for f in sorted(SEED.glob("manifest_*.json")) for r in json.loads(f.read_text())
             if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")
-            and not excluded(r["name"], dataset)][:limit]
+            and not excluded(r["name"], dataset) and (keep is None or r["name"] in keep)][:limit]
     meta: dict[str, list[Any]] = {k: [] for k in ("name", "subject", "source", "terrain_class", "mode", "split",
                                                   "grade_deg", "stair_rise_m", "speed_mps", "frames")}
     arrays: dict[str, list[np.ndarray]] = {k: [] for k in ("qpos", "qvel", "contact", "lift", "plan_contact", "foothold",
