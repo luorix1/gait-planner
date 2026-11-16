@@ -76,6 +76,8 @@ class TerrainImitation(Imitation):
         perm = [f * nl + (nl - 1 - k) for f in range(nf) for k in range(nl)]
         self.blocks.append(("height_scan", nf * nl, perm, [1.0] * (nf * nl)))
         self._obs_dim += nf * nl
+        names = [b[0] for b in self.blocks]
+        self.root_height_col = sum(b[1] for b in self.blocks[:names.index("root_height")])
         bn = list(model.body_names)
         self.key = [bn.index(b) for b in gpdata.KEY_BODIES]
         h = model.host
@@ -179,7 +181,12 @@ class TerrainImitation(Imitation):
         M = _heading(s.body_quat[:, self.root])                       # rows: forward, up, lateral (world)
         x = root[:, :1] + self.scan_f * M[:, 0, :1] + self.scan_l * M[:, 2, :1]
         z = root[:, 2:3] + self.scan_f * M[:, 0, 2:3] + self.scan_l * M[:, 2, 2:3]
-        return torch.cat([super().observation(s), self.ground(x, z) - root[:, 1:2]], 1)
+        obs = super().observation(s)
+        # The recipe's root height is above a flat floor (gp.data.motions sets grade 0), i.e. the world height, which
+        # drifts metres along graded treadmill clips and PARC tiles: a clock and a slope cue. Make it the height above
+        # the terrain under the root, as the style prior's records have it.
+        obs[:, self.root_height_col] = root[:, 1] - self.ground(root[:, :1], root[:, 2:3])[:, 0]
+        return torch.cat([obs, self.ground(x, z) - root[:, 1:2]], 1)
 
 
 @dataclass

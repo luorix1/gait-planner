@@ -33,10 +33,13 @@ from gp import data
 from gp.tasks import PlanConfig, PlanTracking, TerrainImitation, recipe_config
 
 
-def build(task_name: str, D: dict, worlds: int, seed: int, device: str, prior: str = "", starts: list | None = None):
+def build(task_name: str, D: dict, worlds: int, seed: int, device: str, prior: str = "", starts: list | None = None,
+          plan: dict | None = None):
+    """``plan``: a run's recorded PlanConfig (record.json), so evaluation scores with the bands the run trained on."""
     model = data.load_model(device)
     c = recipe_config()
-    task = (PlanTracking(D, c, PlanConfig(prior=prior), starts=starts, seed=seed) if task_name == "planner"
+    kept = {k: v for k, v in (plan or {}).items() if k in PlanConfig.__dataclass_fields__}
+    task = (PlanTracking(D, c, PlanConfig(**{**kept, "prior": prior}), starts=starts, seed=seed) if task_name == "planner"
             else TerrainImitation(D, c, starts=starts, seed=seed))
     # average_fext: contact forces read as the control step's mean, not the last substep's (which carries a
     # two-substep friction mode); a readout only, the physics is the same.

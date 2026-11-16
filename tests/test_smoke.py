@@ -120,6 +120,11 @@ def test_terrain_imitation_steps(D: dict) -> None:
     perm, sign, act = env.task.mirror_maps()
     assert len(perm) == env.task.obs_dim and sorted(act.tolist()) == list(range(env.action_dim))
     assert np.array_equal(env.task.csign, data.coord_mirror_signs(env.model))     # FK signs, not SPRINT's axis rule
+    t, s = env.task, env.state                  # root height: above the terrain under the root, not the world floor
+    root = s.body_com_pos()[:, t.root]
+    want = root[:, 1] - t.ground(root[:, :1], root[:, 2:3])[:, 0]
+    assert torch.allclose(t.observation(s)[:, t.root_height_col], want, atol=1e-5)
+    assert float(want.min()) > 0.3 and float(want.max()) < 1.5                      # a pelvis above its ground
 
 
 def test_plan_tracking_steps(D: dict, tmp_path) -> None:

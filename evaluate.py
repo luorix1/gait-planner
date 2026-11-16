@@ -56,7 +56,9 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
     D = data.take(full, np.sort(pick))
     n = len(D["name"])
     task_name = rec["args"]["task"]
-    env, task = build(task_name, D, n, 0, device, rec["args"].get("prior", ""), starts=[(i, 0) for i in range(n)])
+    env, task = build(task_name, D, n, 0, device, rec["args"].get("prior", ""), starts=[(i, 0) for i in range(n)],
+                      plan=rec.get("plan"))
+    env.auto_reset = False          # a world's last step is read after the step, so it must not be reset to its start
     if task_name == "planner":
         task.style.load_state_dict(torch.load(run / "style_norm.pt"))
         task.style.norm_samples = 0                     # frozen at the training run's normaliser
@@ -80,7 +82,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
     lim_dof = torch.as_tensor(lim, device=dev)
     lim_lo = torch.as_tensor(m.host["limit_lo"][: len(lim)], dtype=torch.float32, device=dev) + accept.LIMIT_MARGIN
     lim_hi = torch.as_tensor(m.host["limit_hi"][: len(lim)], dtype=torch.float32, device=dev) - accept.LIMIT_MARGIN
-    band = torch.as_tensor(PlanConfig().com_band, device=dev)
+    band = torch.as_tensor(task.plan.com_band if task_name == "planner" else PlanConfig().com_band, device=dev)
     mn = list(m.muscle_names)
     emg_w = torch.zeros(m.nmus, len(CHANNELS), device=dev)               # channel = mean of its muscles' activations
     for k, ch in enumerate(CHANNELS):
