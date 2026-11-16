@@ -58,6 +58,7 @@ pose; the prior trains; PPO runs an iteration.
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `gp/free.py` | episodes without a clip: generated courses as free clips; the stand-in plan |
 | `gp/planner.py`, `train_planner.py`, `check_planner.py` | the planner network (diffusion over plan windows); train it; score it before physics |
+| `seed_viewer/` | local debug viewer of the whole seed library (clip on its terrain as SPRINT poses it, QA numbers, traces, flags); 127.0.0.1 only |
 | `tests/test_smoke.py` | the CPU checks |
 
 ## Data (`data/<dataset>/split.json`)

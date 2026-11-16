@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seed Clip Viewer</title>
+<style>
+  :root { --bg:#f6f6f4; --panel:#fff; --ink:#1d1d1b; --muted:#6b6b66; --line:#e2e1dc; --accent:#2f6fde; --bad:#c73a2f; --ok:#2e8b57; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --panel:#1f1f1d; --ink:#ecebe6; --muted:#9a9993; --line:#33332f; --accent:#6b9cff; --bad:#ff6b5e; --ok:#55c08a; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.4 system-ui, sans-serif; height:100vh; display:flex; overflow:hidden; }
+  #left { width:46%; min-width:420px; display:flex; flex-direction:column; border-right:1px solid var(--line); background:var(--panel); }
+  #right { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .bar { padding:8px 10px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+  .bar label { color:var(--muted); display:flex; gap:4px; align-items:center; }
+  select, input[type=text], button { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  button { cursor:pointer; } button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #count { color:var(--muted); margin-left:auto; }
+  #tablewrap { flex:1; overflow:auto; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+  th { position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--line); text-align:left; padding:4px 6px; cursor:pointer; white-space:nowrap; font-weight:600; }
+  th.sorted { color:var(--accent); }
+  td { padding:3px 6px; border-bottom:1px solid var(--line); white-space:nowrap; max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+  tr { cursor:pointer; } tr:hover td { background:color-mix(in srgb, var(--accent) 8%, transparent); }
+  tr.sel td { background:color-mix(in srgb, var(--accent) 18%, transparent); }
+  tr.rej td { color:var(--muted); font-style:italic; }
+  td.bad { color:var(--bad); font-weight:600; }
+  td.flag { color:var(--bad); }
+  th:nth-child(2), td:nth-child(2) { position:sticky; left:0; background:var(--panel); z-index:1; }
+  th:nth-child(2) { z-index:2; }
+  #view { position:relative; flex:1; min-height:240px; }
+  #view canvas { display:block; }
+  #hud { position:absolute; left:10px; top:8px; font:12px/1.5 ui-monospace, monospace; background:color-mix(in srgb, var(--panel) 80%, transparent); padding:4px 8px; border-radius:5px; pointer-events:none; white-space:pre; }
+  #err { position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--bad); font-weight:600; padding:20px; text-align:center; }
+  #controls { display:flex; gap:8px; align-items:center; padding:6px 10px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  #scrub { flex:1; min-width:120px; }
+  #charts { height:210px; background:var(--panel); position:relative; }
+  #meta { height:150px; overflow:auto; padding:6px 10px; background:var(--panel); border-top:1px solid var(--line); font:12px/1.45 ui-monospace, monospace; color:var(--muted); }
+  #meta b { color:var(--ink); font-weight:600; }
+  .help { color:var(--muted); font-size:12px; }
+</style>
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js","three/addons/":"/vendor/three/addons/"}}</script>
+</head>
+<body>
+<div id="left">
+  <div class="bar" id="filters">
+    <span id="sources"></span>
+    <label title="the dataset build's own drops (rejected by the library's checks, hands, excluded names, joint speed) plus your flags"><input type="checkbox" id="f_hide">hide clips we don't use</label>
+    <label>show <select id="f_state"><option value="all" selected>all</option><option value="unused">not used only</option><option value="flag">flagged only</option></select></label>
+    <label>mode <select id="f_mode"><option value="">any</option></select></label>
+    <label>terrain <select id="f_terrain"><option value="">any</option></select></label>
+    <input type="text" id="f_text" placeholder="name / subject contains…" size="22">
+    <span id="count"></span>
+  </div>
+  <div id="tablewrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
+  <div class="bar help">j / k or ↓ / ↑: next / previous clip · space: play · ← / →: step · f: flag · red = past a debug threshold (hover the header)</div>
+</div>
+<div id="right">
+  <div id="view"><div id="hud"></div><div id="err"></div></div>
+  <div id="controls">
+    <button id="play">▶</button>
+    <input type="range" id="scrub" min="0" max="0" value="0">
+    <label class="help">speed <select id="rate"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option></select></label>
+    <button id="follow" class="on" title="camera follows the pelvis">follow</button>
+    <label class="help">coordinate <select id="coord"></select></label>
+    <button id="flag">flag</button>
+  </div>
+  <div id="charts"><canvas id="chart"></canvas></div>
+  <div id="meta">Pick a clip.</div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const SHOW = ["⚑", "name", "source", "mode_src", "terrain_class", "seconds", "ik_cm", "skate_cms", "worst_sole_cm", "out_of_range_pct", "hip_excess_deg", "toe_stuck_pct", "joint_speed", "speed_mps", "grade_deg", "not_used"];
+// debug thresholds: worse than every source's p95 in seed_bones_QA.md, roughly
+const BAD = { ik_cm: v => v > 2.2, skate_cms: v => v > 5, worst_sole_cm: v => v < -2.5, out_of_range_pct: v => v > 20, hip_excess_deg: v => v > 10, toe_stuck_pct: v => v > 10, joint_speed: v => v > 20 };
+const TIP = { ik_cm: "IK marker rms (cm), red > 2.2", skate_cms: "flat-foot skate (cm/s), red > 5", worst_sole_cm: "worst model contact sphere vs terrain (cm), red < -2.5", out_of_range_pct: "frames with a coordinate out of its range (%), red > 20", hip_excess_deg: "hip rotation past its range (deg, SEED only), red > 10", toe_stuck_pct: "toe stuck frames (%), red > 10", joint_speed: "fastest joint after the dataset build's low-pass (rad/s); the build drops clips > 20", not_used: "why the dataset build leaves it out, or your flag" };
+
+let cols, rows, flags = {}, view = [], sortKey = "name", sortDir = 1, sel = null, clip = null;
+const C = (r, k) => r[cols.indexOf(k)];
+const reason = (r) => C(r, "not_used") || (C(r, "name") in flags ? `flagged: ${flags[C(r, "name")] || "no note"}` : "");
+const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } };
+
+async function boot() {
+  const j = await (await fetch("/api/index")).json();
+  ({ cols, rows, flags } = j);
+  const uniq = (k) => [...new Set(rows.map(r => C(r, k)).filter(v => v != null))].sort();
+  $("sources").innerHTML = uniq("source").map(s => `<label><input type="checkbox" value="${s}" checked>${s}</label>`).join(" ");
+  for (const v of uniq("mode_src").concat(uniq("mode").filter(m => !uniq("mode_src").includes(m)))) $("f_mode").add(new Option(v, v));
+  for (const v of uniq("terrain_class")) $("f_terrain").add(new Option(v, v));
+  $("head").innerHTML = SHOW.map(k => `<th data-k="${k}" title="${TIP[k] || ""}">${k}</th>`).join("");
+  $("head").onclick = (e) => { const k = e.target.dataset.k; if (!k || k === "⚑") return; sortDir = sortKey === k ? -sortDir : (["name","source","mode_src","terrain_class","not_used"].includes(k) ? 1 : -1); sortKey = k; refresh(); };
+  $("f_hide").checked = store("seedviewer.hide") === "1";
+  $("filters").oninput = () => { store("seedviewer.hide", $("f_hide").checked ? "1" : "0"); refresh(); };
+  refresh();
+}
+
+function refresh() {
+  const srcs = new Set([...$("sources").querySelectorAll("input:checked")].map(i => i.value));
+  const st = $("f_state").value, hide = $("f_hide").checked, md = $("f_mode").value, tc = $("f_terrain").value, tx = $("f_text").value.toLowerCase();
+  view = rows.filter(r => srcs.has(C(r, "source"))
+    && !(hide && reason(r)) && (st === "all" || (st === "unused" && reason(r)) || (st === "flag" && C(r, "name") in flags))
+    && (!md || C(r, "mode_src") === md || C(r, "mode") === md) && (!tc || C(r, "terrain_class") === tc)
+    && (!tx || (C(r, "name") + " " + C(r, "subject")).toLowerCase().includes(tx)));
+  const i = cols.indexOf(sortKey);
+  view.sort((a, b) => { const x = a[i], y = b[i]; if (x == null) return 1; if (y == null) return -1; return (x < y ? -1 : x > y ? 1 : 0) * sortDir; });
+  const shown = view.slice(0, 500);
+  $("count").textContent = `${view.length} clips${view.length > 500 ? " (first 500 shown)" : ""}`;
+  for (const th of $("head").children) th.classList.toggle("sorted", th.dataset.k === sortKey);
+  $("body").innerHTML = shown.map((r, n) => `<tr data-n="${n}" class="${reason(r) ? "rej" : ""} ${r === sel ? "sel" : ""}">` + SHOW.map(k => {
+    if (k === "⚑") return `<td class="flag" title="${(flags[C(r, "name")] || "").replace(/"/g, "&quot;")}">${C(r, "name") in flags ? "⚑" : ""}</td>`;
+    const v = k === "not_used" ? reason(r) : C(r, k); const bad = v != null && BAD[k] && BAD[k](v);
+    return `<td class="${bad ? "bad" : ""}" title="${k === "not_used" || k === "name" ? String(v || "").replace(/"/g, "&quot;") : ""}">${v == null ? "" : v}</td>`; }).join("") + "</tr>").join("");
+  $("body").onclick = (e) => { const tr = e.target.closest("tr"); if (tr) pick(view[+tr.dataset.n]); };
+}
+
+// ---------------------------------------------------------------- 3D view
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+$("view").prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(matchMedia("(prefers-color-scheme: dark)").matches ? 0x232527 : 0xdde2e8);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 200);
+camera.position.set(2.5, 1.6, 3.0);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.9, 0);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666655, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(3, 6, 2); scene.add(sun);
+let world = new THREE.Group(); scene.add(world);
+const axes = new THREE.AxesHelper(0.3); scene.add(axes);
+
+function resize() {
+  const v = $("view"); renderer.setSize(v.clientWidth, v.clientHeight); camera.aspect = v.clientWidth / v.clientHeight; camera.updateProjectionMatrix();
+  const c = $("chart"); c.width = $("charts").clientWidth * devicePixelRatio; c.height = $("charts").clientHeight * devicePixelRatio; c.style.width = "100%"; c.style.height = "100%"; drawChart();
+}
+addEventListener("resize", resize);
+
+let bones, joints, spheres, frame = 0, playing = false, last = 0, acc = 0;
+const grey = new THREE.Color(0x9a9a9a), green = new THREE.Color(0x2ecc71);
+
+function buildTerrain(c) {
+  const hf = c.hf, nx = hf.length, nz = hf[0].length, dx = c.dx, [x0, y0] = c.hf_min;
+  let lo = Infinity, hi = -Infinity;
+  for (const row of hf) for (const h of row) { if (h < lo) lo = h; if (h > hi) hi = h; }
+  const col = (h) => new THREE.Color().setHSL(0.33 - 0.33 * (hi > lo ? (h - lo) / (hi - lo) : 0), 0.25, 0.55);
+  if (c.terrain.type === "heightfield") {                  // PARC box grid: one column per cell, as the training's tile
+    const geo = new THREE.BoxGeometry(dx, 1, dx), mat = new THREE.MeshStandardMaterial({ roughness: 0.9 });
+    const mesh = new THREE.InstancedMesh(geo, mat, nx * nz), m = new THREE.Matrix4(), base = lo - 0.3;
+    let k = 0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const h = hf[i][j];
+      m.compose(new THREE.Vector3(x0 + i * dx, (h + base) / 2, -(y0 + j * dx)), new THREE.Quaternion(), new THREE.Vector3(1, h - base, 1));
+      mesh.setMatrixAt(k, m); mesh.setColorAt(k++, col(h));
+    }
+    return mesh;
+  }
+  const pos = [], colr = [], idx = [];
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { pos.push(x0 + i * dx, hf[i][j], -(y0 + j * dx)); const cc = col(hf[i][j]); colr.push(cc.r, cc.g, cc.b); }
+  for (let i = 0; i < nx - 1; i++) for (let j = 0; j < nz - 1; j++) { const a = i * nz + j, b = a + nz; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("color", new THREE.Float32BufferAttribute(colr, 3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide, flatShading: true })));
+  g.add(new THREE.LineSegments(new THREE.WireframeGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.08 })));
+  return g;
+}
+
+function buildClip(c) {
+  scene.remove(world); world = new THREE.Group(); scene.add(world);
+  world.add(buildTerrain(c));
+  const nb = c.pts[0].length;
+  bones = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x2f6fde }));
+  bones.geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(c.segments.length * 6), 3));
+  joints = new THREE.InstancedMesh(new THREE.SphereGeometry(0.025, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2f6fde }), nb);
+  spheres = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.85 }), c.radius.length);
+  world.add(bones, joints, spheres);
+  const trail = c.pts.map(p => new THREE.Vector3(...p[0]));
+  world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(trail), new THREE.LineBasicMaterial({ color: 0xe0a020 })));
+  const p0 = new THREE.Vector3(...c.pts[0][0]);
+  controls.target.copy(p0); camera.position.copy(p0).add(new THREE.Vector3(2.2, 0.8, 2.8));
+}
+
+function pose(f) {
+  if (!clip) return;
+  const P = clip.pts[f], a = bones.geometry.attributes.position.array, m = new THREE.Matrix4();
+  clip.segments.forEach(([i, j], k) => { a.set(P[i], k * 6); a.set(P[j], k * 6 + 3); });
+  bones.geometry.attributes.position.needsUpdate = true; bones.geometry.computeBoundingSphere();
+  P.forEach((p, k) => { m.makeTranslation(p[0], p[1], p[2]); joints.setMatrixAt(k, m); });
+  joints.instanceMatrix.needsUpdate = true;
+  const ct = clip.contact[f], down = { l: ct[0] || ct[1], r: ct[2] || ct[3] };
+  clip.spheres[f].forEach((p, k) => { const r = clip.radius[k]; m.compose(new THREE.Vector3(...p), new THREE.Quaternion(), new THREE.Vector3(r, r, r)); spheres.setMatrixAt(k, m); spheres.setColorAt(k, down[clip.sphere_side[k]] ? green : grey); });
+  spheres.instanceMatrix.needsUpdate = true; spheres.instanceColor.needsUpdate = true;
+  if ($("follow").classList.contains("on")) { const pel = new THREE.Vector3(...P[0]), d = pel.clone().sub(controls.target); controls.target.add(d); camera.position.add(d); }
+  const tf = (b) => b ? "■" : "□";
+  $("hud").textContent = `${clip.meta.name}\nframe ${f + 1}/${clip.frames}  t ${(f / clip.fps).toFixed(2)} s\nlowest foot sphere ${clip.gap_cm[f].toFixed(1)} cm   fastest joint ${clip.speed[f].toFixed(1)} rad/s\ncontact L heel ${tf(ct[0])} toe ${tf(ct[1])}   R heel ${tf(ct[2])} toe ${tf(ct[3])}`;
+  $("scrub").value = f; drawChart();
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (clip && playing) { acc += (t - last) / 1000 * +$("rate").value; const step = 1 / clip.fps; while (acc >= step) { acc -= step; frame = (frame + 1) % clip.frames; } pose(frame); }
+  last = t; controls.update(); renderer.render(scene, camera);
+}
+
+// ---------------------------------------------------------------- traces
+function drawChart() {
+  const cv = $("chart"), g = cv.getContext("2d"), W = cv.width, H = cv.height, dpr = devicePixelRatio;
+  g.clearRect(0, 0, W, H); if (!clip) return;
+  const name = $("coord").value, rng = clip.coord_range[name] || [null, null];
+  const panels = [[`${name}${rng[0] == null ? " (m)" : " (deg)"}`, clip.coords[name], rng, css("--accent")],
+                  ["lowest foot sphere (cm)", clip.gap_cm, [0, null], css("--ok")], ["fastest joint (rad/s)", clip.speed, [null, 20], css("--bad")]];
+  const ph = H / panels.length, L = 44 * dpr, R = W - 8 * dpr, n = clip.frames, X = (f) => L + (R - L) * f / Math.max(1, n - 1);
+  g.font = `${11 * dpr}px system-ui`; g.lineWidth = dpr;
+  panels.forEach(([label, y, lines, color], k) => {
+    const top = k * ph + 14 * dpr, bot = (k + 1) * ph - 6 * dpr;
+    const vals = y.concat(lines.filter(v => v != null)); let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+    const Y = (v) => bot - (bot - top) * (v - lo) / (hi - lo);
+    g.fillStyle = css("--muted"); g.fillText(label, L, top - 3 * dpr); g.fillText(hi.toFixed(1), 2 * dpr, top + 8 * dpr); g.fillText(lo.toFixed(1), 2 * dpr, bot);
+    g.setLineDash([4 * dpr, 3 * dpr]); g.strokeStyle = css("--bad");
+    for (const v of lines) if (v != null) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(R, Y(v)); g.stroke(); }
+    g.setLineDash([]); g.strokeStyle = color; g.beginPath(); y.forEach((v, f) => f ? g.lineTo(X(f), Y(v)) : g.moveTo(X(f), Y(v))); g.stroke();
+  });
+  g.strokeStyle = css("--ink"); g.beginPath(); g.moveTo(X(frame), 0); g.lineTo(X(frame), H); g.stroke();
+}
+$("chart").onclick = (e) => { if (!clip) return; const r = e.target.getBoundingClientRect(); const f = Math.round((e.clientX - r.left - 44) / (r.width - 52) * (clip.frames - 1)); frame = Math.max(0, Math.min(clip.frames - 1, f)); pose(frame); };
+
+// ---------------------------------------------------------------- selection
+async function pick(r) {
+  sel = r; refresh();
+  const keep = ["name", "source", "subject", "mode", "mode_src", "terrain_class"];
+  if (!C(r, "exported")) { clip = null; $("err").style.display = "flex"; $("err").textContent = reason(r); $("meta").innerHTML = keep.map(k => `<b>${k}</b> ${C(r, k)}`).join("<br>"); return; }
+  $("err").style.display = "none";
+  const res = await fetch(`/api/clip?file=${encodeURIComponent(C(r, "file"))}`); const c = await res.json();
+  if (c.error) { clip = null; $("err").style.display = "flex"; $("err").textContent = c.error; return; }
+  if (sel !== r) return;
+  clip = c; frame = 0; $("scrub").max = c.frames - 1;
+  const cur = $("coord").value; $("coord").innerHTML = Object.keys(c.coords).map(k => `<option>${k}</option>`).join(""); $("coord").value = cur && c.coords[cur] ? cur : "hip_rotation_r";
+  buildClip(c); pose(0);
+  const m = c.meta, skip = new Set(["license"]);
+  $("meta").innerHTML = `<b>terrain</b> ${JSON.stringify(c.terrain)}<br>`
+    + (reason(r) ? `<b style="color:var(--bad)">not used</b> ${reason(r)}<br>` : "") + Object.entries(m).filter(([k]) => !skip.has(k)).map(([k, v]) => `<b>${k}</b> ${typeof v === "number" ? +v.toFixed(4) : v}`).join(" · ");
+  $("flag").classList.toggle("on", C(r, "name") in flags);
+}
+
+async function toggleFlag() {
+  if (!sel) return;
+  const name = C(sel, "name"), on = !(name in flags);
+  const note = on ? (prompt(`Why is ${name} bad?`, "") ?? null) : "";
+  if (note === null) return;
+  flags = await (await fetch("/api/flag", { method: "POST", body: JSON.stringify({ name, flag: on, note }) })).json();
+  $("flag").classList.toggle("on", name in flags); refresh();
+}
+
+function step(d) { const i = view.indexOf(sel); const n = view[Math.max(0, Math.min(view.length - 1, i + d))]; if (n) { pick(n); const tr = $("body").querySelector(`tr[data-n="${view.indexOf(n)}"]`); tr?.scrollIntoView({ block: "nearest" }); } }
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "❚❚" : "▶"; };
+$("scrub").oninput = (e) => { frame = +e.target.value; pose(frame); };
+$("follow").onclick = (e) => e.target.classList.toggle("on");
+$("coord").onchange = drawChart;
+$("flag").onclick = toggleFlag;
+addEventListener("keydown", (e) => {
+  if (e.target.matches("input[type=text], select")) return;
+  if (e.key === "j" || e.key === "ArrowDown") { step(1); e.preventDefault(); }
+  else if (e.key === "k" || e.key === "ArrowUp") { step(-1); e.preventDefault(); }
+  else if (e.key === " ") { $("play").click(); e.preventDefault(); }
+  else if (clip && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { frame = (frame + (e.key === "ArrowRight" ? 1 : clip.frames - 1)) % clip.frames; pose(frame); e.preventDefault(); }
+  else if (e.key === "f") toggleFlag();
+});
+resize(); requestAnimationFrame(loop); boot();
+</script>
+</body>
+</html>
