@@ -24,10 +24,14 @@ test_terrain the +-15 deg ramps, steeper than any training ground.
 Style limits are in-sample unless ``--oos`` gives two fold priors (train_prior.py --fold): the prior scores motion it
 was trained on higher than new real motion, so limits from its own training windows reject new real motion.
 ``--exclude-steep G`` is the one-step-beyond test: a prior trained without ground steeper than G (train_prior.py
---max-grade), the reference without it, and those steeper real clips as a test group.
+--max-grade), the reference without it, and those steeper real clips as a test group. ``--hold-grade LO,HI`` is the
+interpolation test the same way (train_prior.py --drop-grade): clips with LO < |grade| <= HI.
+
+A conditional prior (train_prior.py --cond) scores every window, and its bad copies, with its clip's labels.
 
 Run: .venv/bin/python check_gate.py runs/prior_v1/prior.pt [--oos runs/prior_fold0/prior.pt,runs/prior_fold1/prior.pt]
      .venv/bin/python check_gate.py runs/prior_le5/prior.pt --exclude-steep 7.5   (CPU is fine: CUDA_VISIBLE_DEVICES=)
+     .venv/bin/python check_gate.py runs/prior_no5/prior.pt --hold-grade 2.5,7.5
 Out: <prior folder>/gate.json (or --out)
 """
 
@@ -155,6 +159,7 @@ def main() -> None:
                                               "--fold); the reference windows are scored by the one that never saw them")
     ap.add_argument("--exclude-steep", type=float, default=None, help="G: reference without ground steeper than G deg, "
                                                                        "and those steeper training clips as a test group")
+    ap.add_argument("--hold-grade", default="", help="LO,HI: as --exclude-steep for LO < |grade| <= HI deg")
     ap.add_argument("--out", default="")
     a = ap.parse_args()
     path = Path(a.prior)
@@ -165,7 +170,10 @@ def main() -> None:
     rng = np.random.default_rng(0)
     # reference: real training windows (style: the last W + 1 frames; kinematics: the last KIN frames)
     Dr = data.load("train")
-    steep = np.abs(np.asarray(Dr["grade_deg"])) > (a.exclude_steep if a.exclude_steep is not None else np.inf)
+    lo, hi = (map(float, a.hold_grade.split(",")) if a.hold_grade
+              else (a.exclude_steep if a.exclude_steep is not None else np.inf, np.inf))
+    g = np.abs(np.asarray(Dr["grade_deg"], float))
+    steep = (g > lo) & (g <= hi)
     Ds, Dr = data.take(Dr, np.flatnonzero(steep)) if steep.any() else None, data.take(Dr, np.flatnonzero(~steep))
     ends = sample_ends(Dr, N_REF, KIN - 1, rng)
     rclip = np.searchsorted(Dr["start"], ends, side="right") - 1
@@ -176,9 +184,9 @@ def main() -> None:
         fold = np.array([zlib.crc32(data.motion_group(str(Dr["name"][c])).encode()) % 2 for c in rclip])
         ref_s = np.empty(len(ends))
         for j in (0, 1):                                   # fold j's windows, scored by the prior trained on the other
-            ref_s[fold == j] = score(folds[1 - j], rec_s[fold == j])
+            ref_s[fold == j] = score(folds[1 - j], rec_s[fold == j], c=folds[1 - j].labels(Dr, rclip[fold == j]))
     else:
-        ref_s = score(prior, rec_s)
+        ref_s = score(prior, rec_s, c=prior.labels(Dr, rclip))
     style_lim = Limits(plan_features(Dr, ends, W + 1), ref_s[:, None])
     kin_lim = Limits(plan_features(Dr, ends, KIN), kinematics(rec_k, rclip, Dr))
     ref_cls = np.asarray(Dr["terrain_class"])[rclip]
@@ -186,7 +194,7 @@ def main() -> None:
     # test windows and their bad copies: held-out splits, and the steep training clips when excluded from the reference
     sets = [(None, data.load((data.HELD_OUT, "test_terrain")))]
     if Ds is not None:
-        sets.append((f"steeper than {a.exclude_steep:g} deg (unseen)", Ds))
+        sets.append((f"{lo:g} < |grade| <= {hi:g} deg (unseen)" if a.hold_grade else f"steeper than {a.exclude_steep:g} deg (unseen)", Ds))
     margin = int(np.ceil(KIN * WARP)) + 1
     grp, moving = [], []
     acc: dict = {k: {g: [] for g in GATES} for k in ("real", *KINDS)}
@@ -201,14 +209,15 @@ def main() -> None:
         moving.append(context(real_k)[:, 0] > 0.3)
         for kind in ("real", *KINDS):
             rs, rk = degraded(D, model, L, te, kind), (real_k if kind == "real" else degraded(D, model, L, te, kind, KIN))
-            sc, k = score(prior, rs), kinematics(rk, ci, D)
+            sc, k = score(prior, rs, c=prior.labels(D, ci)), kinematics(rk, ci, D)
             kin_ok = (k[:, 0] >= lo) & (k[:, 1] <= hi1) & (k[:, 2] <= hi2)
             for g, ok in (("class", sc >= lim_c), ("style", sc >= lim_s), ("kin", kin_ok), ("combined", (sc >= lim_s) & kin_ok)):
                 acc[kind][g].append(ok)
         print(f"scored {label or 'held-out'}", flush=True)
     grp, moving = np.array(grp), np.concatenate(moving)
     acc = {k: {g: np.concatenate(v) for g, v in d.items()} for k, d in acc.items()}
-    out: dict = {"prior": str(path), "oos": a.oos, "exclude_steep": a.exclude_steep, "n_ref": len(ref_s), "k": K,
+    out: dict = {"prior": str(path), "oos": a.oos, "exclude_steep": a.exclude_steep, "hold_grade": a.hold_grade,
+                 "n_ref": len(ref_s), "k": K,
                  "pct": PCT, "kin_pct": KIN_PCT, "target": TARGET, "situation": "plan features", "groups": {}}
     for g in sorted(set(grp)):
         m = grp == g

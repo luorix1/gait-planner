@@ -37,8 +37,11 @@ def test_terrain_matches_sprint(D: dict) -> None:
 
 def _prior(D: dict, tmp_path) -> str:
     from gp.smp import Prior, window_features
-    from train_prior import batch, windows
+    from train_prior import batch, recording_weights, windows
     rec, ends = windows(D, "cpu")
+    w = recording_weights(D, "cpu")                        # balanced: each recording's windows sum to 1
+    assert len(w) == len(ends) and abs(float(w.sum()) - len({data.motion_group(str(c)) for c in D["name"]})) < 1e-3
+    assert batch(rec, ends, 8, weights=w).shape == batch(rec, ends, 8).shape
     p = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"])
     p.set_normaliser(window_features(batch(rec, ends, 512), p.cfg["nt"], p.cfg["dt"]))
     opt = torch.optim.AdamW(p.net.parameters(), lr=2e-4)
@@ -79,6 +82,35 @@ def _roll(env, steps: int = 12) -> list:
     assert o.shape[1] == env.task.obs_dim and torch.isfinite(o).all()
     assert all(torch.isfinite(x).all() for x in rewards)
     return rewards
+
+
+def test_conditional_prior(D: dict, tmp_path) -> None:
+    from gp.smp import N_COND, Prior, conditions, window_features
+    from train_prior import batch, frame_labels, windows
+    rec, ends = windows(D, "cpu")
+    lab = frame_labels(D, "cpu")
+    assert lab.shape == (len(rec), N_COND) and torch.equal(lab[D["start"]], torch.as_tensor(conditions(D)))
+    w, c = batch(rec, ends, 64, lab=lab)
+    assert c.shape == (64, N_COND)
+    p = Prior(nt=len(D["tracked"]), dt=1.0 / D["hz"], n_cond=N_COND)
+    p.set_normaliser(window_features(batch(rec, ends, 512), p.cfg["nt"], p.cfg["dt"]))
+    opt = torch.optim.AdamW(p.net.parameters(), lr=2e-4)
+    first = None
+    for _ in range(30):
+        w, c = batch(rec, ends, 64, lab=lab)
+        loss = p.loss(p.features(w), c)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        first = first or float(loss.detach())
+    assert float(loss.detach()) < first
+    p.ema.module.load_state_dict(p.net.state_dict())
+    p.save(tmp_path / "cond.pt")
+    q = Prior.load(tmp_path / "cond.pt")
+    x = q.features(w)
+    s_c, s_null = q.sds(x, c=c), q.sds(x)                   # labelled and null-label scores differ, both finite
+    assert torch.isfinite(s_c).all() and torch.isfinite(s_null).all() and not torch.allclose(s_c, s_null)
+    assert q.labels(D, [0]).shape == (1, N_COND) and Prior(nt=3, dt=0.025).labels(D, [0]) is None
 
 
 def test_terrain_imitation_steps(D: dict) -> None:

@@ -82,10 +82,11 @@ def degraded(D: dict, model: object, L: object, ends: np.ndarray, kind: str, fra
 
 
 @torch.no_grad()
-def score(prior: Prior, rec: np.ndarray, draws: int = 4) -> np.ndarray:
+def score(prior: Prior, rec: np.ndarray, draws: int = 4, c: torch.Tensor | None = None) -> np.ndarray:
+    """Minus the mean SDS loss; ``c``: a conditional prior's labels (Prior.labels; None = its null label)."""
     torch.manual_seed(0)
     x = prior.features(torch.as_tensor(rec, device=prior.ab.device))
-    return -np.mean([prior.sds(x).mean(1).cpu().numpy() for _ in range(draws)], 0)
+    return -np.mean([prior.sds(x, c=c).mean(1).cpu().numpy() for _ in range(draws)], 0)
 
 
 def unseen_skills(prior: Prior, model: object, L: object, thr: float, rng: np.random.Generator) -> dict:
@@ -98,7 +99,8 @@ def unseen_skills(prior: Prior, model: object, L: object, thr: float, rng: np.ra
     for cls in ("level", "stairs_up", "stairs_down"):
         keep = np.flatnonzero((D["terrain_class"] == cls) & (D["source"] == "camargo2021"))
         valid = np.concatenate([np.arange(D["start"][c] + W + 1, D["start"][c] + D["frames"][c]) for c in keep])
-        s = score(prior, degraded(D, model, L, rng.choice(valid, min(N_WINDOWS // 3, len(valid)), replace=False), "real"))
+        e = rng.choice(valid, min(N_WINDOWS // 3, len(valid)), replace=False)
+        s = score(prior, degraded(D, model, L, e, "real"), c=prior.labels(D, np.searchsorted(D["start"], e, side="right") - 1))
         out[f"camargo_{cls}"] = {"below_threshold": float((s < thr).mean()), "score_median": float(np.median(s))}
     return out
 
@@ -117,12 +119,13 @@ def main() -> None:
         margin = int(np.ceil(W * WARP)) + 1
         valid = np.concatenate([np.arange(s + margin, s + n) for s, n in zip(D["start"], D["frames"], strict=True)])
         ends = rng.choice(valid, min(N_WINDOWS, len(valid)), replace=False)
-        subj = D["subject"][np.searchsorted(D["start"], ends, side="right") - 1]
-        real = score(prior, degraded(D, model, L, ends, "real"))
+        clip = np.searchsorted(D["start"], ends, side="right") - 1
+        subj, lab = D["subject"][clip], prior.labels(D, clip)
+        real = score(prior, degraded(D, model, L, ends, "real"), c=lab)
         r: dict = {"windows": len(ends), "real_score_median": float(np.median(real))}
         deg_all = []
         for kind in ("time_warp", "foot_skate", "crouch"):
-            d = score(prior, degraded(D, model, L, ends, kind))
+            d = score(prior, degraded(D, model, L, ends, kind), c=lab)
             deg_all.append(d)
             r[f"win_vs_{kind}"] = float((real > d).mean())
         deg = np.concatenate(deg_all)
