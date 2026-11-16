@@ -138,6 +138,14 @@ th, td { text-align:left; vertical-align:top; padding:9px 10px; border-bottom:1p
 th { font-weight:600; color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.06em }
 td.num { font-variant-numeric:tabular-nums; white-space:nowrap }
 ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
+.patch { fill:var(--blue-soft); fill-opacity:.55; stroke:var(--blue); stroke-width:1.8; stroke-dasharray:5 4 }
+.tag { display:inline-block; font-size:12px; font-weight:600; letter-spacing:.04em; padding:1px 8px; border-radius:999px; margin:0 6px 2px 0; white-space:nowrap }
+.tag.up { background:var(--blue-soft); color:var(--blue) } .tag.fz { background:var(--grey-soft); color:var(--muted) }
+.tag.pl { border:1.5px dashed var(--wire); color:var(--muted) }
+table.sched td:first-child, table.data td:first-child { font-weight:600; white-space:nowrap }
+table.sched td { font-size:14.5px; min-width:150px }
+table.data td.num { min-width:150px }
+table.data .b { height:12px; border-radius:3px; display:inline-block; vertical-align:middle; margin-right:8px }
 
 @media (max-width:1000px) {
   .split, .datagrid, .two { grid-template-columns:1fr }
@@ -160,12 +168,13 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <div class="wrap">
 
 <header>
-  <p class="eyebrow">gait_planner · plan · updated 15 Nov 2026</p>
+  <p class="eyebrow">gait_planner · plan · updated 16 Nov 2026</p>
   <h1>Sparse-target planner</h1>
-  <p class="lede">A planner says where and when each foot lands, where the body's centre of mass should be, and which way the pelvis faces. A muscle policy works out the rest. A style prior and six checks against human data decide which new episodes are kept, so new skills come out of the loop instead of from new recordings.</p>
+  <p class="lede">A planner says where and when each foot lands, where the body's centre of mass should be, and which way the pelvis faces. A muscle policy works out the rest. A style prior coaches the motion; checks against human forces, loads and contact decide which new episodes are kept, so new skills come out of the loop instead of from new recordings.</p>
   <div class="chips">
-    <span class="chip done"><i></i>Data, training code, planner network: built</span>
-    <span class="chip next"><i></i>Phase 1 policies: training</span>
+    <span class="chip done"><i></i>Data v3, training code, planner network, seed library with Bones SEED: built</span>
+    <span class="chip done"><i></i>Phase 1 first runs: done, still falling</span>
+    <span class="chip next"><i></i>Acceptance filter: being rebuilt and examined on real clips</span>
     <span class="chip todo"><i></i>Loop rounds: not built yet</span>
   </div>
   <div class="links">
@@ -182,7 +191,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     <div class="parts">
       <div class="part"><div class="ic">P</div><div><h3>Planner</h3><p>Given the ground ahead and a goal, it proposes footholds, when each foot is down, a band for the centre of mass and the pelvis orientation. It is learned from the start, as in PARC.</p></div></div>
       <div class="part"><div class="ic">M</div><div><h3>Muscle policy</h3><p>Drives 90 muscles at 40 Hz in our GPU simulator to follow the plan. Joint angles are left free; nothing tells it the full pose.</p></div></div>
-      <div class="part"><div class="ic">✓</div><div><h3>Gatekeepers</h3><p>A style prior scores how human the motion looks. Six checks compare forces, loads and effort with human data. Only episodes that pass become new training data.</p></div></div>
+      <div class="part"><div class="ic">✓</div><div><h3>Coach and gate</h3><p>A style prior scores how human the motion looks and pays half the reward. Checks against human forces, loads, effort and contact decide which episodes become new data.</p></div></div>
     </div>
   </div>
 </section>
@@ -193,7 +202,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     <p>Feet get a place and a time. The body gets a band, and the pelvis an orientation, which fixes where the hips are. The joints are free. Overlapping foot intervals mean walking, and a gap between them means flight, so the plan sets the gait without dictating the swing.</p>
   </div>
   <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 440" role="img" aria-label="A plan on stairs: alternating footholds on each tread, a centre-of-mass band above them with the pelvis orientation marked inside it, and per-foot contact timing below with short double-support overlaps.">
+    <svg class="dia" viewBox="0 0 1200 440" role="img" aria-label="A plan on stairs: alternating footholds on each tread, a centre-of-mass band above them with the pelvis orientation marked inside it, dashed patches around the next two footholds marking the ground the policy sees, and per-foot contact timing below with short double-support overlaps.">
       <!-- terrain: level, five treads up, level -->
       <path class="rock" d="M160 300 H480 V266 H570 V232 H660 V198 H750 V164 H840 V130 H1180 V330 H160 Z"/>
       <!-- centre-of-mass band -->
@@ -227,10 +236,13 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <g class="pel" transform="translate(1050 44) rotate(-8)"><rect x="-16" y="-6" width="32" height="12" rx="5"/><path d="M16 -6 L27 0 L16 6 z"/></g>
       <path class="call" d="M705 120 V70 H692"/><text class="ta" x="686" y="75" text-anchor="end">Pelvis orientation</text>
       <path class="call" d="M408 420 L408 432 L440 432"/><text class="ta" x="446" y="436">Both feet down (walking)</text>
+      <!-- the terrain the policy sees: patches around the next two planned footholds -->
+      <rect class="patch" x="583" y="212" width="70" height="26" rx="4"/><rect class="patch" x="673" y="178" width="70" height="26" rx="4"/>
+      <path class="call" d="M583 228 L546 250 H540"/><text class="ta" x="534" y="255" text-anchor="end">Ground the policy sees: patches at the next footholds</text>
       <text class="ts" x="1180" y="436" text-anchor="end">time runs left to right</text>
     </svg>
   </div>
-  <p class="muted" style="font-size:15px">The policy sees its own body, a 17 × 3 height scan of the ground ahead and the next second of the plan. It is rewarded for contacts (0.15), footholds within 10 cm (0.15), staying in the band (0.10), keeping the pelvis within 6° of its planned orientation (0.10) and the style score (0.50), minus muscle effort.</p>
+  <p class="muted" style="font-size:15px">The policy sees its own body, the next second of the plan and the ground only around where the plan puts each foot down next: 7 × 7 heights 5 cm apart per foot (after Heyrman et al. 2026, whose policy learnt faster that way than from a whole map). A coarser strip of the ground ahead goes to the value network only. It is rewarded for contacts (0.15), footholds within 10 cm (0.15), staying in the band (0.10), keeping the pelvis within 6° of its planned orientation (0.10) and the style score (0.50), minus muscle effort.</p>
 </section>
 
 <section aria-labelledby="s-train">
@@ -239,15 +251,15 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     <p>First every part learns from real motion. Then the loop grows the data: new ground, new plans, and only the episodes that pass the gatekeeper are kept.</p>
   </div>
   <div class="panel">
-    <div class="cap"><p class="eyebrow">Phase 1 · training now</p><h3>Learn from real motion</h3><p>The muscle policy follows plans copied from real clips, so a failure is the policy's, not the planner's. A full-pose tracker on the same clips, for the same hours and side by side on the same GPU, is the baseline. Both have been training since 15 Nov, 18:49.</p></div>
+    <div class="cap"><p class="eyebrow">Phase 1 · first runs done</p><h3>Learn from real motion</h3><p>The muscle policy follows plans copied from real clips, so a failure is the policy's, not the planner's. A full-pose tracker on the same clips, for the same hours and side by side, is the baseline. The first runs (8 h each, on v2) were still improving when they stopped: the baseline fell in 58 % of episodes (joint error 7.8°), the planner policy in 80 % (contacts on time 87 %, pelvis 8.7° off). Next: retrain on v3 with the foothold patches and the fixed height input.</p></div>
     <div class="scroll">
     <svg class="dia" viewBox="0 0 1200 480" role="img" aria-label="Phase 1: human motion gives each clip's plan and teaches the style prior. The muscle policy is rewarded half for following the plan and half for the style prior's looks-human score; real plans also teach the planner network. A full-pose baseline trains on the same clips for the same hours. Gate G1 compares the two on held-out clips.">
-      <g class="n store"><rect x="20" y="170" width="210" height="120" rx="14"/><text class="tt" x="125" y="214" text-anchor="middle">Human motion</text><text class="ts" x="125" y="240" text-anchor="middle">AB01 + PARC</text><text class="ts" x="125" y="262" text-anchor="middle">498 clips · 64 min</text></g>
+      <g class="n store"><rect x="20" y="170" width="210" height="120" rx="14"/><text class="tt" x="125" y="214" text-anchor="middle">Human motion</text><text class="ts" x="125" y="240" text-anchor="middle">v3: AB01 + PARC</text><text class="ts" x="125" y="262" text-anchor="middle">322 clips · 48 min</text></g>
       <g class="n"><rect x="330" y="20" width="300" height="110" rx="14"/><text class="tt" x="480" y="52" text-anchor="middle">Real plans</text><text class="ts" x="480" y="76" text-anchor="middle">per foot: where and when it is down</text><text class="ts" x="480" y="97" text-anchor="middle">centre-of-mass path and height</text><text class="ts" x="480" y="118" text-anchor="middle">pelvis orientation</text></g>
-      <g class="n"><rect x="330" y="350" width="300" height="90" rx="14"/><text class="tt" x="480" y="382" text-anchor="middle">Style prior</text><text class="ts" x="480" y="406" text-anchor="middle">learns how 0.3 s of human motion looks</text><text class="ts" x="480" y="427" text-anchor="middle">trained · ranks real above bad 99.5 %</text></g>
-      <g class="n"><rect x="760" y="20" width="240" height="110" rx="14"/><text class="tt" x="880" y="56" text-anchor="middle">Planner network</text><text class="ts" x="880" y="80" text-anchor="middle">learns to write plans</text><text class="ts" x="880" y="101" text-anchor="middle">from ground ahead + a goal</text><text class="ts" x="880" y="122" text-anchor="middle">trains on its own (3.4 h)</text></g>
-      <g class="n hot"><rect x="760" y="165" width="240" height="130" rx="14"/><text class="tt" x="880" y="198" text-anchor="middle">Muscle policy</text><text class="ts" x="880" y="222" text-anchor="middle">90 muscles, 40 times a second</text><text class="ts" x="880" y="243" text-anchor="middle">sees its body, the ground ahead</text><text class="ts" x="880" y="264" text-anchor="middle">and the next second of plan</text><text class="tl" x="880" y="286" text-anchor="middle" style="fill:var(--blue)">training now</text></g>
-      <g class="n off"><rect x="760" y="350" width="240" height="90" rx="14"/><text class="ts" x="880" y="380" text-anchor="middle">Baseline: full-pose tracking</text><text class="ts" x="880" y="402" text-anchor="middle">sees the whole clip pose</text><text class="tl" x="880" y="426" text-anchor="middle" style="fill:var(--blue)">training now</text></g>
+      <g class="n"><rect x="330" y="350" width="300" height="90" rx="14"/><text class="tt" x="480" y="382" text-anchor="middle">Style prior</text><text class="ts" x="480" y="406" text-anchor="middle">learns how 0.3 s of human motion looks</text><text class="ts" x="480" y="427" text-anchor="middle">ranks real above bad copies 99 %</text></g>
+      <g class="n"><rect x="760" y="20" width="240" height="110" rx="14"/><text class="tt" x="880" y="56" text-anchor="middle">Planner network</text><text class="ts" x="880" y="80" text-anchor="middle">learns to write plans</text><text class="ts" x="880" y="101" text-anchor="middle">from ground ahead + a goal</text><text class="ts" x="880" y="122" text-anchor="middle">trains on its own (3.4 h, not run)</text></g>
+      <g class="n hot"><rect x="760" y="165" width="240" height="130" rx="14"/><text class="tt" x="880" y="198" text-anchor="middle">Muscle policy</text><text class="ts" x="880" y="222" text-anchor="middle">90 muscles, 40 times a second</text><text class="ts" x="880" y="243" text-anchor="middle">sees its body, the next second</text><text class="ts" x="880" y="264" text-anchor="middle">of plan, ground at its footholds</text><text class="tl" x="880" y="286" text-anchor="middle" style="fill:var(--blue)">first run done</text></g>
+      <g class="n off"><rect x="760" y="350" width="240" height="90" rx="14"/><text class="ts" x="880" y="380" text-anchor="middle">Baseline: full-pose tracking</text><text class="ts" x="880" y="402" text-anchor="middle">sees the whole clip pose</text><text class="tl" x="880" y="426" text-anchor="middle" style="fill:var(--blue)">first run done</text></g>
       <g class="n"><rect x="1035" y="165" width="150" height="130" rx="14"/><text class="tt" x="1110" y="196" text-anchor="middle">Gate G1</text><text class="ts" x="1110" y="220" text-anchor="middle">held-out clips:</text><text class="ts" x="1110" y="241" text-anchor="middle">half accepted,</text><text class="ts" x="1110" y="262" text-anchor="middle">kinetics as human</text><text class="ts" x="1110" y="283" text-anchor="middle">as the baseline</text></g>
       <path class="w" d="M230 200 H280 V75 H324" marker-end="url(#ah)"/>
       <path class="w" d="M230 260 H280 V395 H324" marker-end="url(#ah)"/>
@@ -268,15 +280,15 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     </div>
   </div>
   <div class="panel">
-    <div class="cap"><p class="eyebrow">Phase 3 · each round · parts built</p><h3>The loop</h3><p>New ground gets a little harder each round. Only episodes that pass the gatekeeper join the planner's data, next to the real clips, and the planner and policy retrain on all of it. Built: the course generator, the planner, episodes on generated ground. Being tested: the gatekeeper's new parts. Not built: the code that runs the rounds.</p></div>
+    <div class="cap"><p class="eyebrow">Phase 3 · each round · parts built</p><h3>The loop</h3><p>New ground gets a little harder each round. Only episodes that pass the gatekeeper join the planner's data, next to the real clips; the planner is retrained from scratch on all of it and the policy keeps training. Built: the course generator, the planner, episodes on generated ground. Being rebuilt: the acceptance filter, with its own exam on real clips. Not built: the code that runs the rounds.</p></div>
     <div class="scroll">
-    <svg class="dia" id="loop" viewBox="0 0 1200 400" role="img" aria-label="Loop: the course generator gives new ground and a goal to the planner, whose plan the muscle policy tries in physics; the gatekeeper drops falls and episodes failing any check and keeps the rest; kept episodes join the planner data, which retrains the planner and the policy and slowly grows the style prior.">
-      <g class="n"><rect x="20" y="30" width="205" height="110" rx="14"/><text class="tt" x="122" y="66" text-anchor="middle">Course generator</text><text class="ts" x="122" y="90" text-anchor="middle">stairs, turns, ramps, gaps</text><text class="ts" x="122" y="111" text-anchor="middle">a bit harder each round</text></g>
+    <svg class="dia" id="loop" viewBox="0 0 1200 400" role="img" aria-label="Loop: the course generator gives new ground and a goal to the planner, whose plan the muscle policy tries in physics; the gatekeeper drops falls and episodes failing any check and keeps the rest; kept episodes join the planner data, which retrains the planner and the policy; the style prior grows only with new human recordings.">
+      <g class="n"><rect x="20" y="30" width="205" height="110" rx="14"/><text class="tt" x="122" y="66" text-anchor="middle">Course generator</text><text class="ts" x="122" y="90" text-anchor="middle">turns, ramps, gaps (stairs</text><text class="ts" x="122" y="111" text-anchor="middle">with data), harder each round</text></g>
       <g class="n hot"><rect x="325" y="30" width="220" height="110" rx="14"/><text class="tt" x="435" y="66" text-anchor="middle">Planner</text><text class="ts" x="435" y="90" text-anchor="middle">writes footholds, timing,</text><text class="ts" x="435" y="111" text-anchor="middle">centre of mass, pelvis</text></g>
       <g class="n hot"><rect x="645" y="30" width="220" height="110" rx="14"/><text class="tt" x="755" y="66" text-anchor="middle">Muscle policy</text><text class="ts" x="755" y="90" text-anchor="middle">tries the plan</text><text class="ts" x="755" y="111" text-anchor="middle">in physics</text></g>
-      <g class="n"><rect x="965" y="30" width="215" height="200" rx="14"/><text class="tt" x="1072" y="62" text-anchor="middle">Gatekeeper</text><text class="ts" x="1072" y="88" text-anchor="middle">falls: dropped first</text><text class="ts" x="1072" y="110" text-anchor="middle">the six checks (below)</text><text class="ts" x="1072" y="132" text-anchor="middle">looks human, against real</text><text class="ts" x="1072" y="152" text-anchor="middle">motion with similar plans*</text><text class="ts" x="1072" y="174" text-anchor="middle">knee bend, planted feet*</text><text class="tl" x="1072" y="210" text-anchor="middle">* being tested</text></g>
+      <g class="n"><rect x="965" y="30" width="215" height="200" rx="14"/><text class="tt" x="1072" y="62" text-anchor="middle">Gatekeeper</text><text class="ts" x="1072" y="88" text-anchor="middle">falls: dropped first</text><text class="ts" x="1072" y="110" text-anchor="middle">forces, loads, effort,</text><text class="ts" x="1072" y="132" text-anchor="middle">loaded-foot slip, all</text><text class="ts" x="1072" y="152" text-anchor="middle">against real clips*</text><text class="ts" x="1072" y="174" text-anchor="middle">style score: open*</text><text class="tl" x="1072" y="210" text-anchor="middle">* being rebuilt or tested</text></g>
       <g class="n store"><rect x="325" y="265" width="290" height="100" rx="14"/><text class="tt" x="470" y="300" text-anchor="middle">Planner data</text><text class="ts" x="470" y="324" text-anchor="middle">real clips + kept episodes</text><text class="ts" x="470" y="345" text-anchor="middle">at least ¾ real in every batch</text></g>
-      <g class="n"><rect x="20" y="265" width="205" height="100" rx="14"/><text class="tt" x="122" y="300" text-anchor="middle">Style prior</text><text class="ts" x="122" y="324" text-anchor="middle">grows slowly; first</text><text class="ts" x="122" y="345" text-anchor="middle">version kept as a guard</text></g>
+      <g class="n"><rect x="20" y="265" width="205" height="100" rx="14"/><text class="tt" x="122" y="300" text-anchor="middle">Style prior</text><text class="ts" x="122" y="324" text-anchor="middle">grows with new human</text><text class="ts" x="122" y="345" text-anchor="middle">recordings (SEED next)</text></g>
       <g class="n off"><rect x="1035" y="300" width="150" height="56" rx="14"/><text class="ts" x="1110" y="333" text-anchor="middle">dropped</text></g>
       <path class="w" d="M225 85 H319" marker-end="url(#ah)"/>
       <path class="w" d="M545 85 H639" marker-end="url(#ah)"/>
@@ -285,7 +297,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <path class="w dash" d="M1110 230 V294" marker-end="url(#ah)"/>
       <path class="w" d="M435 265 V146" marker-end="url(#ah)"/>
       <path class="w" d="M590 265 V200 H755 V146" marker-end="url(#ah)"/>
-      <path class="w" d="M325 315 H231" marker-end="url(#ah)"/>
+      <path class="w dash" d="M325 315 H231" marker-end="url(#ah)"/>
       <text class="tl" x="272" y="58" text-anchor="middle">ground</text><text class="tl" x="272" y="75" text-anchor="middle">+ goal</text>
       <text class="tl" x="592" y="75" text-anchor="middle">plan</text>
       <text class="tl" x="912" y="75" text-anchor="middle">episode</text>
@@ -293,26 +305,73 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <text class="tl" x="1118" y="268">fails any</text>
       <text class="tl" x="443" y="215">retrain</text>
       <text class="tl" x="672" y="192">retrain</text>
-      <text class="tl" x="278" y="304" text-anchor="middle">accepted</text><text class="tl" x="278" y="336" text-anchor="middle">windows</text>
+      <text class="tl" x="278" y="304" text-anchor="middle">real clips</text><text class="tl" x="278" y="336" text-anchor="middle">only</text>
       <circle class="dot" r="8"><animateMotion dur="6s" repeatCount="indefinite" path="M435 85 H930 V315 H435 Z"/></circle>
       <circle class="dot" r="8"><animateMotion dur="6s" begin="-3s" repeatCount="indefinite" path="M435 85 H930 V315 H435 Z"/></circle>
     </svg>
     </div>
-    <p class="note">The prior grows conservatively: every batch is at least three-quarters real clips; a kept window joins only if the last prior already scores it as human; the first prior stays frozen as a guard, and a round is undone if its scores on known ground drop.</p>
+    <p class="note">Open: the style score's place in the gate. It turned out to measure familiarity: a prior that never saw 10° ramps rejected every real 10° walk, and real PARC motion scored about as badly as crouched walking. So it coaches well (it prefers real motion over broken copies 99 % of the time) but cannot yet accept new ground. Prior variants are being compared on how well they grade real and broken motion (balanced sampling, the original's normaliser, priors told the situation, more people from Bones SEED). Until that is settled the prior grows only with new human recordings, never with kept episodes.</p>
+  </div>
+</section>
+
+<section aria-labelledby="s-flow">
+  <div class="sec-head">
+    <h2 id="s-flow">What flows where, and when each part changes</h2>
+    <p>During training everything runs 40 times a second in 4,096 simulated worlds at once. Most parts are trained beforehand and frozen; while the policy trains, only the policy and two running averages change.</p>
+  </div>
+  <div class="panel">
+    <div class="cap"><p class="eyebrow">Every 25 ms · 4,096 worlds at once</p><h3>One control step</h3><p>The plan and the body's state make the policy's input; the policy answers with 90 muscle excitations; physics advances; the reward compares the new state with the plan and asks the frozen style prior how human the last third of a second looked.</p></div>
+    <div class="scroll">
+    <svg class="dia" viewBox="0 0 1200 370" role="img" aria-label="One control step: the plan (the clip's own, or the planner's on a course) and the body's state make what the policy sees: its body, the next second of the plan and the ground at its next footholds. The muscle policy sends 90 muscle excitations to physics (75 steps, motor delays), which gives the body's new state; that loops back as the next step's input and feeds the reward: plan terms for half, the frozen style prior's score of the last 13 frames for half, minus muscle effort. Rewards go to PPO, which updates every 20 steps; its value network also sees the strip scan and the reference pose.">
+      <g class="n"><rect x="20" y="40" width="170" height="90" rx="14"/><text class="tt" x="105" y="74" text-anchor="middle">Plan</text><text class="ts" x="105" y="98" text-anchor="middle">the clip's own, or</text><text class="ts" x="105" y="119" text-anchor="middle">the planner's</text></g>
+      <g class="n"><rect x="250" y="30" width="270" height="110" rx="14"/><text class="tt" x="385" y="62" text-anchor="middle">What the policy sees</text><text class="ts" x="385" y="86" text-anchor="middle">its body: joints, speeds, muscles</text><text class="ts" x="385" y="107" text-anchor="middle">the next second of the plan</text><text class="ts" x="385" y="128" text-anchor="middle">ground at its next footholds</text></g>
+      <g class="n hot"><rect x="590" y="40" width="160" height="90" rx="14"/><text class="tt" x="670" y="78" text-anchor="middle">Muscle policy</text><text class="ts" x="670" y="104" text-anchor="middle">one network pass</text></g>
+      <g class="n"><rect x="840" y="40" width="160" height="90" rx="14"/><text class="tt" x="920" y="74" text-anchor="middle">Physics</text><text class="ts" x="920" y="98" text-anchor="middle">75 steps (3 kHz)</text><text class="ts" x="920" y="119" text-anchor="middle">human motor delays</text></g>
+      <g class="n"><rect x="1050" y="40" width="130" height="90" rx="14"/><text class="tt" x="1115" y="78" text-anchor="middle">Body</text><text class="ts" x="1115" y="104" text-anchor="middle">new state</text></g>
+      <path class="w" d="M190 85 H244" marker-end="url(#ah)"/>
+      <path class="w" d="M520 85 H584" marker-end="url(#ah)"/>
+      <path class="w blue" d="M750 85 H834" marker-end="url(#ah)"/>
+      <path class="w" d="M1000 85 H1044" marker-end="url(#ah)"/>
+      <text class="tl" x="795" y="72" text-anchor="middle">90 muscles</text>
+      <path class="w dash" d="M1115 130 V172 H385 V146" marker-end="url(#ah)"/>
+      <text class="tl" x="900" y="164" text-anchor="middle">next step, 25 ms later</text>
+      <g class="n store"><rect x="250" y="215" width="560" height="135" rx="14"/><text class="tt" x="530" y="246" text-anchor="middle">Reward, every step</text><text class="ts" x="530" y="272" text-anchor="middle">plan ½: contacts · footholds · centre-of-mass band · pelvis</text><text class="ts" x="530" y="296" text-anchor="middle">style ½: the last 13 frames → frozen style prior →</text><text class="ts" x="530" y="318" text-anchor="middle">its error at 3 noise levels, rescaled → exp</text><text class="ts" x="530" y="340" text-anchor="middle">minus muscle effort</text></g>
+      <g class="n"><rect x="900" y="215" width="280" height="135" rx="14"/><text class="tt" x="1040" y="246" text-anchor="middle">PPO</text><text class="ts" x="1040" y="272" text-anchor="middle">every 20 steps: 82k samples</text><text class="ts" x="1040" y="296" text-anchor="middle">updates value net and policy</text><text class="ts" x="1040" y="318" text-anchor="middle">value net also sees the strip</text><text class="ts" x="1040" y="340" text-anchor="middle">scan and the reference pose</text></g>
+      <path class="w" d="M105 130 V282 H244" marker-end="url(#ah)"/>
+      <text class="tl" x="113" y="200">targets</text>
+      <path class="w" d="M640 172 V209" marker-end="url(#ah)"/>
+      <path class="w" d="M810 282 H894" marker-end="url(#ah)"/>
+      <text class="tl" x="852" y="270" text-anchor="middle">reward</text>
+    </svg>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="cap"><p class="eyebrow">Update schedule</p><h3>When each part changes</h3><p>Inside one policy update: every world runs 20 steps (rewards computed each step), advantages are worked out (γ 0.99, λ 0.95), then the value network and the policy are updated in separate passes (2 passes over 40 minibatches, with a left–right symmetry loss), and the next 20 steps begin.</p></div>
+    <div class="scroll"><table class="sched">
+      <thead><tr><th>Part</th><th>Before the policy trains</th><th>While the policy trains</th><th>Each loop round (to build)</th></tr></thead>
+      <tbody>
+        <tr><td>Data</td><td><span class="tag up">built</span>once per version from the seed library (v3: 322 clips, 48 min)</td><td><span class="tag fz">fixed</span></td><td><span class="tag pl">planned</span>kept episodes' plans join the planner's data</td></tr>
+        <tr><td>Style prior</td><td><span class="tag up">trained once</span>200k steps, about 20 min</td><td><span class="tag fz">frozen</span>scores every step</td><td><span class="tag pl">planned</span>retrained only when new human recordings arrive</td></tr>
+        <tr><td>Style reward scale</td><td>–</td><td><span class="tag up">every step</span>running mean of the prior's error, for the first 100M samples (about 1,200 updates), then fixed</td><td><span class="tag fz">fixed</span></td></tr>
+        <tr><td>Planner</td><td><span class="tag up">trained once</span>200k steps, about 3.4 h</td><td><span class="tag fz">frozen</span>plans each course before its episode; to change: re-plan every 0.5 s from the body</td><td><span class="tag pl">planned</span>retrained from scratch on real and kept plans</td></tr>
+        <tr><td>Muscle policy</td><td>–</td><td><span class="tag up">every 20 steps</span>PPO on 82k samples (0.5 s of motion per world)</td><td><span class="tag pl">planned</span>keeps training on the new courses and the real clips</td></tr>
+        <tr><td>Input scaling</td><td>–</td><td><span class="tag up">every step</span>running statistics of the policy's inputs, for the first 5M samples (about 60 updates), then fixed</td><td><span class="tag fz">fixed</span></td></tr>
+        <tr><td>Acceptance filter</td><td><span class="tag up">set once</span>limits from real clips, then an exam on held-out real clips</td><td><span class="tag fz">not used</span></td><td><span class="tag pl">planned</span>decides which episodes are kept</td></tr>
+      </tbody></table></div>
   </div>
 </section>
 
 <section aria-labelledby="s-gen">
   <div class="sec-head">
     <h2 id="s-gen">The planner on generated ground</h2>
-    <p>The course generator joins flights, landing turns, ramps, gaps and platforms, harder as one difficulty setting rises. The planner, trained on the real clips' plans, plans across a course from a standing start.</p>
+    <p>The course generator joins landing turns, ramps and gaps (flights and platforms too, once the data has them), harder as one difficulty setting rises. For now it stays inside the data: ramps of 3–10° and gaps one ordinary step clears. The planner, trained on the real clips' plans, plans across a course from a standing start.</p>
   </div>
   <div class="split">
     <div class="panel" style="padding:12px; background:#FFFFFF">
       <img class="gif" style="border:0" src="course.png" alt="Overhead view of a generated course: a level start, a five-step flight down, a square landing where the path turns left, two more flights, a gap, and level ground to the end. Light and dark blue dots mark left and right footholds; an amber line traces the centre of mass." width="1100" height="730">
     </div>
     <div style="display:grid; gap:16px">
-      <p class="muted" style="font-size:15px">Seen from above, lighter is higher. Start at top left: down a flight, a landing turn, two more flights, a gap, then stop. Footholds: left light blue, right dark blue; amber is the centre of mass.</p>
+      <p class="muted" style="font-size:15px">An earlier, harder course, seen from above (lighter is higher). Start at top left: down a flight, a landing turn, two more flights, a gap, then stop. Footholds: left light blue, right dark blue; amber is the centre of mass.</p>
       <dl class="spec">
         <dt>Reads</dt><dd>the ground 3.6 m ahead and 1.6 m across, and a goal</dd>
         <dt>Writes</dt><dd>the next 1.2 s of plan, pelvis orientation included; keeps 0.5 s, then plans again</dd>
@@ -321,7 +380,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <dt>Across a stair edge</dt><dd>8 % (it often skips a tread)</dd>
         <dt>Held-out clips</dt><dd>next touchdown 0.05 s and 11 cm off; pelvis orientation 4° off 0.6 s ahead (medians)</dd>
       </dl>
-      <p class="note">These numbers come from a small model (2 layers instead of 4, 6k iterations instead of 200k, one minute on the GPU), a check that the pieces fit. The full model is the real run. Stairs are weak because they are half a minute of the data; the loop is meant to fix that.</p>
+      <p class="note">These numbers come from a small model (2 layers instead of 4, 6k iterations instead of 200k, one minute on the GPU), a check that the pieces fit; the full model has not run yet. Today the planner plans a whole course before the episode, continuing its own past plan. It will re-plan every 0.5 s from the body's actual motion, so a policy that falls behind gets a plan that starts where it is.</p>
     </div>
   </div>
 </section>
@@ -329,7 +388,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <section aria-labelledby="s-checks">
   <div class="sec-head">
     <h2 id="s-checks">The six checks</h2>
-    <p>An episode that falls is dropped first. Then it must pass all six. Each limit is the 5th or 95th percentile of the same measure on real clips.</p>
+    <p>An episode that falls is dropped first. Then it must pass every check; a check with no limit for that ground counts as not passed yet. Each limit comes from the same measure on real clips, compared like with like (per stance, per leg).</p>
   </div>
   <div class="checks">
     <div class="check"><div class="k"><b>1</b><h3>Looks human</h3></div>
@@ -340,7 +399,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <circle class="me" cx="168" cy="30" r="6"/><text class="mt" x="178" y="26">episode</text>
         <text class="mt" x="14" y="74">less human</text><text class="mt" x="206" y="74" text-anchor="end">real</text>
       </svg>
-      <p>Style score over 2 s windows.</p><span class="src">vs real clips, same terrain</span></div>
+      <p>Style score over 2 s windows. Its place in the gate is open (see the loop).</p><span class="src">vs real clips, same terrain</span></div>
     <div class="check"><div class="k"><b>2</b><h3>Follows the plan</h3></div>
       <svg class="mini" viewBox="0 0 220 80" role="img" aria-label="Each foot lands inside its planned foothold circle, and the centre of mass stays in its band.">
         <rect class="mband" x="10" y="8" width="200" height="16" rx="4"/><circle class="me" cx="110" cy="16" r="4"/>
@@ -373,18 +432,18 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       </svg>
       <p>No muscle held at 95 % for more than a tenth of any second.</p><span class="src">saturation limit</span></div>
     <div class="check"><div class="k"><b>6</b><h3>Clean contact</h3></div>
-      <svg class="mini" viewBox="0 0 220 80" role="img" aria-label="A planted foot slides less than 2 cm, and a joint stays clear of its limit.">
+      <svg class="mini" viewBox="0 0 220 80" role="img" aria-label="A loaded foot slides no more than real feet do, and a joint stays clear of its limit.">
         <line class="mg" x1="10" y1="56" x2="120" y2="56"/>
         <path class="mfoot" d="M40 56 q-1 -12 10 -12 h24 q9 0 9 9 v3 z"/>
-        <path class="mlim" d="M42 66 H82" marker-start="url(#mah)" marker-end="url(#mah)"/><text class="mt" x="62" y="78" text-anchor="middle">slide ≤ 2 cm</text>
+        <path class="mlim" d="M42 66 H82" marker-start="url(#mah)" marker-end="url(#mah)"/><text class="mt" x="62" y="78" text-anchor="middle">slip while loaded</text>
         <path class="mg" d="M140 60 A34 34 0 0 1 208 60" style="fill:none"/><line class="ml" x1="204" y1="44" x2="212" y2="40"/>
         <line class="mcurve" x1="174" y1="60" x2="160" y2="34"/><circle class="me" cx="174" cy="60" r="3.5"/>
         <text class="mt" x="174" y="78" text-anchor="middle">clear of limits</text>
       </svg>
-      <p>No sliding feet, no joints driven into their limits.</p><span class="src">sliding and limit hits</span></div>
+      <p>A loaded foot slides no more than real feet do; joints sit at their limits no more than in real motion.</p><span class="src">vs real clips, per gait</span></div>
   </div>
-  <p class="note">Being tested for the loop: the looks-human limit judged against real motion with similar plans (not one limit per terrain), and kinematic checks for knee bend (a stiff knee, a crouch) and planted feet sliding. On held-out clips with deliberately broken copies, together they catch nearly every bad copy; they still reject too much real running and ramp walking, which the next round of tests addresses.</p>
-  <p class="muted" style="font-size:15px">Camargo 2021 (22 subjects; inverse dynamics redone on our body, matching their own at r 0.88–0.997) is the human reference for forces, moments and EMG. It is all walking, so running takes its limits from AB01's 2.5 minutes of treadmill running on force plates (inverse dynamics on the same body; the plates' 14 ms lag behind the cameras corrected). AB01 ran at 2.0–2.7 m/s and PARC at 3.4 m/s typically, so the running limits rise with the target speed, following AB01's own trend plus a margin that widens the further they extrapolate, up to 4.5 m/s. Jumps, drops and platforms still skip checks 3 and 4.</p>
+  <p class="note">Being rebuilt (16 Nov), after a review: the old contact check measured walking progress rather than slip (every real held-out clip failed it), the force limits compared an episode's worst stance with single real stances, and ground without limits passed unchecked. The filter now gets its own exam, like the style prior's: real held-out clips must pass each check about 95 % of the time, and deliberately broken copies must fail.</p>
+  <p class="muted" style="font-size:15px">Camargo 2021 (22 subjects; inverse dynamics redone on our body, matching their own at r 0.88–0.997) is the human reference for forces, moments and EMG. It is all walking, so running takes its limits from AB01's 2.5 minutes of treadmill running on force plates (inverse dynamics on the same body; the plates' 14 ms lag behind the cameras corrected). AB01 ran at 2.0–2.7 m/s while the data's running reaches about 4.5 m/s (Bones SEED's sprints), so the running limits rise with the target speed, following AB01's own trend plus a margin that widens the further they extrapolate. Jumps, drops and platforms have no force reference yet, so those checks stay pending there.</p>
 </section>
 
 <section aria-labelledby="s-run">
@@ -393,7 +452,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
     <p>Only the planner and the muscle policy are needed. The prior, the checks and the human reference ranges stay behind.</p>
   </div>
   <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 250" role="img" aria-label="Deployment: new ground and a goal go to the planner, whose plan goes to the muscle policy, which drives the body at 40 Hz; the body's state returns to the policy. Style prior, six checks and Camargo ranges are training only.">
+    <svg class="dia" viewBox="0 0 1200 250" role="img" aria-label="Deployment: new ground and a goal go to the planner, whose plan goes to the muscle policy, which drives the body at 40 Hz; the body's state returns to the policy, and (to build) to the planner every 0.5 s. Style prior, acceptance filter and Camargo ranges are training only.">
       <g class="n"><rect x="20" y="100" width="210" height="90" rx="14"/><text class="tt" x="125" y="140" text-anchor="middle">New ground</text><text class="ts" x="125" y="164" text-anchor="middle">+ a goal</text></g>
       <g class="n hot"><rect x="320" y="100" width="190" height="90" rx="14"/><text class="tt" x="415" y="152" text-anchor="middle">Planner</text></g>
       <g class="n hot"><rect x="640" y="100" width="230" height="90" rx="14"/><text class="tt" x="755" y="140" text-anchor="middle">Muscle policy</text><text class="ts" x="755" y="164" text-anchor="middle">40 times a second</text></g>
@@ -402,10 +461,12 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
       <path class="w" d="M510 145 H634" marker-end="url(#ah)"/>
       <path class="w" d="M870 135 H974" marker-end="url(#ah)"/>
       <path class="w dash" d="M1075 190 V226 H755 V196" marker-end="url(#ah)"/>
+      <path class="w dash" d="M755 226 H415 V196" marker-end="url(#ah)"/>
+      <text class="tl" x="585" y="243" text-anchor="middle">to build: re-plan every 0.5 s from the body</text>
       <text class="tl" x="572" y="134" text-anchor="middle">plan</text>
       <text class="tl" x="922" y="124" text-anchor="middle">muscles</text>
       <text class="tl" x="915" y="243" text-anchor="middle">its body and the ground ahead</text>
-      <g class="n off"><rect x="320" y="14" width="550" height="56" rx="14"/><text class="ts" x="595" y="48" text-anchor="middle">Training only: style prior · six checks · human reference ranges</text></g>
+      <g class="n off"><rect x="320" y="14" width="550" height="56" rx="14"/><text class="ts" x="595" y="48" text-anchor="middle">Training only: style prior · acceptance filter · human reference ranges</text></g>
     </svg>
   </div>
 </section>
@@ -413,13 +474,13 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <section aria-labelledby="s-data">
   <div class="sec-head">
     <h2 id="s-data">What it starts from</h2>
-    <p>498 clips, 64 minutes, retargeted onto one body. AB01 is our pilot subject on treadmill and overground; PARC is published motion capture of running, platforms, gaps and a few stairs.</p>
+    <p>Every clip is retargeted onto one body. The training data (v3) is AB01, our pilot subject on treadmill and overground, plus PARC's 31 original platform clips. The seed library holds far more: Bones SEED (16 h from 426 people) is converted and checked, ready for the next dataset; Camargo 2021 stays out of training on purpose, as the human reference for forces and EMG.</p>
   </div>
   <div class="datagrid">
     <div class="panel">
-      <div class="cap"><h3>Minutes of training data by skill</h3><div class="legend"><span style="--c:var(--blue)">AB01</span><span style="--c:var(--amber)">PARC</span></div></div>
-      <svg class="dia" id="chart" viewBox="0 0 760 330" role="img" aria-label="Minutes by skill: level walking 32.5, running 14.8, ramps 10.3, platforms and gaps 4.7, standing 1.3, stairs 0.5."></svg>
-      <p class="muted" style="font-size:14.5px">Stairs are the thinnest skill: half a minute. Scherpereel 2023 stair data comes next. Held out: 70 clips (10 min) of unseen trials and 22 clips (3 min) of the steepest ramps, ±15°. Five hand-assisted climbs and one clip whose toe passes through a platform were dropped.</p>
+      <div class="cap"><h3>Minutes by skill</h3><div class="legend"><span style="--c:var(--blue)">in training (v3)</span><span style="--c:var(--amber)">Bones SEED, ready</span><span style="--c:var(--wire)">Camargo, reference only</span></div></div>
+      <div class="scroll"><table class="data" id="skills"><thead><tr><th>Skill</th><th>In training (v3)</th><th>Bones SEED</th><th>Camargo</th></tr></thead><tbody></tbody></table></div>
+      <p class="muted" style="font-size:14.5px; margin-top:10px">Held out in v3: 57 clips of unseen trials and 22 of the steepest ramps (±15°). Dropped: PARC's physics-tracker replays (16 of its 18 minutes were its simulated humanoid, not capture), five hand-assisted climbs, and SEED's on-the-spot turns (the model's knee cannot twist, so pivots overload its hip). Bones SEED: Motion Data by Bones Studio; confidential, it stays on our machine.</p>
     </div>
     <div class="panel body">
       <div class="plate"><img src="body.png" alt="Rajagopal v3 model, front and three-quarter views: bones, muscle paths in red, heel and toe contact spheres in teal." width="577" height="1106"></div>
@@ -441,8 +502,8 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 <section aria-labelledby="s-road">
   <div class="sec-head"><h2 id="s-road">Roadmap and gates</h2><p>Each phase ends at a gate. Phase 1 decides whether sparse targets can match full-pose tracking at all.</p></div>
   <div class="road">
-    <div class="phase done"><span class="st">Done</span><h3>0 · Data</h3><p>Dataset, plans, references, filter limits, tests, an end-to-end trial of every step.</p><div class="gate"><b>G0</b>The prior ranks real motion above 95 % of degraded copies, for every subject.</div></div>
-    <div class="phase now"><span class="st">Training</span><h3>1 · Feasibility</h3><p>Level and ramps: sparse plan + style vs full-pose tracking.</p><div class="gate"><b>G1</b>Half of episodes accepted; kinetics in the human band at least as often as the baseline; 10k steps/s.</div></div>
+    <div class="phase done"><span class="st">Done</span><h3>0 · Data</h3><p>Dataset, plans, references, filter limits, tests, an end-to-end trial of every step. v3 without simulated replays; Bones SEED in the seed library.</p><div class="gate"><b>G0</b>The prior ranks real motion above 95 % of degraded copies, for every subject.</div></div>
+    <div class="phase now"><span class="st">First runs done</span><h3>1 · Feasibility</h3><p>Level and ramps: sparse plan + style vs full-pose tracking. The first 8 h runs still fell too often to judge; retrain on v3 once the style prior and the filter are settled.</p><div class="gate"><b>G1</b>Half of episodes accepted; kinetics in the human band at least as often as the baseline; 10k steps/s.</div></div>
     <div class="phase"><span class="st">Later</span><h3>2 · Stairs</h3><p>Footholds on treads, up and down.</p><div class="gate"><b>G2</b>Stairs accepted at least half as often as level ground, both directions.</div></div>
     <div class="phase"><span class="st">Parts built</span><h3>3 · Planner loop</h3><p>Learned planner on generated ground, PARC-style rounds. Generator, planner and clip-free episodes are built; the rounds are next.</p><div class="gate"><b>G3</b>Each round adds coverage; acceptance stays within 10 points; the frozen prior's scores hold.</div></div>
     <div class="phase"><span class="st">Later</span><h3>4 · Evaluation</h3><p>Held-out terrain, human kinetics and EMG, changed dynamics.</p></div>
@@ -464,13 +525,15 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
   <div>
     <details><summary>Run order (your GPU runs)</summary><div>
       <table><thead><tr><th>Step</th><th>Command</th><th>Gives</th><th>Time (idle 4090)</th></tr></thead><tbody>
-        <tr><td class="num">1</td><td><code>train_prior.py --out runs/prior_v1</code></td><td>the style prior (200k iterations)</td><td class="num">~22 min</td></tr>
-        <tr><td class="num">2</td><td><code>check_prior.py runs/prior_v1/prior.pt</code>, then <code>python -m gp.accept --prior …</code></td><td>gate G0 (must pass); the style limit for check 1</td><td class="num">minutes</td></tr>
-        <tr><td class="num">3</td><td><code>train.py --task baseline</code> and <code>--task planner</code>, equal <code>--hours</code>, side by side</td><td>the two Phase 1 policies</td><td class="num">your hours</td></tr>
-        <tr><td class="num">4</td><td><code>evaluate.py</code>, then <code>g1.py</code> and <code>emg_report.py</code></td><td>gate G1 and EMG timing</td><td class="num">under an hour</td></tr>
-        <tr><td class="num">5</td><td><code>train_planner.py --out runs/planner_net_v1</code>, then <code>check_planner.py runs/planner_net_v1/planner.pt</code></td><td>the planner network (200k iterations) and its score before physics</td><td class="num">~3.4 h alone</td></tr>
+        <tr><td class="num">1</td><td>Prior variants: <code>train_prior.py</code> (<code>--balance</code>, <code>--min-std</code>, <code>--cond</code>), each with two half-data copies</td><td>which prior grades real and broken motion best</td><td class="num">~40 min per variant</td></tr>
+        <tr><td class="num">2</td><td><code>check_filter.py</code></td><td>the acceptance filter's exam on held-out real clips</td><td class="num">CPU, minutes</td></tr>
+        <tr><td class="num">3</td><td>A v4 dataset: v3 + Bones SEED, each dataset weighted equally; then the chosen prior on it</td><td>the training data and the style prior for the next runs</td><td class="num">~20 min</td></tr>
+        <tr><td class="num">4</td><td><code>train.py --task baseline</code> and <code>--task planner</code>, equal <code>--hours</code>, side by side</td><td>Phase 1 again, with foothold patches and the fixed height input</td><td class="num">your hours</td></tr>
+        <tr><td class="num">5</td><td><code>evaluate.py</code>, then <code>g1.py</code> and <code>emg_report.py</code></td><td>gate G1 and EMG timing</td><td class="num">under an hour</td></tr>
+        <tr><td class="num">6</td><td><code>train_planner.py --out runs/planner_net_v1</code>, then <code>check_planner.py</code></td><td>the full planner network and its score before physics</td><td class="num">~3.4 h alone</td></tr>
+        <tr><td class="num">–</td><td><code>imitate_clip.py</code> (queued)</td><td>can the body do PARC's and SEED's hardest clips at all (FlashSAC, one clip at a time)</td><td class="num">tonight</td></tr>
       </tbody></table>
-      <p class="muted" style="font-size:14px; margin-top:10px">Every step has been run end to end with tiny settings, and 16 tests pass. In the code, <code>--task planner</code> trains the muscle policy on plans copied from clips; the planner network trains on its own (step 5) and drives the policy once the loop runs.</p>
+      <p class="muted" style="font-size:14px; margin-top:10px">Every step has been run end to end with tiny settings, and 18 tests pass. In the code, <code>--task planner</code> trains the muscle policy on plans copied from clips; the planner network trains on its own (step 6) and drives the policy once the loop runs.</p>
     </div></details>
     <details><summary>Settings</summary><div>
       <ul class="tight">
@@ -480,6 +543,7 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <li>A fall: pelvis more than 0.3 m from the clip's, or tilted over 60°, for 3 steps. On generated ground there is no clip: the centre of mass more than 0.5 m from the plan's, or the tilt.</li>
         <li>Planner: a diffusion model over plan frames at 20 Hz (0.4 s given, 1.2 s generated), reading the ground on a 0.1 m grid ahead and a goal; 4 layers × 256; half of each batch mirrored; 200k iterations.</li>
         <li>Generated courses: every part runs along the grid so walls stay straight; turns are 90° on a square landing; turning stairs are a flight, a landing turn and a flight.</li>
+        <li>The policy's ground input: 7 × 7 heights 5 cm apart around each foot's next planned landing, shifted up to 5 cm each episode; the 17 × 3 strip goes to the value network. Its pelvis height is above the ground under it (until 16 Nov it was the world height, metres off on graded and PARC clips).</li>
         <li>The critic also sees the full reference pose; the policy never does.</li>
       </ul>
     </div></details>
@@ -491,14 +555,21 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <tr><td>The loop narrows to easy plans</td><td>Sample plans by coverage; make coverage a gate</td></tr>
         <tr><td>Limits too strict on rare terrain</td><td>Per-class limits; the 2nd percentile where real data is thin</td></tr>
         <tr><td>Terrain errors in the clips leak into plans</td><td>Plans only from clips that pass the seed library's checks</td></tr>
-        <tr><td>The growing prior drifts away from human motion</td><td>Three-quarters real per batch; only already-accepted windows join; frozen first prior with rollback</td></tr>
-        <tr><td>Style rests on two people</td><td>Add Scherpereel 2023's subjects; G0 checks each subject</td></tr>
-        <tr><td>Clips carry small contact errors (our toes reach past PARC's foot)</td><td>All PARC clips scanned; the worst six dropped; the rest are a few cm for a fraction of a second</td></tr>
-        <tr><td>The planner skips stair treads (half a minute of stair data)</td><td>The planner check counts footholds across an edge; stairs grow through the loop and Scherpereel 2023</td></tr>
+        <tr><td>The growing prior drifts away from human motion</td><td>It grows only with new human recordings; kept episodes never train it</td></tr>
+        <tr><td>The acceptance filter rejects real motion, or passes unchecked ground</td><td>Rebuilt with limits from real clips per stance and leg; its own exam on held-out real clips before the loop</td></tr>
+        <tr><td>Style rests on few people</td><td>Bones SEED adds 426 people (16 h) in the next dataset</td></tr>
+        <tr><td>Simulated motion passes as capture</td><td>PARC's physics-tracker replays dropped (v3); the seed viewer shows every clip on its terrain, with flags</td></tr>
+        <tr><td>No stairs in the training data</td><td>Stairs wait for data (Scherpereel 2023); the planner check counts footholds across an edge</td></tr>
       </tbody></table>
     </div></details>
     <details><summary>Decisions and open question</summary><div>
       <table><thead><tr><th>Date</th><th>Decision</th></tr></thead><tbody>
+        <tr><td class="num">16 Nov</td><td>Drop PARC's physics-tracker replays (dataset v3); real jumps and sprints are to come from Bones SEED.</td></tr>
+        <tr><td class="num">16 Nov</td><td>The policy sees the ground only around its next planned footholds; the strip scan goes to the value network.</td></tr>
+        <tr><td class="num">16 Nov</td><td>Bones SEED joins the seed library (our body only, never PARC's generator; on-the-spot turns dropped by a hip-rotation rule).</td></tr>
+        <tr><td class="num">16 Nov</td><td>Courses stay inside the data for the proof of concept: turns, 3–10° ramps, small gaps.</td></tr>
+        <tr><td class="num">16 Nov</td><td>The style prior samples every recording equally, as the original does; its other construction choices are benchmarked first.</td></tr>
+        <tr><td class="num">16 Nov</td><td>The acceptance filter gets its own exam on real clips before the loop.</td></tr>
         <tr><td class="num">15 Nov</td><td>The plan includes the pelvis orientation (6° band, weight 0.10, the centre-of-mass band's weight halved to 0.10): with the footholds it pins the hips, leaving each leg little more than the knee's swivel and the ankle.</td></tr>
         <tr><td class="num">15 Nov</td><td>Running limits come from AB01's treadmill running and rise with target speed to 4.5 m/s.</td></tr>
         <tr><td class="num">15 Nov</td><td>The planner is a diffusion model over the plan (not the pose), reading the ground ahead and a goal.</td></tr>
@@ -510,7 +581,8 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <tr><td class="num">14 Nov</td><td>Muscle effort is metabolic at 0.6 MPa.</td></tr>
         <tr><td class="num">14 Nov</td><td>A separate track from the tiered controller, run first.</td></tr>
       </tbody></table>
-      <p style="margin-top:12px"><b>Open:</b> which held-out human data serves the changed-dynamics tests (load carriage, ankle weakness, exo)?</p>
+      <p style="margin-top:12px"><b>Open:</b> can any style prior variant gate new ground, or does it stay a coach?</p>
+      <p style="margin-top:8px"><b>Open:</b> which held-out human data serves the changed-dynamics tests (load carriage, ankle weakness, exo)?</p>
       <p style="margin-top:8px"><b>Open:</b> winding stairs. Clean ones need rotated boxes (exact, but the same staircase in every world) or a small SPRINT change letting a ground cell hold an angled wall.</p>
     </div></details>
     <details><summary>References</summary><div>
@@ -518,6 +590,8 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
         <li><a href="https://xbpeng.github.io/projects/SMP/index.html">SMP</a> (Mu et al.): a frozen diffusion prior used as a reward.</li>
         <li><a href="https://arxiv.org/abs/2505.04002">PARC</a> (Xu et al., SIGGRAPH 2025): generator and tracker trained together, with physics-corrected data added each round.</li>
         <li><a href="https://arxiv.org/html/2409.14393v1">MaskedMimic</a> (Tessler et al., SIGGRAPH Asia 2024): one controller from partial targets, learned from full motion capture.</li>
+        <li><a href="https://arxiv.org/abs/2610.29612">Watch Your Step</a> (Heyrman et al. 2026): terrain sampled only around predicted footholds learns faster than a whole map.</li>
+        <li>Bones SEED: Motion Data by Bones Studio (<a href="https://bones.studio/">bones.studio</a>), gated licence.</li>
         <li>Seed library: <code>~/Jinwoo/seed_library</code>, the source of the clips and their terrain.</li>
       </ul>
     </div></details>
@@ -527,30 +601,17 @@ ul.tight { margin:0; padding-left:20px; display:grid; gap:6px; font-size:15px }
 </div>
 
 <script>
-// Minutes of training data by skill (data/v2/clips.npz, 15 Nov 2026), drawn to one scale.
+// Minutes by skill (seed library manifests and data/v3, 16 Nov 2026), one bar scale for the whole table.
 (function () {
   const rows = [
-    { skill: 'Level walking', ab01: 32.15, parc: 0.33 },
-    { skill: 'Running', ab01: 2.50, parc: 12.27 },
-    { skill: 'Ramps', ab01: 10.31, parc: 0 },
-    { skill: 'Platforms and gaps', ab01: 0, parc: 4.73 },
-    { skill: 'Standing', ab01: 1.32, parc: 0 },
-    { skill: 'Stairs', ab01: 0, parc: 0.49 },
+    ['Level walking', 32.2, 417.5, 224.7], ['Running', 1.5, 332.5, 0.1], ['Ramps', 11.3, 0, 358.6],
+    ['Stairs', 0, 0, 184.7], ['Jumps and hops', 0, 208.4, 0], ['Platforms, boxes, gaps', 1.9, 4.4, 0], ['Standing', 1.3, 13.7, 15.3],
   ];
-  const svg = document.getElementById('chart'), NS = 'http://www.w3.org/2000/svg';
-  const x0 = 190, x1 = 720, max = 35, X = (m) => x0 + (x1 - x0) * m / max, rowH = 46, y0 = 24;
-  const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
-  for (let m = 0; m <= 30; m += 10) {
-    el('line', { x1: X(m), x2: X(m), y1: y0 - 6, y2: y0 + rows.length * rowH, class: 'grid' });
-    el('text', { x: X(m), y: y0 + rows.length * rowH + 22, 'text-anchor': 'middle', class: 'tl' }, m + (m === 30 ? ' min' : ''));
-  }
-  rows.forEach((r, i) => {
-    const y = y0 + i * rowH + 8, h = 26, tot = r.ab01 + r.parc;
-    el('text', { x: x0 - 14, y: y + 18, 'text-anchor': 'end', class: 'ta' }, r.skill);
-    if (r.ab01) el('rect', { x: X(0), y, width: X(r.ab01) - X(0), height: h, rx: 4, style: 'fill:var(--blue)' });
-    if (r.parc) el('rect', { x: X(r.ab01), y, width: Math.max(2, X(r.parc) - X(0)), height: h, rx: 4, style: 'fill:var(--amber)' });
-    el('text', { x: X(tot) + 8, y: y + 18, class: 'ta' }, tot.toFixed(1));
-  });
+  const colors = ['var(--blue)', 'var(--amber)', 'var(--wire)'], max = 420, W = 120;
+  const tb = document.querySelector('#skills tbody');
+  const cell = (m, k) => `<td class="num">${m ? `<span class="b" style="width:${Math.max(2, W * m / max)}px;background:${colors[k]}"></span>` : ''}${m ? m.toFixed(1) : '–'}</td>`;
+  tb.innerHTML = rows.map(r => `<tr><td>${r[0]}</td>${cell(r[1], 0)}${cell(r[2], 1)}${cell(r[3], 2)}</tr>`).join('')
+    + `<tr><td>Total</td><td class="num">48 min</td><td class="num">16.3 h</td><td class="num">13.1 h</td></tr>`;
   // the loop's moving dots are decoration: stop them for anyone who asked for less motion
   try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('loop').pauseAnimations(); } catch (e) {}
 })();
