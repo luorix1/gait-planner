@@ -19,11 +19,11 @@ Started 2026-11-14. Data: the seed library's Rajagopal v3 export (`~/Jinwoo/seed
 
 | Step | Command | Device |
 |---|---|---|
-| 0. data (done) | `python -m gp.data` -> `data/v2/` (the active dataset; `ab01` or `v1` as an argument rebuilds those) | CPU, 15 s |
+| 0. data (done) | `python -m gp.data` -> `data/<dataset>/` (the active one, `gp.data.DATASET`; `GP_DATASET=v3` or an argument picks another) | CPU, 15 s |
 | 0b. Camargo kinetics (done) | `camargo_id.py extract`, then `camargo_id.py solve` -> `data/v1/kinetics.npz` | CPU |
-| 0c. filter thresholds (done) | `python -m gp.accept` -> `data/v2/accept.json` (Camargo kinetics per class) | CPU |
+| 0c. filter thresholds (done) | `python -m gp.accept` -> `data/<dataset>/accept.json` (Camargo kinetics per class) | CPU |
 | 0d. Camargo EMG (done) | `camargo_emg.py` (uv, mat-io) -> `data/v1/emg.npz` | CPU |
-| 0e. AB01 running kinetics (done) | `ab01_id.py` (bolt env) -> `data/v2/kinetics_ab01.npz`, then `python -m gp.accept` | CPU, 2 min |
+| 0e. AB01 running kinetics (done) | `ab01_id.py` (bolt env) -> `data/<dataset>/kinetics_ab01.npz`, then `python -m gp.accept` | CPU, 2 min |
 | 1. style prior | `python train_prior.py --out runs/prior_v1` (200k iterations) | GPU |
 | 2. gate G0 | `python check_prior.py runs/prior_v1/prior.pt` -> `g0.json` | GPU or CPU |
 | 3. baseline | `python train.py --task baseline --out runs/baseline_v1 --hours H` | GPU |
@@ -62,9 +62,15 @@ pose; the prior trains; PPO runs an iteration.
 
 ## Data (`data/<dataset>/split.json`)
 
-**v2, the active dataset (2026-11-15).** AB01 (below) plus PARC's capture, so the loop starts with every skill it is
-meant to combine: 498 clips, 1.07 h. PARC adds 207 clips (18 min, one performer, already passed through PARC's physics
-tracker): level running (3.3 m/s median), platforms, gap jumps, 5 stair clips and 2 walks. Its terrain is a box grid
+**v3 (2026-11-16; active once today's v2 prior exams finish).** v2 without PARC's physics-tracker replays
+(`gp.data.SIM_REPLAY`): PARC's `dm_motion_recorder` appends `_dm` to the motion its torque-driven humanoid produced
+while tracking a clip, and those were 16.0 of v2's 17.9 PARC minutes (all running, gap jumps, jump strides, stairs and
+walking, half the platforms). Only PARC's 31 untracked platform clips stay (1.9 min). 322 clips, 48 min: `train` 243
+(36 min), `test_trial` 57, `test_terrain` 22. Real jumps and sprints are to come from Bones SEED instead.
+
+**v2 (2026-11-15).** AB01 (below) plus PARC's clips, so the loop starts with every skill it is
+meant to combine: 498 clips, 1.07 h. PARC adds 207 clips (18 min, one performer; 89 % of it PARC's physics-tracker
+replays, which v3 drops): level running (3.3 m/s median), platforms, gap jumps, 5 stair clips and 2 walks. Its terrain is a box grid
 (0.39 m cells), built into one shared heightfield; each clip stands on its own tile. Left out (`gp.data.EXCLUDE`):
 clips that use the hands, 3 `_mdm_` clips (likely PARC generator output), the 5 `mid_climbing` clips (PARC labels a
 hand down in 3-5 % of frames) and `parc_dm_platform_024_dm` (swing toe 7.5 cm into a platform face). PARC is split by

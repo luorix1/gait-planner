@@ -35,6 +35,7 @@ Out: ``data/<dataset>/clips.npz``, ``plans.npz``, ``split.json``
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 import zlib
@@ -46,7 +47,8 @@ import numpy as np
 from .terrain import atlas, height, hf_height, pad, profile, tile_from_boxes
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASET = "v2"                           # the active dataset; data/ab01 and data/v1 are kept for reproduction
+#: The active dataset (data/ab01, data/v1 and data/v2 are kept for reproduction); GP_DATASET picks another per process.
+DATASET = os.environ.get("GP_DATASET", "v2")
 OUT = ROOT / "data" / DATASET
 #: Camargo's inverse dynamics, plates and EMG (built on v1): the human reference ranges for every dataset.
 REF = ROOT / "data" / "v1"
@@ -64,6 +66,11 @@ MAX_JOINT_SPEED = 20.0
 #: labels a hand down in 3-5 % of frames, under the seed library's 5 % cut); ``parc_dm_platform_024_dm`` swing toe
 #: 7.5 cm into a platform face for 0.33 s (its untracked twin is clean). User 2026-11-15.
 EXCLUDE = ("_mdm_", "mid_climbing", "parc_dm_platform_024_dm")
+#: PARC's physics-tracker replays: its dm_motion_recorder appends ``_dm`` to the motion PARC's torque-driven humanoid
+#: produced while tracking a clip, so these are simulation, not capture. In v2 they were 16.0 of PARC's 17.9 min (all
+#: running, jumps, stairs and walking, half the platforms). Datasets with ``no_replays`` leave them out (user
+#: 2026-11-16); PARC's untracked platform clips stay.
+SIM_REPLAY = re.compile(r"(^|_)dm(_|$)")
 KEY_BODIES = ("calcn_l", "calcn_r", "toes_l", "toes_r", "torso")
 SIDES = ("l", "r")
 #: Drawn once: np.random.default_rng(2026).choice(sorted Camargo subjects, 3, replace=False).
@@ -116,6 +123,8 @@ SPECIFIC_TENSION = 0.6e6
 
 
 DATASETS: dict[str, dict[str, Any]] = {
+    "v3": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"), no_replays=True,
+               held_out="as v2, without PARC's physics-tracker replays (SIM_REPLAY)"),
     "v2": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"),
                held_out="AB01 as ab01; PARC test_trial: motions with crc32(<word>_<NNN> tag) % 10 == 0"),
     "ab01": dict(sources=("ab01",), split=split_ab01, splits=("train", "test_trial", "test_terrain"),
@@ -243,9 +252,31 @@ def heightfield_gap(hf: dict[str, Any], offset: Any, ctr: np.ndarray, r: np.ndar
     return ctr[..., 1] - r - h
 
 
+def excluded(name: str, dataset: str = DATASET) -> str:
+    """Why ``dataset`` leaves a clip out by its name ('' if it does not): an EXCLUDE entry, or a PARC tracker replay."""
+    hit = next((x for x in EXCLUDE if x in name), "")
+    if not hit and DATASETS[dataset].get("no_replays") and name.startswith("parc_") and SIM_REPLAY.search(name):
+        hit = "PARC tracker replay (_dm)"
+    return hit
+
+
+def resample(q: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """SPRINT's load_motion on a clip's coordinates ``[T, n]`` at SRC_HZ: low-pass, central differences, low-pass
+    again, then onto the control grid. Returns qpos and qvel ``[F, n]`` and the grid times ``[F]``."""
+    from sprint.recipes.motion import _lowpass
+    src_dt = 1.0 / SRC_HZ
+    ts = np.arange(len(q)) * src_dt
+    qf = _lowpass(q, src_dt, CUTOFF_HZ, 4)
+    qd = _lowpass(np.gradient(qf, ts, axis=0, edge_order=2), src_dt, CUTOFF_HZ, 4)
+    grid = np.arange(int(np.floor(ts[-1] * HZ + 1e-9)) + 1) / HZ
+    qpos = np.stack([np.interp(grid, ts, qf[:, k]) for k in range(q.shape[1])], 1)
+    qvel = np.stack([np.interp(grid, ts, qd[:, k]) for k in range(q.shape[1])], 1)
+    return qpos, qvel, grid
+
+
 def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = None) -> None:
     """``limit``: the first clips only (smoke tests), written to ``out``."""
-    from sprint.recipes.motion import _lowpass, _rotate, forward_kinematics_np, model_layout
+    from sprint.recipes.motion import _rotate, forward_kinematics_np, model_layout
 
     t0 = time.time()
     model = load_model()
@@ -265,7 +296,7 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
     out = out or ROOT / "data" / dataset
     rows = [r for f in sorted(SEED.glob("manifest_*.json")) for r in json.loads(f.read_text())
             if r["exported"] and r["source"] in ds["sources"] and not r.get("uses_hands")
-            and not any(x in r["name"] for x in EXCLUDE)][:limit]
+            and not excluded(r["name"], dataset)][:limit]
     meta: dict[str, list[Any]] = {k: [] for k in ("name", "subject", "source", "terrain_class", "mode", "split",
                                                   "grade_deg", "stair_rise_m", "speed_mps", "frames")}
     arrays: dict[str, list[np.ndarray]] = {k: [] for k in ("qpos", "qvel", "contact", "lift", "plan_contact", "foothold",
@@ -288,14 +319,7 @@ def build(dataset: str = DATASET, limit: int | None = None, out: Path | None = N
         P = P - [x0, 0.0]
         if tile is not None:
             tile["origin"] = (tile["origin"][0] - x0, tile["origin"][1] - z0)
-        # SPRINT's load_motion: low-pass, central differences, low-pass again; then onto the control grid
-        src_dt = 1.0 / SRC_HZ
-        ts = np.arange(len(q)) * src_dt
-        qf = _lowpass(q, src_dt, CUTOFF_HZ, 4)
-        qd = _lowpass(np.gradient(qf, ts, axis=0, edge_order=2), src_dt, CUTOFF_HZ, 4)
-        grid = np.arange(int(np.floor(ts[-1] * HZ + 1e-9)) + 1) / HZ
-        qpos = np.stack([np.interp(grid, ts, qf[:, k]) for k in range(len(names))], 1)
-        qvel = np.stack([np.interp(grid, ts, qd[:, k]) for k in range(len(names))], 1)
+        qpos, qvel, grid = resample(q)
         if np.abs(qvel[:, rot]).max() > MAX_JOINT_SPEED:
             glitched.append(r["name"])
             continue
