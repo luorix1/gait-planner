@@ -4,10 +4,11 @@
   clip's own terrain (a SPRINT profile, or a tile of one shared heightfield for ground a profile cannot describe:
   turns, platforms, gaps), with a 2D height scan in the observation and resets raised by the clip's per-frame lift
   (no contact sphere starts inside the terrain).
-- :class:`PlanTracking`, the planner's task: the actor sees its body, the height scan and the plan (per foot:
-  down or not, the foothold, time to touchdown and lift-off; the centre-of-mass target; and the pelvis orientation,
-  as the recipe's root orientation error) at the recipe's lookahead taps, never the joint angles; the critic also
-  reads the full reference (privileged). Reward: matching the planned contacts and footholds, staying in the
+- :class:`PlanTracking`, the planner's task: the actor sees its body, the terrain around where the plan puts each
+  foot down next (foothold patches) and the plan (per foot: down or not, the foothold, time to touchdown and lift-off;
+  the centre-of-mass target; and the pelvis orientation, as the recipe's root orientation error) at the recipe's
+  lookahead taps, never the joint angles; the critic also reads the strip height scan and the full reference
+  (privileged). Reward: matching the planned contacts and footholds, staying in the
   centre-of-mass band and the pelvis-orientation band, the frozen style prior's score, minus the recipe's effort
   terms. The pelvis orientation fixes where the hips are, so with the footholds it leaves each leg little more than
   its knee's swivel and the ankle (user 2026-11-15: too many free degrees of freedom without it). Falls stay the recipe's (pelvis 0.3 m from the clip's or tilted 60 deg from it).
@@ -35,6 +36,15 @@ from .terrain import Ground
 #: forward-major. Lateral offsets are symmetric, so the left/right mirror swaps them.
 SCAN_FORWARD = tuple(np.round(np.arange(-0.4, 1.21, 0.1), 2))
 SCAN_LATERAL = (-0.2, 0.0, 0.2)
+#: Foothold patches (PlanTracking's actor; after Heyrman et al. 2026, arXiv 2610.29612, whose policy learnt faster and
+#: stepped better on sparse ground from patches at its predicted footholds than from the whole map or patches at the
+#: current feet): PATCH x PATCH terrain heights PATCH_CELL apart (a 0.35 m square, about a foot and a half) around each
+#: foot's next planned landing, in the root's heading frame, relative to the root. Each episode shifts both patches by
+#: up to PATCH_JITTER (m, forward and lateral), so the policy does not over-trust the exact point; the plan's footholds
+#: in the observation stay exact.
+PATCH = 7
+PATCH_CELL = 0.05
+PATCH_JITTER = 0.05
 
 
 def recipe_config(**kw: Any) -> ImitationConfig:
@@ -186,6 +196,7 @@ class PlanConfig:
     tol_orient: float = 0.10               # rad beyond the band
     w_style: float = 0.50
     contact_bw: float = 0.05               # a foot is down above this fraction of body weight
+    actor_strip: bool = False              # the actor also reads the strip height scan (the critic always does)
     prior: str = ""                        # the style prior's file (train_prior.py)
 
 
@@ -201,6 +212,8 @@ class PlanTracking(TerrainImitation):
         super().__init__(D, config, starts=starts, seed=seed)
         self.plan = plan or PlanConfig()
         self.name = "plan_tracking"
+        if not self.plan.actor_strip:                   # the actor sees the terrain through the foothold patches
+            self.CRITIC_ONLY = (*type(self).CRITIC_ONLY, "height_scan")
 
     def bind(self, model: Any) -> None:
         super().bind(model)
@@ -209,6 +222,10 @@ class PlanTracking(TerrainImitation):
             self.blocks += [(f"plan_feet[{t}]", 12, [*range(6, 12), *range(6)], foot * 2),
                             (f"plan_com[{t}]", 3, [0, 1, 2], list(_POLAR))]
             self._obs_dim += 15
+        k = PATCH                                       # mirror: left and right swap, each patch flips laterally
+        perm = [((1 - sd) * k + i) * k + (k - 1 - j) for sd in range(2) for i in range(k) for j in range(k)]
+        self.blocks.append(("foothold_patch", 2 * k * k, perm, [1.0] * (2 * k * k)))
+        self._obs_dim += 2 * k * k
         self.blocks.append(("free_episode", 1, [0], [1.0]))
         self._obs_dim += 1
 
@@ -223,6 +240,10 @@ class PlanTracking(TerrainImitation):
         self.style = StyleReward(Prior.load(self.plan.prior, dev))
         self.ring = torch.zeros(self.n, W + 1, self.p_record.shape[1], device=dev)
         self.lost = torch.zeros(self.n, dtype=torch.long, device=dev)
+        o = (torch.arange(PATCH, device=dev, dtype=torch.float32) - (PATCH - 1) / 2) * PATCH_CELL
+        self.patch_f, self.patch_l = o.repeat_interleave(PATCH), o.repeat(PATCH)   # forward-major, as the strip scan
+        self.patch_shift = torch.zeros(self.n, 2, device=dev)                    # per episode: forward, lateral
+        self.patch_jitter = PATCH_JITTER
 
     # -- hooks ---------------------------------------------------------------------------------------------------
     def reset(self, s: Any, worlds: Any) -> None:
@@ -230,6 +251,7 @@ class PlanTracking(TerrainImitation):
         idx = worlds.nonzero().squeeze(1)
         if idx.numel():                     # the window so far: the clip's own frames, clamped at its start
             self.lost[idx] = 0
+            self.patch_shift[idx] = (torch.rand(len(idx), 2, device=self.dev) * 2 - 1) * self.patch_jitter
             f = self.frame[idx][:, None] + torch.arange(-W, 1, device=self.dev)
             f = torch.maximum(f, self.clip_start[self.clip[idx]][:, None])
             self.ring[idx] = self.p_record[f]
@@ -247,8 +269,23 @@ class PlanTracking(TerrainImitation):
             fh = torch.einsum("nij,nkj->nki", M, self.p_foothold[f] - root[:, None])
             feet = torch.cat([self.p_contact[f].float()[..., None], fh, self.p_td[f][..., None], self.p_lo[f][..., None]], -1)
             parts += [feet.flatten(1), torch.einsum("nij,nj->ni", M, self.p_com[f] - com)]
+        hold = self.next_footholds()                                                          # [N, 2, 3]
+        df = (self.patch_f + self.patch_shift[:, :1])[:, None]                                # [N, 1, P]
+        dl = (self.patch_l + self.patch_shift[:, 1:])[:, None]
+        x = hold[..., :1] + df * M[:, None, 0, :1] + dl * M[:, None, 2, :1]                   # [N, 2, P]
+        z = hold[..., 2:] + df * M[:, None, 0, 2:] + dl * M[:, None, 2, 2:]
+        parts.append(self.ground(x.flatten(1), z.flatten(1)) - root[:, 1:2])
         parts.append(self.free_clip[self.clip].float()[:, None])
         return torch.nan_to_num(torch.cat(parts, 1), 0.0, 0.0, 0.0)
+
+    def next_footholds(self) -> Any:
+        """Per side (l, r), where the plan puts the foot down next ``[N, 2, 3]``: a foot in the air, its landing; a
+        foot down, the landing after its planned lift-off (its current foothold while lift-off is over PLAN_CAP_S away,
+        and never past the clip's end)."""
+        f = self.frame
+        ahead = torch.where(self.p_contact[f], torch.ceil(self.p_lo[f] * gpdata.HZ).long() + 1, 0)       # [N, 2]
+        g = torch.minimum(f[:, None] + ahead, (self.clip_last[self.clip] + self.taps[-1])[:, None])
+        return self.p_foothold[g, torch.arange(2, device=self.dev).expand_as(g)]
 
     def reward(self, s: Any) -> Any:
         super().reward(s)                   # advances the frame; falls and the imitation metrics (logged, not paid)

@@ -130,8 +130,20 @@ def test_plan_tracking_steps(D: dict, tmp_path) -> None:
     cols = task.actor_columns()
     offsets = np.cumsum([0] + [b[1] for b in task.blocks])[:-1]
     actor_blocks = {b[0].split("[")[0] for b, o in zip(task.blocks, offsets, strict=True) if o in set(cols.tolist())}
-    assert "joint_angle_error" not in actor_blocks and "plan_feet" in actor_blocks and "height_scan" in actor_blocks
+    assert "joint_angle_error" not in actor_blocks and "plan_feet" in actor_blocks
+    assert "foothold_patch" in actor_blocks and "height_scan" not in actor_blocks         # the strip is the critic's
     assert "root_orientation_error" in actor_blocks and "root_position_error" not in actor_blocks   # pelvis orientation
+    from gp.tasks import PATCH
+    i = [b[0] for b in task.blocks].index("foothold_patch")
+    perm = np.array(task.blocks[i][2])
+    assert (perm[perm] == np.arange(len(perm))).all()                                     # the mirror is an involution
+    task.patch_shift.zero_()                    # without the jitter, each patch's centre is the ground at the landing
+    k, o, s = PATCH, int(offsets[i]), env.state
+    patch = task.observation(s)[:, o:o + 2 * k * k].view(-1, 2, k, k)
+    hold = task.next_footholds()
+    want = task.ground(hold[..., 0], hold[..., 2]) - s.body_com_pos()[:, task.root, 1:2]
+    assert torch.allclose(patch[:, :, k // 2, k // 2], want, atol=1e-5)
+    assert "height_scan" not in PlanTracking(D, plan=PlanConfig(prior="x", actor_strip=True)).CRITIC_ONLY
     pc = task.plan
     assert abs(pc.w_contact + pc.w_foothold + pc.w_com + pc.w_orient + pc.w_style - 1.0) < 1e-9
     for k in ("r_contact", "r_foothold", "r_com", "r_orient", "r_style"):

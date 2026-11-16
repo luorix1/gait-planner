@@ -117,9 +117,13 @@ Both:
 - **Metabolic cost at 0.6 MPa** (`gp.data.SPECIFIC_TENSION`): Rajagopal's F0 = PCSA x 60 N/cm^2, and SPRINT's default
   0.25 MPa makes every muscle 2.4x heavy, so heat (charged per kg) read 2.4x high. From the same states the cost falls
   to 0.53-0.60x (9.4 -> 5.2 W/kg at 10 % excitation everywhere). Forces are unchanged (tested).
-- **Observation:** the actor reads its body, a 2D height scan (17 points from -0.4 to 1.2 m ahead x 3 at -0.2, 0,
-  0.2 m to the side, in its heading frame) and the plan at the
-  recipe's lookahead taps (0-40 steps = 1 s). The critic also reads the full reference.
+- **Observation:** the actor reads its body, the plan at the recipe's lookahead taps (0-40 steps = 1 s) and the
+  terrain only around where the plan puts each foot down next (`gp.tasks.PATCH`: 7 x 7 heights 5 cm apart, a 0.35 m
+  square in its heading frame, shifted up to 5 cm per episode), as Heyrman et al. 2026 (arXiv 2610.29612) found
+  patches at the coming footholds learn faster and step better on sparse ground than a whole map or patches at the
+  current feet. The plan already says where the feet go, so no foothold predictor is needed. The critic also reads the
+  2D strip scan (17 points from -0.4 to 1.2 m ahead x 3 at -0.2, 0, 0.2 m to the side) and the full reference;
+  `PlanConfig(actor_strip=True)` gives the actor the strip too (the A/B test). The baseline keeps the strip scan.
 - **Falls:** the recipe's (pelvis over 0.3 m from the clip's, or tilted over 60 deg, for 3 steps).
 - **G0 thresholds** (`check_prior.py`): real beats each degraded copy in >= 95 % of pairs; with the threshold at
   the degraded copies' 95th percentile, no held-out subject over 10 % below it. That second reading is mine.
