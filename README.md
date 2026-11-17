@@ -298,6 +298,48 @@ re-anchor; the goal is the centreline `speed x 1.2 s` ahead, clamped before the 
 `check_planner.py` scores held-out windows (contacts, next touchdown's time and place, centre of mass) and course
 rollouts (footholds on the course, in gaps, across edges; reaching the end) beside the stand-in plan.
 
+## Watch Your Step on our body (`gp/wys.py`, `train_wys.py`, `export_wys.py`)
+
+A replication of Heyrman et al. 2026 (arXiv 2610.29612) from the authors' released code, with the G1 swapped for our
+Rajagopal body: velocity commands, a blind foothold predictor refit on the policy's own rollouts every 500 iterations
+(`gp/fpm.py`), 7 x 7 height patches at its predicted footholds, their terrain curriculum as one SPRINT heightfield
+(`gp/wys_terrain.py`), their reward and randomisation. The plan page lists what changes for our body.
+
+`scripts/run.sh` is one run end to end, in the foreground: it trains (`train_wys.py`; running the same `--name` again
+resumes from `runs/NAME/checkpoint.pt`, saved every 10 minutes), then writes a SPRINT Studio folder,
+`runs/NAME/studio_<iteration>/`: one 10 s episode per terrain type at level 5, walking forward at 0.8 m/s, training aids
+off. Where SPRINT Studio is installed it is also copied into Studio's results folder.
+
+```bash
+setsid nohup scripts/run.sh --name wys_v1 --hours 12 > /dev/null 2>&1 < /dev/null &   # local, detached
+scripts/run.sh --name try --smoke                  # the whole pipeline in minutes (256 worlds, 3 min of training)
+.venv/bin/python export_wys.py runs/NAME [--level 7] [--speed 1.0]   # export again, other settings
+```
+
+On a SLURM cluster (NCSA Delta by default) each run is one one-GPU job running `scripts/run.sh` from the checkout, so
+its run directory is the same as a local one. The cluster's checkout comes from this one by rsync (no remote; `.git`
+goes along, so runs record their commit). Our SPRINT engine (branch gait-planner-engine, with a commit that exists only
+on the lab machine) and the model go along too:
+
+```bash
+# on your machine (one rsync login each; Duo):
+export GP_REMOTE=<user>@login.delta.ncsa.illinois.edu:/u/<user>/gait_planner
+scripts/ncsa/sync.sh push                       # tracked files, .git; SPRINT -> ../sprint-gait-planner; data/models/
+# on the login node, in that checkout, once:
+scripts/slurm/setup.sh                          # GP_ACCOUNT -> ~/.bashrc, .venv from requirements.lock + that SPRINT
+scripts/slurm/smoke.sh                          # 30-min check: a --smoke run and its Studio export
+# runs:
+scripts/slurm/submit.sh --name wys_v1 --hours 12                    # 13 h limit (hours + 1), gpuA100x4
+scripts/slurm/submit.sh --name wys_v1 --hours 23                    # again: continues it for another 23 h
+scripts/slurm/submit.sh --name wys_v1 --hours 23 --after <job id>   # queued behind the running part
+# back on your machine:
+scripts/ncsa/sync.sh pull wys_v1                # logs, record, predictor models, policy, Studio folders (--all: checkpoint)
+```
+
+A pull copies each run's Studio folders into SPRINT Studio's results folder. SLURM's own log is
+`runs/slurm/<job id>_NAME.out`; the run's is `runs/NAME/stdout.log`, and `runs/NAME/LAUNCH.txt` records every start
+(host, GPU, commit, command).
+
 ## Known limits
 
 - The muscle policy still trains on plans copied from real clips; the planner network is trained and checked on its

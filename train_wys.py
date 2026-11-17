@@ -3,8 +3,10 @@
 paper's. Physics: our body as the imitation recipe runs it (implicit contact, SCONE motor delays), at the paper's
 50 Hz control with 60 physics steps (3 kHz).
 
-Run (GPU, detached; a fresh --out per run):
+Run (GPU, detached):
   setsid nohup .venv/bin/python train_wys.py --out runs/wys_v1 --hours 12 > runs/wys_v1.log 2>&1 < /dev/null &
+An --out that holds a checkpoint.pt is continued (the PPO state, the terrain levels, the predictor and its schedule),
+so a job cut off by a cluster's time limit resumes when submitted again.
 Out: <out>/record.json, progress.csv, tb/, checkpoint.pt and policy.pt (every 10 min and at the end),
 foot_model_<iteration>.pt (each refit), task_state.pt (terrain levels, the current predictor).
 """
@@ -53,11 +55,19 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     a = ap.parse_args()
     out = Path(a.out)
-    out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
+    resume = (out / "checkpoint.pt").exists()
+    out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(a.seed)
     env, task = build(a.worlds, a.seed, a.device, out)
     cfg = replace(default_ppo(), rollout_steps=task.c.steps_per_iter)
     agent = PPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")
+    if resume:
+        agent.load(str(out / "checkpoint.pt"))
+        ts = torch.load(out / "task_state.pt", map_location=task.dev, weights_only=False)
+        task.level[:] = ts["level"].to(task.dev)
+        task.steps, task.fpm_ready = int(ts["steps"]), bool(ts["fpm_ready"])
+        task.fpm.load_state_dict(ts["fpm"])
+        print(f"resumed {out} at iteration {task.steps // task.c.steps_per_iter}, {agent.env_steps / 1e6:.0f}M steps", flush=True)
     here = Path(__file__).parent
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=here, capture_output=True, text=True).stdout.strip())
@@ -65,9 +75,14 @@ def main() -> None:
                   wys=asdict(task.c), ppo={k: list(v) if isinstance(v, tuple) else v for k, v in asdict(cfg).items()},
                   terrain=dict(types=task.T.types, cell=task.T.cell), obs_dim=task.obs_dim,
                   actor_inputs=int(task.n_actor), started=time.strftime("%Y-%m-%d %H:%M:%S"))
+    if resume and (out / "record.json").exists():
+        first = json.loads((out / "record.json").read_text())
+        first.setdefault("resumes", []).append(record)
+        record = first
     (out / "record.json").write_text(json.dumps(record, indent=1, default=str))
     print(task.describe(), flush=True)
-    f = (out / "progress.csv").open("w", buffering=1)
+    new_csv = not (out / "progress.csv").exists()
+    f = (out / "progress.csv").open("a", buffering=1)
     tb = SummaryWriter(out / "tb", flush_secs=30)
     w: csv.DictWriter | None = None
     start = time.time()
@@ -79,7 +94,8 @@ def main() -> None:
         s = dict(s, seconds=round(time.time() - start), iteration=task.steps // task.c.steps_per_iter)
         if w is None:
             w = csv.DictWriter(f, fieldnames=list(s), extrasaction="ignore")
-            w.writeheader()
+            if new_csv:
+                w.writeheader()
         w.writerow(s)
         rows.append(s)
         for k, v in s.items():

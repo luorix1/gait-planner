@@ -57,7 +57,7 @@ OUT = ROOT / "data" / DATASET
 REF = ROOT / "data" / "v1"
 SEED = Path.home() / "Jinwoo/seed_library/data/osim_export"
 #: Byte-identical to the model the seed library's IK used (STC/assets/models/gait/Rajagopal_lower_collision_v3.osim).
-MODEL = Path.home() / "Jinwoo/neural_test/models/Rajagopal_lower_collision_v3.osim"
+MODEL = Path(os.environ.get("GP_MODEL") or Path.home() / "Jinwoo/neural_test/models/Rajagopal_lower_collision_v3.osim")
 HZ = 40.0
 SRC_HZ = 30.0
 CUTOFF_HZ = 6.0

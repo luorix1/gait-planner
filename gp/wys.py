@@ -108,6 +108,8 @@ class WysConfig:
     spike_lin: float = 5.0
     spike_ang: float = 10.0
     training: bool = True                # False: no assist, pushes, disturbance or predictor refits (evaluation)
+    #: evaluation: the tiles (row, col) worlds take in turn at each reset, in place of the curriculum's
+    eval_tiles: tuple = ()
 
 
 def _rot(q: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
@@ -265,7 +267,7 @@ class WatchYourStep(TorchTask):
         if self.foot_model_path is not None:
             self.fpm.load_state_dict(torch.load(self.foot_model_path, map_location=dev))
             self.fpm_ready = True
-        self.steps = 0
+        self.steps, self._eval_next = 0, 0
         self.buf: dict[str, list] | None = None
         self.record_steps = math.ceil(c.refit_samples / n)
         self.fpm_val = float("nan")
@@ -454,7 +456,12 @@ class WatchYourStep(TorchTask):
         if k == 0:
             return
         # terrain curriculum from the episode that just ended (IsaacLab terrain_levels_vel), then the new tile
-        if self.steps > 0:
+        if c.eval_tiles:
+            t = torch.as_tensor(c.eval_tiles, device=self.dev)
+            pick = (self._eval_next + torch.arange(k, device=self.dev)) % len(t)
+            self._eval_next = int(self._eval_next + k)
+            self.level[i], self.col[i] = t[pick, 0], t[pick, 1]
+        elif self.steps > 0:
             dist = s.body_pos[i, self.root][:, [0, 2]].norm(dim=1).nan_to_num(0.0)
             up = dist > 4.0
             down = (dist < self.cmd[i, :2].norm(dim=1) * c.episode_s * 0.5) & ~up
