@@ -1,0 +1,23 @@
+# Clips for scripts/slurm/submit_hard.sh: one single-clip FlashSAC check each (can our body do this motion?).
+# The representative hardest of each dataset (picked 17 Nov by speed, rise or drop, knee flexion and flight).
+# Bones SEED goes too (user 17 Nov: a throwaway check, not motion generation); it stays out of git and public pages.
+#
+# AB01: its fastest running (2.7 m/s level; passed locally on 16 Nov, with half the clip's flight) and running uphill.
+ab01_mc025_w0
+ab01_mc030_w0
+# PARC capture: the fastest jump up onto the 0.58 m platform (4.4 m/s, +0.69 m), the fastest jump down (4.4 m/s,
+# -0.52 m), the deepest knee (150 deg, past the model's 140 deg limit).
+parc_platform_platform_005_w0
+parc_platform_platform_007_w0
+parc_platform_platform_022_w0
+# Bones SEED: its fastest run (4.4 m/s, with a 180 deg turn), a 1 m drop, a jump onto 50 cm, a no-hands jump over a
+# 0.75 m obstacle (the obstacle is not in the terrain), a standing broad jump, a vertical jump at 159 deg knee, and
+# stairs up and down (16 cm rise).
+seed_run_loop_180_R_001__A333_w0
+seed_jump_off_1m_R_002__A415_w0
+seed_jump_on_50cm_002__A415_w0
+seed_jump_over_obstacle_no_hand_0_75m_R_002__A415_w0
+seed_broad_jump_002__A360_w0
+seed_high_jump_R_002__A392_w0
+seed_stairs_climbing_up_start_R_001__A300_w0
+seed_stairs_climbing_down_loop_R_001__A300_w0

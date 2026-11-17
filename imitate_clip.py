@@ -10,8 +10,14 @@ averaged over each episode's steps; the pelvis's highest rise above its start an
 body weight; the clip's own heel/toe flags for the reference), longest and total, against the clip's over the same
 frames.
 
-Run (GPU, detached; a fresh --out per run; clips from data/hard, built by ``gp.data.build("hard", clips=[...])``;
-runs/hard_clips_chain.sh builds it and runs every clip):
+Learner and effort as STC's Rajagopal running test (STC configs/rajagopal/imitation/flash_sac/test_running.yaml, the
+same model and recipe family): 150M frames, 2048 worlds, 4M replay, batch 8192, 1024 transitions per update, learning
+from 400k transitions, metabolic weight 0.002 (STC found 0.02 pushes running toward a knee-dominant strategy; a
+feasibility check should not be held back by effort). Not ported from STC: per-joint weights (ankle 3, MTP 0.25) and
+error-weighted episode starts (the recipe has neither).
+
+Run (GPU, detached; a fresh --out per run; clips from a dataset built by ``gp.data.build("hard", clips=[...])``,
+e.g. scripts/hard/build.sh; scripts/hard/run.sh runs one clip):
   setsid nohup .venv/bin/python imitate_clip.py parc_platform_platform_005_w0 --frames 30e6 \
       --out runs/hard_clips/parc_platform_platform_005_w0 > runs/hard_clips/platform.log 2>&1 < /dev/null &
 Out: <out>/record.json, progress.csv, tb/ (TensorBoard), checkpoint.pt (every 10 min and at the end), policy.pt,
@@ -56,9 +62,10 @@ class FromStart(TerrainImitation):
 
 
 def make_env(D: dict, worlds: int, seed: int, device: str, cls: type = TerrainImitation,
-             starts: list | None = None) -> tuple[Any, Any]:
-    """train.build's env (same body, recipe, step options) for any TerrainImitation subclass and fixed starts."""
-    c = recipe_config()
+             starts: list | None = None, metabolic: float | None = None) -> tuple[Any, Any]:
+    """train.build's env (same body, recipe, step options) for any TerrainImitation subclass and fixed starts;
+    ``metabolic`` replaces the recipe's metabolic weight."""
+    c = recipe_config() if metabolic is None else recipe_config(w_metabolic=metabolic)
     task = cls(D, c, starts=starts, seed=seed)
     opts = sprint.StepOptions(dt_ctrl=1.0 / data.HZ, n_sub=c.physics_steps, implicit_friction=True,
                               implicit_normal=c.implicit_normal, strict=False, average_fext=True)
@@ -127,11 +134,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("clips", nargs="+")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--frames", type=float, default=0, help="env steps; also the FlashSAC schedule's horizon")
+    ap.add_argument("--frames", type=float, default=150e6, help="env steps; also the FlashSAC schedule's horizon")
     ap.add_argument("--minutes", type=float, default=0)
     ap.add_argument("--data", default=str(ROOT / "data/hard"))
-    ap.add_argument("--worlds", type=int, default=4096)
-    ap.add_argument("--capacity", type=int, default=0, help="replay transitions (0: the recipe's 5M)")
+    ap.add_argument("--worlds", type=int, default=2048)
+    ap.add_argument("--capacity", type=int, default=4_000_000, help="replay transitions (STC test_running: 4M)")
+    ap.add_argument("--batch", type=int, default=8192)
+    ap.add_argument("--transitions-per-update", type=int, default=1024)
+    ap.add_argument("--learning-starts", type=int, default=400_000)
+    ap.add_argument("--metabolic", type=float, default=0.002, help="metabolic weight (recipe 0.02)")
     ap.add_argument("--episodes", type=int, default=32)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda")
@@ -145,8 +156,9 @@ def main() -> None:
     full = data.load("train", src=Path(a.data))
     names = list(full["name"])
     D = data.take(full, [names.index(c) for c in a.clips])
-    env, task = make_env(D, a.worlds, a.seed, a.device)
-    cfg = FlashSACConfig()
+    env, task = make_env(D, a.worlds, a.seed, a.device, metabolic=a.metabolic)
+    cfg = replace(FlashSACConfig(), batch_size=a.batch, transitions_per_update=a.transitions_per_update,
+                  learning_starts=a.learning_starts)
     if a.frames:
         cfg = replace(cfg, total_frames=int(a.frames))
     if a.capacity:
@@ -156,7 +168,8 @@ def main() -> None:
                       actor_hidden_dim=128, critic_hidden_dim=128, compile_mode=None)
     dev = "cuda" if env.device.is_cuda else "cpu"
     agent = FlashSAC(env, cfg, device=dev)
-    sel_env = make_env(D, 2 * len(D["name"]), a.seed, a.device, starts=_selection_starts(task.motions, task.config))[0]
+    sel_env = make_env(D, 2 * len(D["name"]), a.seed, a.device, starts=_selection_starts(task.motions, task.config),
+                       metabolic=a.metabolic)[0]
     best = _Best(out, sel_env, every=16 * a.worlds * cfg.rollout_steps if a.smoke else 5_000_000)
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True).stdout.strip())

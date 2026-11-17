@@ -340,6 +340,27 @@ A pull copies each run's Studio folders into SPRINT Studio's results folder. SLU
 `runs/slurm/<job id>_NAME.out`; the run's is `runs/NAME/stdout.log`, and `runs/NAME/LAUNCH.txt` records every start
 (host, GPU, commit, command).
 
+### Single-clip checks: can our body do the hardest clips? (`scripts/hard/`, `imitate_clip.py`, `hard_report.py`)
+
+One FlashSAC imitation per clip on the clip's own terrain, then 32 evaluation episodes from its first frame. The learner
+and effort follow STC's Rajagopal running test (same model): 150M frames, 2048 worlds, 4M replay, batch 8192, 1024
+transitions per update, metabolic weight 0.002. `scripts/hard/clips.txt` lists the representative hardest clips of
+each dataset (AB01's fastest and uphill running; PARC's fastest jump up, fastest jump down, deepest knee; Bones SEED's
+fastest run, 1 m drop, jump onto 50 cm, jump over 0.75 m, broad jump, deep-knee vertical jump, stairs up and down).
+Bones SEED goes to the cluster for this throwaway check (user, 17 Nov); it stays out of git and public pages.
+
+```bash
+scripts/hard/build.sh                           # on this machine: data/hard_ncsa from scripts/hard/clips.txt
+scripts/ncsa/sync.sh push                       # carries data/hard_ncsa along
+scripts/slurm/submit_hard.sh                    # on the login node: one job per clip not yet done (20 h 40 min limit each)
+.venv/bin/python hard_report.py                 # pass / partial / fail per clip -> runs/hard/summary.md
+scripts/ncsa/sync.sh pull-hard                  # back on this machine: runs/hard (no checkpoints) and the report
+scripts/hard/run.sh --clip NAME [--smoke]       # one clip here, in the foreground
+```
+
+A clip passes when no evaluation episode falls and they cover 95 % of the playable clip; the report also compares
+flight time with the clip's, since a run finished with much less flight is a grounded imitation, not the running.
+
 ## Known limits
 
 - The muscle policy still trains on plans copied from real clips; the planner network is trained and checked on its

@@ -3,8 +3,10 @@
 #
 #   scripts/ncsa/sync.sh push                  # tracked files and .git -> $GP_REMOTE; the SPRINT engine -> beside it
 #                                              # (../sprint-gait-planner); the model and its meshes -> data/models/
+#                                              # and data/hard_ncsa if built (scripts/hard/build.sh)
 #   scripts/ncsa/sync.sh pull NAME... [--all]  # runs/NAME <- $GP_REMOTE: logs, record, progress, predictor models,
 #                                              # policy and the Studio folders (--all: checkpoint.pt too)
+#   scripts/ncsa/sync.sh pull-hard             # runs/hard <- $GP_REMOTE (no checkpoints), then hard_report.py
 #
 # GP_REMOTE is the checkout on the cluster as rsync writes it, e.g.
 #   export GP_REMOTE=<user>@login.delta.ncsa.illinois.edu:/u/<user>/gait_planner
@@ -13,7 +15,7 @@
 # After a pull, each run's Studio folders are copied into SPRINT Studio's results folder.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
 [[ $# -ge 1 && $1 != -h && $1 != --help ]] || usage 0
 [[ -n ${GP_REMOTE:-} ]] || { echo "set GP_REMOTE, e.g. <user>@login.delta.ncsa.illinois.edu:/u/<user>/gait_planner" >&2; exit 1; }
 
@@ -30,6 +32,11 @@ case $1 in
     rsync -az "$stage/SPRINT_COMMIT" "${GP_REMOTE%/*}/sprint-gait-planner/"
     mkdir -p "$stage/models" && cp "$model" "$stage/models/" && cp -r "$(dirname "$model")/Geometry" "$stage/models/"
     rsync -az "$stage/models" "$GP_REMOTE/data/"
+    if [[ -d data/hard_ncsa ]]; then
+      [[ -f data/hard_ncsa/CLIPS.txt ]] || { echo "data/hard_ncsa has no CLIPS.txt: rebuild it with scripts/hard/build.sh" >&2; exit 1; }
+      rsync -az data/hard_ncsa "$GP_REMOTE/data/"
+      echo "pushed data/hard_ncsa ($(wc -l < data/hard_ncsa/CLIPS.txt) clips)"
+    fi
     echo "pushed $(git rev-parse --short HEAD) ($(git branch --show-current)), SPRINT $(cut -c1-7 "$stage/SPRINT_COMMIT") and $(basename "$model") to $GP_REMOTE"
     ;;
   pull)
@@ -48,6 +55,11 @@ case $1 in
         for d in runs/"$n"/studio_*; do [[ -d $d ]] && rm -rf "$dest/$n.$(basename "$d")" && cp -r "$d" "$dest/$n.$(basename "$d")" && echo "  -> $dest/$n.$(basename "$d")"; done
       fi
     done
+    ;;
+  pull-hard)
+    rsync -az --exclude 'checkpoint.pt' "$GP_REMOTE/runs/hard" runs/
+    env -u PYTHONPATH .venv/bin/python hard_report.py runs/hard | head -5
+    echo "table: runs/hard/summary.md"
     ;;
   *) usage ;;
 esac
