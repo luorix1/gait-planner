@@ -10,7 +10,7 @@
 #
 # GP_REMOTE is the checkout on the cluster as rsync writes it, e.g.
 #   export GP_REMOTE=<user>@login.delta.ncsa.illinois.edu:/u/<user>/gait_planner
-# Each rsync is one login (Delta asks for your password and Duo; an ssh ControlMaster saves the repeats).
+# Each command is one rsync login (Delta asks for your password and Duo; an ssh ControlMaster saves the repeats).
 # push carries .git, so runs on the cluster record their commit; it never touches the cluster's runs/ or .venv.
 # After a pull, each run's Studio folders are copied into SPRINT Studio's results folder.
 set -euo pipefail
@@ -23,21 +23,25 @@ sprint=${GP_SPRINT_SRC:-$HOME/Jinwoo/worktrees/sprint-gait-planner}
 model=${GP_MODEL:-$HOME/Jinwoo/neural_test/models/Rajagopal_lower_collision_v3.osim}
 case $1 in
   push)
+    # Everything goes in ONE rsync (one login, one Duo prompt): staged locally first in ~/.cache/gait_planner_sync,
+    # laid out as the cluster's parent folder: <checkout>/ (tracked files, .git, data/models, data/hard_ncsa) and
+    # sprint-gait-planner/ (the engine's tracked files, SPRINT_COMMIT).
     git diff --quiet HEAD || echo "note: uncommitted changes go too; runs will record the commit as dirty"
-    { git ls-files; echo .git; } | rsync -az -r --files-from=- ./ "$GP_REMOTE/"
-    stage=$(mktemp -d); trap 'rm -rf "$stage"' EXIT
-    git -C "$sprint" rev-parse HEAD > "$stage/SPRINT_COMMIT"
     git -C "$sprint" diff --quiet HEAD || echo "note: $sprint has uncommitted changes; they go too"
-    { git -C "$sprint" ls-files; } | rsync -az -r --files-from=- "$sprint/" "${GP_REMOTE%/*}/sprint-gait-planner/"
-    rsync -az "$stage/SPRINT_COMMIT" "${GP_REMOTE%/*}/sprint-gait-planner/"
-    mkdir -p "$stage/models" && cp "$model" "$stage/models/" && cp -r "$(dirname "$model")/Geometry" "$stage/models/"
-    rsync -az "$stage/models" "$GP_REMOTE/data/"
+    stage=${GP_SYNC_STAGE:-$HOME/.cache/gait_planner_sync}
+    repo=$stage/${GP_REMOTE##*/}
+    mkdir -p "$repo/data/models" "$stage/sprint-gait-planner"
+    { git ls-files; echo .git; } | rsync -a -r --delete --files-from=- ./ "$repo/"
+    git -C "$sprint" ls-files | rsync -a --files-from=- "$sprint/" "$stage/sprint-gait-planner/"
+    git -C "$sprint" rev-parse HEAD > "$stage/sprint-gait-planner/SPRINT_COMMIT"
+    cp "$model" "$repo/data/models/"
+    rsync -a --copy-links "$(dirname "$model")/Geometry/" "$repo/data/models/Geometry/"   # its meshes are symlinks here
     if [[ -d data/hard_ncsa ]]; then
       [[ -f data/hard_ncsa/CLIPS.txt ]] || { echo "data/hard_ncsa has no CLIPS.txt: rebuild it with scripts/hard/build.sh" >&2; exit 1; }
-      rsync -az data/hard_ncsa "$GP_REMOTE/data/"
-      echo "pushed data/hard_ncsa ($(wc -l < data/hard_ncsa/CLIPS.txt) clips)"
+      rsync -a --delete data/hard_ncsa "$repo/data/"
     fi
-    echo "pushed $(git rev-parse --short HEAD) ($(git branch --show-current)), SPRINT $(cut -c1-7 "$stage/SPRINT_COMMIT") and $(basename "$model") to $GP_REMOTE"
+    rsync -az "$stage/" "${GP_REMOTE%/*}/"
+    echo "pushed $(git rev-parse --short HEAD) ($(git branch --show-current)), SPRINT $(cut -c1-7 "$stage/sprint-gait-planner/SPRINT_COMMIT"), $(basename "$model")$([[ -d data/hard_ncsa ]] && echo " and data/hard_ncsa ($(wc -l < data/hard_ncsa/CLIPS.txt) clips)") to $GP_REMOTE"
     ;;
   pull)
     shift
