@@ -40,7 +40,9 @@ case $1 in
       [[ -f data/hard_ncsa/CLIPS.txt ]] || { echo "data/hard_ncsa has no CLIPS.txt: rebuild it with scripts/hard/build.sh" >&2; exit 1; }
       rsync -a --delete data/hard_ncsa "$repo/data/"
     fi
-    rsync -az "$stage/" "${GP_REMOTE%/*}/"
+    # the two folders by name (no trailing slash), so rsync never tries to set the cluster's parent folder's
+    # permissions (your home on Delta: "failed to set permissions on /u/<user>/.")
+    rsync -az "$repo" "$stage/sprint-gait-planner" "${GP_REMOTE%/*}/"
     echo "pushed $(git rev-parse --short HEAD) ($(git branch --show-current)), SPRINT $(cut -c1-7 "$stage/sprint-gait-planner/SPRINT_COMMIT"), $(basename "$model")$([[ -d data/hard_ncsa ]] && echo " and data/hard_ncsa ($(wc -l < data/hard_ncsa/CLIPS.txt) clips)") to $GP_REMOTE"
     ;;
   pull)
