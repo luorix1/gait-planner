@@ -10,8 +10,10 @@ six checks, accepted or not, the numbers behind each, and G1's share of the righ
 inside the real band. The style check needs ``accept.json`` calibrated with the same prior. The activations of the
 muscles Camargo's EMG measured are saved per right stride (``emg_strides.npz``) for ``emg_report.py``.
 
+Clips are drawn up to ``--per-class`` from each source, mode and terrain class (ab01/walk/ramp_up, seed/run/level, ...).
+
 Run: .venv/bin/python evaluate.py runs/planner_v1 [--prior runs/prior_v1/prior.pt]
-Out: <run>/eval.json, <run>/emg_strides.npz, and a table per split and terrain class
+Out: <run>/eval.json, <run>/emg_strides.npz, and tables per split by terrain class and by source and mode
 """
 
 from __future__ import annotations
@@ -51,7 +53,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
               thresholds: dict | None) -> tuple[list[dict], list[tuple[np.ndarray, str]]]:
     full = data.load(split)
     rng = np.random.default_rng(0)
-    cls = np.array(full["terrain_class"])
+    cls = np.array([f"{a}/{b}/{c}" for a, b, c in zip(full["source"], full["mode"], full["terrain_class"], strict=True)])
     pick = np.concatenate([rng.permutation(np.flatnonzero(cls == c))[:per_class] for c in sorted(set(cls))])
     D = data.take(full, np.sort(pick))
     n = len(D["name"])
@@ -130,7 +132,7 @@ def run_split(run: Path, rec: dict, split: str, per_class: int, scorer: Prior | 
     out, strides = [], []
     for i in range(n):
         row = dict(clip=str(D["name"][i]), terrain_class=str(D["terrain_class"][i]), subject=str(D["subject"][i]),
-                   mode=str(D["mode"][i]),
+                   mode=str(D["mode"][i]), source=str(D["source"][i]), speed_mps=float(D["speed_mps"][i]),
                    completed=not bool(fell[i]), survived=float(steps[i] / possible[i].clamp_min(1)),
                    **{k: float(v[i] / steps[i].clamp_min(1)) for k, v in sums.items()})
         if scorer is not None:
@@ -180,10 +182,11 @@ def main() -> None:
         keys = ["completed", "survived", "accepted", "in_band_mean"] + [
             k for k in ("joint_error_deg", "r_contact", "foothold_error", "com_error", "r_style", "style_sds_loss")
             if k in rows[0]]
-        print(f"\n{split}\n{'class':12s} {'n':>3s} " + " ".join(f"{k:>15s}" for k in keys))
-        for c in sorted({r["terrain_class"] for r in rows}):
-            rs = [r for r in rows if r["terrain_class"] == c]
-            print(f"{c:12s} {len(rs):3d} " + " ".join(f"{np.nanmean([r[k] for r in rs]):15.3f}" for k in keys))
+        for by in (lambda r: r["terrain_class"], lambda r: f"{r['source']}/{r['mode']}"):
+            print(f"\n{split}\n{'group':22s} {'n':>4s} " + " ".join(f"{k:>15s}" for k in keys))
+            for c in sorted({by(r) for r in rows}):
+                rs = [r for r in rows if by(r) == c]
+                print(f"{c:22s} {len(rs):4d} " + " ".join(f"{np.nanmean([r[k] for r in rs]):15.3f}" for k in keys))
     report.update(prior=prior, accept_json=str(acc_path) if thresholds else None)
     np.savez(run / "emg_strides.npz", profiles=np.array(prof, np.float32).reshape(-1, len(CHANNELS), 101),
              split=np.array(prof_split), terrain_class=np.array(prof_cls), channels=np.array(CHANNELS))
