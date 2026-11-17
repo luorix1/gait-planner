@@ -30,7 +30,9 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -f $list ]] || { echo "no $list: run scripts/hard/build.sh on your machine, then scripts/ncsa/sync.sh push" >&2; exit 1; }
 [[ -n $time ]] || time=$(python3 -c "m = int($minutes) + 40; print(f'{m // 60:02d}:{m % 60:02d}:00')")
-[[ -n ${GP_ACCOUNT:-} || $dry == 1 ]] || { echo "set GP_ACCOUNT (scripts/slurm/setup.sh)" >&2; exit 1; }
+GP_ACCOUNT=${GP_ACCOUNT:-${NT_ACCOUNT:-}}                    # neural_test's allocation serves too
+[[ -n $GP_ACCOUNT || $dry == 1 ]] || { echo "no SLURM account: run scripts/slurm/setup.sh once (it sets GP_ACCOUNT)" >&2; exit 1; }
+[[ -x .venv/bin/python || $dry == 1 ]] || { echo "no .venv: run scripts/slurm/setup.sh on the login node first" >&2; exit 1; }
 mkdir -p runs/slurm
 n=0
 while read -r clip; do

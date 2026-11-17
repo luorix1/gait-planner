@@ -4,7 +4,8 @@
 #   scripts/ncsa/sync.sh push                     # on your machine: this checkout, SPRINT and the model -> the cluster
 #   scripts/slurm/setup.sh [--account NAME]       # then on the login node, in that checkout
 #
-# 1. SLURM account: --account, else $GP_ACCOUNT, else your only *-gpu account (sacctmgr; on Delta bxxx-delta-gpu).
+# 1. SLURM account: --account, else $GP_ACCOUNT, else neural_test's $NT_ACCOUNT, else your only *-gpu account
+#    (sacctmgr; on Delta bxxx-delta-gpu).
 #    Written to ~/.bashrc as `export GP_ACCOUNT=...`, so later logins have it.
 # 2. SPRINT: the exact engine every gait_planner run uses (branch gait-planner-engine: v1.0.0 a44107e plus the
 #    specific-tension commit 42c0606, which exists only on the lab machine), pushed by sync.sh to ../sprint-gait-planner.
@@ -14,11 +15,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-account=${GP_ACCOUNT:-}
+account=${GP_ACCOUNT:-${NT_ACCOUNT:-}}
 while [[ $# -gt 0 ]]; do
   case $1 in
     --account) account=$2; shift 2 ;;
-    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option $1 (--help)" >&2; exit 1 ;;
   esac
 done
