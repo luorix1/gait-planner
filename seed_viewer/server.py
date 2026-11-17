@@ -156,8 +156,14 @@ class Clips:
         ctr = xp[:, self.sph_body] + _rotate(xq[:, self.sph_body], np.broadcast_to(self.sph_pos, (T, len(self.sph), 3)))
         hf, hf_min, dx = np.asarray(d["hf"], np.float64), np.asarray(d["hf_min"], np.float64), float(d["dx"])
         # terrain under each sphere: canonical (x, y) = (osim x, -osim z), cell (i, j) at hf_min + (i, j) dx (nearest)
-        ij = np.rint((np.stack([ctr[..., 0], -ctr[..., 2]], -1) - hf_min) / dx).astype(int)
-        g = hf[np.clip(ij[..., 0], 0, hf.shape[0] - 1), np.clip(ij[..., 1], 0, hf.shape[1] - 1)]
+        xy = np.stack([ctr[..., 0], -ctr[..., 2]], -1)
+        Td = json.loads(str(d["terrain"]))
+        if Td["type"] == "stairs":  # the exact steps (training's SPRINT profile); the 2.5 cm grid moves edges +-1.25 cm
+            k = Td["scale"]
+            g = np.asarray(Td["levels"])[np.searchsorted(np.asarray(Td["edges"]) * k, xy @ np.asarray(Td["u"]))] * k
+        else:
+            ij = np.rint((xy - hf_min) / dx).astype(int)
+            g = hf[np.clip(ij[..., 0], 0, hf.shape[0] - 1), np.clip(ij[..., 1], 0, hf.shape[1] - 1)]
         gap = (ctr[..., 1] - self.sph_r - g).min(1)
         rot = ~self.trans
         speed = np.r_[0.0, np.abs(np.diff(q[:, rot], axis=0)).max(1) * fps]
