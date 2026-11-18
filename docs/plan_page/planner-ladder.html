@@ -146,7 +146,6 @@ table { border-collapse:collapse; width:100%; font-size:15px; min-width:1040px }
 th, td { text-align:left; vertical-align:top; padding:10px 10px; border-bottom:1px solid var(--line) }
 th { font-weight:600; color:var(--muted); font-size:12.5px; text-transform:uppercase; letter-spacing:.06em }
 td:first-child { font:600 14px var(--mono); white-space:nowrap }
-td.chg { background:var(--amber-soft); font-weight:600 }
 td.q { color:var(--muted) }
 
 /* sketch + measures */
@@ -162,6 +161,29 @@ td.q { color:var(--muted) }
 .sketch-tag { display:inline-block; font:600 11.5px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--amber); border:1.5px solid var(--amber); border-radius:6px; padding:1px 6px; margin-left:8px; vertical-align:2px }
 .tchips { display:flex; flex-wrap:wrap; gap:6px }
 .tchips span { font-size:13.5px; padding:3px 10px; border-radius:999px; background:var(--grey-soft); color:var(--ink) }
+
+/* glance lanes */
+.lanes { display:grid; grid-template-columns:140px repeat(8, minmax(118px, 1fr)); gap:8px 6px; min-width:1100px; align-items:stretch }
+.lanes .lh { font:600 13px var(--body); color:var(--muted); letter-spacing:.04em; text-transform:uppercase; align-self:center; position:sticky; left:0; background:var(--panel); padding-right:8px; z-index:1 }
+.lanes .lh.corner { grid-row:1; grid-column:1 }
+.lanes .rung { grid-row:1; display:grid; gap:2px; align-content:start; text-align:left; font:inherit; color:var(--ink); background:none; border:0; border-bottom:2px solid var(--line); padding:4px 6px 10px; cursor:pointer; border-radius:8px 8px 0 0 }
+.lanes .rung:hover { background:var(--grey-soft) }
+.lanes .rung b { font:600 15px var(--mono) }
+.lanes .rung span { font-size:14px }
+.lanes .rung em { font-style:normal; font-size:13px; font-weight:600; color:var(--blue) }
+.lanes .bar { border-radius:9px; padding:9px 11px; font-size:14px; line-height:1.3; background:var(--grey-soft); color:var(--ink); border:1.5px solid transparent; display:flex; align-items:center; min-height:50px }
+.lanes .bar.none { background:transparent; border:1.5px dashed var(--line); color:var(--muted) }
+.lanes .bar.own { background:var(--teal-soft) }
+.lanes .bar.hum { background:var(--amber-soft) }
+.lanes .bar.mix { background:linear-gradient(90deg, var(--amber-soft), var(--teal-soft)) }
+.lanes .bar.new { box-shadow:inset 5px 0 0 var(--blue); padding-left:15px }
+.lanes .qq { font-size:13.5px; color:var(--muted); line-height:1.35; padding:8px 6px 0; border-top:1px solid var(--line) }
+.lanes .lh.q { align-self:start; padding-top:8px }
+.lkey { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:16px; font-size:13.5px; color:var(--muted) }
+.lkey .k::before { content:""; display:inline-block; width:22px; height:12px; border-radius:4px; margin-right:7px; vertical-align:-1px; background:var(--grey-soft) }
+.lkey .k.hum::before { background:var(--amber-soft) } .lkey .k.own::before { background:var(--teal-soft) }
+.lkey .k.mix::before { background:linear-gradient(90deg, var(--amber-soft), var(--teal-soft)) }
+.lkey .k.new::before { box-shadow:inset 5px 0 0 var(--blue) }
 
 /* road */
 .road { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:14px }
@@ -187,8 +209,6 @@ table.rt { min-width:0; font-size:14.5px }
 table.rt td { padding:7px 8px }
 table.rt td:first-child { font:600 14.5px var(--body); white-space:normal }
 table.rt td.w { font:500 14px var(--mono); white-space:nowrap; text-align:right }
-table.rt tr.off td { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--wire) }
-table.rt tr.off td.why { text-decoration:none }
 .seg-l { font:600 14px var(--body); fill:var(--ink) }
 .seg-n { font:500 13px var(--mono); fill:var(--muted) }
 a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
@@ -391,10 +411,6 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
             <tr><td>Speed tracking</td><td>exp(−error² / 0.25): the commanded forward speed, and no sideways speed</td><td class="w">+0.25</td></tr>
             <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25): turning at the rate the command asks for, 0.5 × the gap to a target heading, at most 1 rad/s</td><td class="w">+0.25</td></tr>
             <tr><td>Fall</td><td>ends the episode, no penalty: tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank on the ground</td><td class="w">end</td></tr>
-            <tr class="off"><td>Upright, vertical speed, roll and pitch, joint acceleration, excitation change, leg contact</td><td class="why">dropped: the style judge and the effort cover posture, smoothness and cost; a leg on the ground is a fall</td><td class="w">0</td></tr>
-            <tr class="off"><td>Standing still</td><td class="why">dropped: at a zero command, tracking already rewards standing still</td><td class="w">0</td></tr>
-            <tr class="off"><td>Joint torques</td><td class="why">dropped: the effort terms already price the muscles</td><td class="w">0</td></tr>
-            <tr class="off"><td>Hips and waist off nominal</td><td class="why">dropped: AB01's own walking would pay 0.21 a step</td><td class="w">0</td></tr>
           </tbody>
         </table>
       </div>
@@ -422,22 +438,52 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-glance">
   <div class="sec-head">
     <h2 id="s-glance">All eight at a glance</h2>
-    <p>Highlighted cells are the one thing that changes from the row above. Each row's question is answered by comparing it with that row.</p>
+    <p>Read left to right. A bar runs for as long as a choice stays the same; a blue edge marks the rung where it changes. Each rung's question compares it with the rung to its left. Click a rung to watch it above.</p>
   </div>
-  <div class="panel tbl">
-    <table>
-      <thead><tr><th>Design</th><th>Footholds come from</th><th>Guesser sees terrain</th><th>Trained on</th><th>Policy sees ahead</th><th>Must step there</th><th>Policy's reward</th><th>Question it answers</th></tr></thead>
-      <tbody>
-        <tr><td>L0</td><td>none; the policy reads the full map</td><td>–</td><td>–</td><td>0.8 m, the map edge</td><td>–</td><td>speed + turn tracking + style − effort (B1)</td><td class="q">the reference for everything below</td></tr>
-        <tr><td>L1</td><td class="chg">blind guesser, 2 patches</td><td>no</td><td>the policy's own landings</td><td>2 footholds</td><td>no, it only looks</td><td>same as L0</td><td class="q">does looking only where the feet go learn faster on our body?</td></tr>
-        <tr><td>L2</td><td>guesser, 2 patches</td><td class="chg">yes, a strip ahead</td><td>own landings</td><td>2 footholds</td><td>no</td><td>same as L0</td><td class="q">does the guesser need terrain?</td></tr>
-        <tr><td>L3</td><td>guesser, 2 patches</td><td>yes</td><td class="chg">human footsteps</td><td>2 footholds</td><td>no</td><td>same as L0</td><td class="q">does human data make placement human-like?</td></tr>
-        <tr><td>L4</td><td>guesser, 2 patches</td><td>yes</td><td>human footsteps</td><td>2 footholds</td><td class="chg">yes, rewarded</td><td class="chg">+ landing on the guessed footholds</td><td class="q">is looking enough, or must it step there?</td></tr>
-        <tr><td>L5</td><td class="chg">planner: footholds, timing, centre-of-mass band</td><td>yes</td><td>human plans</td><td class="chg">about 1.5 s, 3 to 4 steps</td><td>yes</td><td class="chg">the plan's terms + style − effort; speed and turning move to the planner</td><td class="q">does anticipation need a longer horizon?</td></tr>
-        <tr><td>L5.5</td><td>planner</td><td>yes</td><td class="chg">human plans where the clips cover the terrain; its own landings elsewhere</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">is mixing in its own landings enough to leave the clips?</td></tr>
-        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs, in rounds</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">do the checks and rounds beat L5.5 past the clips, without drifting from human?</td></tr>
-      </tbody>
-    </table>
+  <div class="panel scroll">
+    <div class="lanes" role="img" aria-label="Five design choices across the eight rungs; each rung starts one new choice.">
+      <div class="lh corner"></div>
+      <button type="button" class="rung" data-arm="0" style="grid-column:2"><b>L0</b><span>Full map</span><em>the reference</em></button>
+      <button type="button" class="rung" data-arm="1" style="grid-column:3"><b>L1</b><span>Blind guess</span><em>+ blind guesser</em></button>
+      <button type="button" class="rung" data-arm="2" style="grid-column:4"><b>L2</b><span>+ terrain</span><em>guesser sees terrain</em></button>
+      <button type="button" class="rung" data-arm="3" style="grid-column:5"><b>L3</b><span>Human-trained</span><em>human labels</em></button>
+      <button type="button" class="rung" data-arm="4" style="grid-column:6"><b>L4</b><span>Follow</span><em>rewarded to follow</em></button>
+      <button type="button" class="rung" data-arm="5" style="grid-column:7"><b>L5</b><span>Planner</span><em>planner, 1.5 s</em></button>
+      <button type="button" class="rung" data-arm="6" style="grid-column:8"><b>L5.5</b><span>Mixed labels</span><em>mixed labels</em></button>
+      <button type="button" class="rung" data-arm="7" style="grid-column:9"><b>L6</b><span>+ loop</span><em>+ checked loop</em></button>
+      <div class="lh" style="grid-row:2">Policy sees</div>
+      <div class="bar map" style="grid-row:2; grid-column:2 / span 1">the full map, 0.8 m ahead</div>
+      <div class="bar pat new" style="grid-row:2; grid-column:3 / span 4">2 patches at the guessed footholds</div>
+      <div class="bar plan new" style="grid-row:2; grid-column:7 / span 3">the plan: footholds, timing, centre-of-mass band, about 1.5 s</div>
+      <div class="lh" style="grid-row:3">Footholds picked by</div>
+      <div class="bar none" style="grid-row:3; grid-column:2 / span 1">nobody</div>
+      <div class="bar pat new" style="grid-row:3; grid-column:3 / span 1">a guesser that sees only the body</div>
+      <div class="bar pat new" style="grid-row:3; grid-column:4 / span 3">a guesser that also reads a terrain strip</div>
+      <div class="bar plan new" style="grid-row:3; grid-column:7 / span 3">a planner</div>
+      <div class="lh" style="grid-row:4">Trained on</div>
+      <div class="bar none" style="grid-row:4; grid-column:2 / span 1">–</div>
+      <div class="bar own new" style="grid-row:4; grid-column:3 / span 2">the policy’s own landings</div>
+      <div class="bar hum new" style="grid-row:4; grid-column:5 / span 3">human footsteps</div>
+      <div class="bar mix new" style="grid-row:4; grid-column:8 / span 1">human where the clips cover the terrain, its own landings elsewhere</div>
+      <div class="bar mix new" style="grid-row:4; grid-column:9 / span 1">human + its own checked runs, in rounds</div>
+      <div class="lh" style="grid-row:5">Must step there</div>
+      <div class="bar none" style="grid-row:5; grid-column:2 / span 4">no, it only looks</div>
+      <div class="bar plan new" style="grid-row:5; grid-column:6 / span 4">yes, rewarded for landing there</div>
+      <div class="lh" style="grid-row:6">Policy’s reward</div>
+      <div class="bar base" style="grid-row:6; grid-column:2 / span 4">speed + turn tracking + style − effort</div>
+      <div class="bar plan new" style="grid-row:6; grid-column:6 / span 1">+ landing on the footholds</div>
+      <div class="bar plan new" style="grid-row:6; grid-column:7 / span 3">the plan’s terms + style − effort</div>
+      <div class="lh q" style="grid-row:7">Question</div>
+      <div class="qq" style="grid-row:7; grid-column:2">the reference for everything to its right</div>
+      <div class="qq" style="grid-row:7; grid-column:3">does looking only where the feet go learn faster on our body?</div>
+      <div class="qq" style="grid-row:7; grid-column:4">does the guesser need terrain?</div>
+      <div class="qq" style="grid-row:7; grid-column:5">does human data make placement human-like?</div>
+      <div class="qq" style="grid-row:7; grid-column:6">is looking enough, or must it step there?</div>
+      <div class="qq" style="grid-row:7; grid-column:7">does anticipation need a longer horizon?</div>
+      <div class="qq" style="grid-row:7; grid-column:8">is mixing in its own landings enough to leave the clips?</div>
+      <div class="qq" style="grid-row:7; grid-column:9">do the checks and rounds beat L5.5 past the clips, without drifting from human?</div>
+    </div>
+    <div class="lkey"><span class="k hum">human data</span><span class="k own">the policy’s own landings</span><span class="k mix">both</span><span class="k new">changes at this rung</span></div>
   </div>
 </section>
 
@@ -743,6 +789,9 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   const playBtn = $('play');
   function setPlay(v) { playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; playBtn.setAttribute('aria-pressed', String(v)); }
   playBtn.addEventListener('click', () => setPlay(!playing));
+  document.querySelectorAll('.rung[data-arm]').forEach(b => b.addEventListener('click', () => {
+    setArm(+b.dataset.arm); $('sceneWrap').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }));
   document.querySelectorAll('[data-show]').forEach(b => b.addEventListener('click', () => {
     const [a, t] = b.dataset.show.split(','); setPlay(true); setTer(t); setArm(+a);
     const T = TER[t]; tau = Math.max(0, T.t0[T.feature] - 1.4);
