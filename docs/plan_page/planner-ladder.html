@@ -1,0 +1,679 @@
+<title>Footstep Planner Ladder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the plan page's wide lab notebook (same tokens); one animated scene + one flow diagram carry the ladder. */
+:root {
+  --paper:#F4F6F9; --panel:#FFFFFF; --ink:#1B2633; --muted:#55606D; --line:#D5DDE7; --wire:#7C8895;
+  --blue:#2F6FB0; --blue-2:#8FB3DA; --blue-soft:#E6EEF8; --amber:#C98A1E; --amber-soft:rgba(227,163,59,.24);
+  --good:#2E8B57; --good-soft:#E3F2EA; --bad:#C0463A; --bad-soft:#F8E3E0; --teal:#1F8A86; --teal-soft:#DDF1EF;
+  --terrain:#DFE5EC; --pit:#C9D2DC; --grey-soft:#EEF1F5;
+  --display:"Space Grotesk", "Segoe UI", system-ui, sans-serif; --body:"Inter", system-ui, -apple-system, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-2:#3E6A99; --blue-soft:#1C2C40; --amber:#F0B65A; --amber-soft:rgba(240,182,90,.2);
+  --good:#5CC08A; --good-soft:#163024; --bad:#EC7F72; --bad-soft:#3A1E1B; --teal:#4CC2BC; --teal-soft:#14302E;
+  --terrain:#243040; --pit:#1A232E; --grey-soft:#1C2530; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-2:#3E6A99; --blue-soft:#1C2C40; --amber:#F0B65A; --amber-soft:rgba(240,182,90,.2);
+  --good:#5CC08A; --good-soft:#163024; --bad:#EC7F72; --bad-soft:#3A1E1B; --teal:#4CC2BC; --teal-soft:#14302E;
+  --terrain:#243040; --pit:#1A232E; --grey-soft:#1C2530; color-scheme:dark }
+body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 64px }
+.wrap { max-width:1320px; margin:0 auto; display:grid; gap:52px }
+h1, h2, h3 { font-family:var(--display); margin:0; text-wrap:balance; letter-spacing:-0.01em }
+h1 { font-size:clamp(32px, 4.6vw, 52px); line-height:1.05 }
+h2 { font-size:clamp(23px, 2.8vw, 30px); line-height:1.15 }
+h3 { font-size:18px; line-height:1.25 }
+p { margin:0 }
+a { color:var(--blue) }
+a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:6px }
+.eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
+header { display:grid; gap:16px; max-width:1000px }
+.lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:74ch }
+.chips { display:flex; flex-wrap:wrap; gap:8px }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; font-size:14px; font-weight:500; border:1px solid var(--line); background:var(--panel) }
+.chip i { width:9px; height:9px; border-radius:50%; background:var(--wire) }
+.chip.next i { background:var(--blue) } .chip.todo i { background:transparent; border:2px solid var(--wire); width:7px; height:7px }
+.chip.ill i { background:var(--amber) }
+.links { font-size:14px; display:flex; flex-wrap:wrap; gap:6px 18px }
+section { display:grid; gap:18px }
+.sec-head { display:grid; gap:6px; max-width:920px }
+.sec-head p { color:var(--muted); max-width:78ch }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px; min-width:0 }
+.scroll { overflow-x:auto }
+svg.dia { width:100%; height:auto; display:block }
+.note { font-size:14.5px; color:var(--muted) }
+.split { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, 1fr); gap:28px; align-items:center }
+.split > * { min-width:0 }
+.reasons { display:grid; gap:18px }
+.reason { display:grid; gap:4px }
+.reason b { font-family:var(--display); font-size:18px; font-weight:600 }
+.reason p { color:var(--muted); font-size:15.5px }
+.cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:8px; align-content:start; min-width:0 }
+.card p { color:var(--muted); font-size:15px }
+.card .tag { font:600 12px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+.btn { justify-self:start; font:500 14px var(--body); color:var(--blue); background:var(--blue-soft); border:1px solid transparent; border-radius:999px; padding:6px 14px; cursor:pointer }
+.btn:hover { border-color:var(--blue) }
+
+/* controls */
+.controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center }
+.seg { display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:14px; padding:3px; background:var(--panel); gap:2px }
+.seg button { font:500 14px var(--body); color:var(--muted); background:none; border:0; border-radius:11px; padding:6px 12px; cursor:pointer; display:grid; line-height:1.2; text-align:left }
+.seg button b { font:600 13px var(--mono); color:var(--ink) }
+.seg button[aria-pressed="true"] { background:var(--blue-soft); color:var(--ink) }
+.play { font:500 14px var(--body); color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 14px; cursor:pointer; min-width:84px }
+
+/* the scene */
+.stage { display:grid; gap:14px }
+.scene-wrap { border-radius:10px; background:var(--grey-soft); overflow:hidden }
+.scene-wrap svg { min-width:720px }
+.terrain { fill:var(--terrain); stroke:var(--wire); stroke-width:2; stroke-linejoin:round }
+.limb { fill:none; stroke-linecap:round; stroke-linejoin:round; stroke-width:7 }
+.limb.near { stroke:var(--ink) } .limb.far { stroke:var(--wire) } .limb.arm { stroke-width:5.5 }
+.limb.torso { stroke:var(--ink); stroke-width:8 }
+.headc { fill:var(--panel); stroke:var(--ink); stroke-width:5 }
+.foot.near { fill:var(--ink) } .foot.far { fill:var(--wire) }
+.print { stroke:var(--wire); stroke-width:5; stroke-linecap:round; opacity:.45 }
+.mapdot { fill:var(--blue) }
+.stripdot { fill:var(--wire); opacity:.75 }
+.pdot { fill:var(--wire); opacity:.45 }
+.pband { fill:var(--teal-soft); stroke:var(--teal); stroke-width:2 }
+.pband.ghost { fill:none; stroke-dasharray:5 5; opacity:.7 }
+.patchdot { fill:var(--teal) }
+.plab { fill:var(--teal); font:700 15px var(--mono); text-anchor:middle }
+.ring { fill:none; stroke:var(--amber); stroke-width:3 }
+.ring.faint { opacity:.5 } .ring.hit { stroke:var(--good); stroke-width:4 }
+.tlab { fill:var(--muted); font:500 13px var(--mono); text-anchor:middle }
+.comband { fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.5; stroke-dasharray:4 4 }
+.horizon { stroke:var(--blue); stroke-width:2; stroke-dasharray:6 6 }
+.hlab { fill:var(--blue); font:600 13px var(--body) }
+.hud { fill:var(--ink); font:600 16px var(--body) }
+.hud2 { fill:var(--muted); font:400 14px var(--body) }
+.badge rect { stroke-width:1.5 }
+.badge text { font:600 13.5px var(--body); text-anchor:middle }
+.badge.ok rect { fill:var(--good-soft); stroke:var(--good) } .badge.ok text { fill:var(--good) }
+.badge.edge rect { fill:var(--amber-soft); stroke:var(--amber) } .badge.edge text { fill:var(--ink) }
+.badge.out rect { fill:var(--bad-soft); stroke:var(--bad) } .badge.out text { fill:var(--bad) }
+.tick { fill:none; stroke:var(--good); stroke-width:3; stroke-linecap:round; stroke-linejoin:round }
+.illus { fill:var(--muted); font:400 13px var(--body); text-anchor:end }
+.legend { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:14px; color:var(--muted) }
+.legend span::before { content:""; display:inline-block; width:14px; height:12px; border-radius:3px; margin-right:7px; vertical-align:-1px; background:var(--c); border:1.5px solid var(--b, transparent) }
+.below { display:grid; gap:22px }
+.below > * { min-width:0 }
+.below .cap { order:-1 }
+#flow { max-width:1000px; margin:0 auto }
+.loopsvg .t2, .loopsvg .lab { font-size:16px }
+.cap { display:grid; gap:12px; align-content:start; border-top:1px solid var(--line); padding-top:18px }
+.cap h3 { font-size:21px }
+.cap dl { margin:0; display:grid; grid-template-columns:minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap:10px 28px }
+.cap dt { font:600 12px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+.cap dd { margin:2px 0 0; font-size:15.5px }
+
+/* flow diagram */
+.fn rect { fill:var(--panel); stroke:var(--line); stroke-width:2 }
+.fn.key rect { fill:var(--teal-soft); stroke:var(--teal); stroke-width:2.5 }
+.fn.pol rect { fill:var(--blue-soft); stroke:var(--blue); stroke-width:2.5 }
+.fn.dash rect { fill:none; stroke:var(--wire); stroke-dasharray:7 6 }
+.fn.hum rect { fill:none; stroke:var(--amber); stroke-dasharray:7 6; stroke-width:2.5 }
+.fn { transition:opacity .35s }
+.fn text { text-anchor:middle }
+.fn.off { opacity:.28 }
+.t1 { fill:var(--ink); font:600 18px var(--body) }
+.t2 { fill:var(--muted); font:400 14px var(--body) }
+.e { fill:none; stroke-width:2.5; opacity:0; transition:opacity .35s }
+.e.on { opacity:1 }
+.e.data { stroke:var(--wire) } .e.terr { stroke:var(--teal) }
+.e.hum { stroke:var(--amber); stroke-dasharray:7 6 } .e.train { stroke:var(--wire); stroke-dasharray:7 6 }
+.el { fill:var(--muted); font:500 13.5px var(--body); opacity:0; transition:opacity .35s }
+.el.on { opacity:1 }
+.el.terr { fill:var(--teal) } .el.hum { fill:var(--amber) }
+.mk-wire { fill:var(--wire) } .mk-teal { fill:var(--teal) } .mk-amber { fill:var(--amber) }
+.w { fill:none; stroke:var(--wire); stroke-width:2.5 }
+.w.terr { stroke:var(--teal) } .w.train { stroke-dasharray:7 6 }
+.lab { fill:var(--muted); font:500 14px var(--body) }
+.lab.terr { fill:var(--teal); font-weight:600 }
+.big { fill:var(--ink); font:600 22px var(--display); text-anchor:middle }
+.loopdot { fill:var(--blue); stroke:var(--panel); stroke-width:3 }
+
+/* table */
+.tbl { overflow-x:auto }
+table { border-collapse:collapse; width:100%; font-size:15px; min-width:860px }
+th, td { text-align:left; vertical-align:top; padding:10px 10px; border-bottom:1px solid var(--line) }
+th { font-weight:600; color:var(--muted); font-size:12.5px; text-transform:uppercase; letter-spacing:.06em }
+td:first-child { font:600 14px var(--mono); white-space:nowrap }
+td.chg { background:var(--amber-soft); font-weight:600 }
+td.q { color:var(--muted) }
+
+/* sketch + measures */
+.meas { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr); gap:24px; align-items:start }
+.meas > * { min-width:0 }
+.mgrid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px }
+.ax { stroke:var(--line); stroke-width:1.5 }
+.axl { fill:var(--muted); font:500 13px var(--body) }
+.ln { fill:none; stroke-width:3; stroke-linejoin:round; stroke-linecap:round }
+.ln.ppl { stroke:var(--blue) } .ln.rea { stroke:var(--amber); stroke-dasharray:9 6 } .ln.pla { stroke:var(--teal); stroke-dasharray:3 6 }
+.pt.ppl { fill:var(--blue) } .pt.rea { fill:var(--amber) } .pt.pla { fill:var(--teal) }
+.dl { font:600 13.5px var(--body) } .dl.ppl { fill:var(--blue) } .dl.rea { fill:var(--amber) } .dl.pla { fill:var(--teal) }
+.sketch-tag { display:inline-block; font:600 11.5px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--amber); border:1.5px solid var(--amber); border-radius:6px; padding:1px 6px; margin-left:8px; vertical-align:2px }
+.tchips { display:flex; flex-wrap:wrap; gap:6px }
+.tchips span { font-size:13.5px; padding:3px 10px; border-radius:999px; background:var(--grey-soft); color:var(--ink) }
+
+/* road */
+.road { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:14px }
+.road li { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; display:grid; gap:4px; align-content:start; min-width:0 }
+.road li.now { border-color:var(--blue); background:var(--blue-soft) }
+.road li:not(:last-child)::after { content:"→"; position:absolute; right:-13px; top:50%; transform:translateY(-50%); color:var(--wire); font-weight:600 }
+.road .st { font:600 13px var(--mono); color:var(--blue) }
+.road b { font-family:var(--display); font-size:17px; font-weight:600 }
+.road span { font-size:14px; color:var(--muted) }
+.road .cost { font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:4px }
+
+@media (max-width:1000px) { .road { grid-template-columns:repeat(3, minmax(0, 1fr)) } .road li:nth-child(3)::after { content:none } }
+@media (max-width:900px) {
+  .split, .meas, .cards, .cap dl { grid-template-columns:minmax(0, 1fr) }
+  .mgrid { grid-template-columns:minmax(0, 1fr) }
+}
+@media (max-width:560px) { .road { grid-template-columns:minmax(0, 1fr) } .road li::after { content:none !important } .panel { padding:16px } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">gait_planner · footstep planner study · draft, 18 Nov 2026</p>
+  <h1>Footstep planner ladder</h1>
+  <p class="lede">Seven designs for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
+  <div class="chips">
+    <span class="chip next"><i></i>L0 + L1 run first (the stage-1 build)</span>
+    <span class="chip todo"><i></i>L2, L3 are cheap variants</span>
+    <span class="chip todo"><i></i>L4 to L6 need a following reward or a planner</span>
+    <span class="chip ill"><i></i>Scenes are illustrations, not simulation output</span>
+  </div>
+  <div class="links"><a href="https://claude.ai/artifact/JEJTXyCWPxEBVHdF3iomaD">Plan page (plan v2)</a></div>
+</header>
+
+<section aria-labelledby="s-why">
+  <div class="sec-head">
+    <h2 id="s-why">Why a blind guesser works in Watch Your Step</h2>
+    <p>The guesser never decides where a foot lands. It only decides where the policy looks. The terrain still reaches it, through a loop that runs through the body.</p>
+  </div>
+  <div class="panel split">
+    <div class="scroll">
+      <svg class="dia loopsvg" viewBox="0 0 760 390" role="img" aria-labelledby="loop-t">
+        <title id="loop-t">The loop: body state goes to the blind guesser, which picks where two patches go; the patches give the policy terrain heights; the policy's muscles change the body, and the next guess moves.</title>
+        <defs>
+          <marker id="lw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="lt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <path class="w" d="M260 75 H366" marker-end="url(#lw)"/>
+        <path class="w" d="M485 114 V268" marker-end="url(#lw)"/>
+        <path class="w terr" d="M370 311 H264" marker-end="url(#lt)"/>
+        <path class="w terr" d="M145 272 V118" marker-end="url(#lt)"/>
+        <path class="w train" d="M680 150 V75 H604" marker-end="url(#lw)"/>
+        <text class="lab" x="315" y="62" text-anchor="middle">every 20 ms</text>
+        <text class="lab" x="497" y="188">where</text><text class="lab" x="497" y="206">to look</text>
+        <text class="lab terr" x="315" y="338" text-anchor="middle">terrain</text><text class="lab terr" x="315" y="356" text-anchor="middle">gets in here</text>
+        <text class="lab terr" x="133" y="180" text-anchor="end">and comes</text><text class="lab terr" x="133" y="198" text-anchor="end">back as</text><text class="lab terr" x="133" y="216" text-anchor="end">posture</text>
+        <text class="big" x="315" y="186">20 to 30 rounds</text>
+        <text class="lab" x="315" y="210" text-anchor="middle">in every step</text>
+        <circle class="loopdot" r="8" id="loopdot"><animateMotion dur="2.6s" repeatCount="indefinite" path="M145 75 H485 V311 H145 Z"/></circle>
+        <g class="fn"><rect x="30" y="36" width="230" height="78" rx="12"/><text class="t1" x="145" y="69">Body state</text><text class="t2" x="145" y="91">joints, speeds, command</text></g>
+        <g class="fn"><rect x="370" y="36" width="230" height="78" rx="12"/><text class="t1" x="485" y="69">Blind guesser</text><text class="t2" x="485" y="91">next landing of each foot</text></g>
+        <g class="fn key"><rect x="370" y="272" width="230" height="78" rx="12"/><text class="t1" x="485" y="305">Two patches</text><text class="t2" x="485" y="327">7 × 7 heights each</text></g>
+        <g class="fn pol"><rect x="30" y="272" width="230" height="78" rx="12"/><text class="t1" x="145" y="305">Muscle policy</text><text class="t2" x="145" y="327">shapes the step</text></g>
+        <g class="fn dash"><rect x="606" y="150" width="148" height="84" rx="12"/><text class="t1" x="680" y="186">Landings</text><text class="t2" x="680" y="208">training labels</text></g>
+      </svg>
+    </div>
+    <div class="reasons">
+      <div class="reason"><b>It is redone every 20 ms</b><p>The guess is recomputed 20 to 30 times per step from joint angles, joint speeds, base velocity and the command. When a patch shows a stair edge and the policy shortens the swing, the body changes, and the next guess moves with it.</p></div>
+      <div class="reason"><b>It learns from real landings</b><p>Its labels are where the policy's feet actually landed, terrain adjustments included. Stair posture (more knee bend, upward base speed) teaches it stair-sized steps without seeing a stair.</p></div>
+      <div class="reason"><b>Its misses fit inside the patch</b>
+        <svg class="dia" viewBox="0 0 500 150" role="img" aria-labelledby="ruler-t" style="max-width:500px">
+          <title id="ruler-t">The paper's typical misses, 7 cm for the next foothold and 12 cm for the one after, both fit inside the patch, which spans 15 cm either side of the guess.</title>
+          <rect x="110" y="34" width="240" height="14" rx="4" fill="var(--blue-2)"/>
+          <rect x="160" y="60" width="140" height="14" rx="4" fill="var(--blue)"/>
+          <text class="lab" x="358" y="46">one after, 12 cm</text>
+          <text class="lab" x="308" y="72">next, 7 cm</text>
+          <rect x="80" y="92" width="300" height="30" rx="6" class="pband"/>
+          <g class="patchdot"><circle cx="80" cy="107" r="5"/><circle cx="130" cy="107" r="5"/><circle cx="180" cy="107" r="5"/><circle cx="230" cy="107" r="5"/><circle cx="280" cy="107" r="5"/><circle cx="330" cy="107" r="5"/><circle cx="380" cy="107" r="5"/></g>
+          <line x1="230" y1="84" x2="230" y2="130" stroke="var(--ink)" stroke-width="2"/>
+          <text class="axl" x="80" y="144" text-anchor="middle">−15 cm</text>
+          <text class="axl" x="230" y="144" text-anchor="middle">guess</text>
+          <text class="axl" x="380" y="144" text-anchor="middle">+15 cm</text>
+        </svg>
+        <p>The paper's stones are 30 to 50 cm and its gaps 10 to 20 cm, so most corrections fit inside one patch.</p>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">Where it breaks</span><h3>A landing far from the guess</h3><p>Wide gaps, high step-ups, the first step onto a big feature. The guess assumes a normal stride, so the patch can show the pit instead of the far edge.</p><button class="btn" type="button" data-show="1,gap">Watch L1 on the wide gap</button></div>
+    <div class="card"><span class="tag">Where it breaks</span><h3>Planning past two steps</h3><p>People change step length two or three steps before stairs or an obstacle. Two patches show two footholds, so the policy reacts. It can succeed while correcting later than a person would.</p><button class="btn" type="button" data-show="1,stairs">Watch L1 on stairs</button></div>
+    <div class="card"><span class="tag">What it never tested</span><h3>Human-like placement</h3><p>The paper's claims are faster training and better transfer on a G1 robot with joint position control. Whether the feet land where a person's would is our question, not theirs.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-ladder">
+  <div class="sec-head">
+    <h2 id="s-ladder">The ladder</h2>
+    <p>Pick a design and a terrain. Every design uses the same muscle policy, body, style judge, task reward and training budget. The footsteps are the same in every scene, so the only thing that changes is what each design sees and where its footholds come from.</p>
+  </div>
+  <div class="panel stage">
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Design" id="armSeg"></div>
+      <div class="seg" role="group" aria-label="Terrain" id="terSeg">
+        <button type="button" data-ter="stones" aria-pressed="false">Stepping stones</button>
+        <button type="button" data-ter="stairs" aria-pressed="true">Stairs, 16 cm</button>
+        <button type="button" data-ter="gap" aria-pressed="false">Wide gap, 70 cm</button>
+      </div>
+      <button class="play" type="button" id="play" aria-pressed="true">Pause</button>
+    </div>
+    <div class="scene-wrap scroll" id="sceneWrap">
+      <svg class="dia" id="scene" viewBox="0 0 1200 440" role="img" aria-label="Side view of the walker on the chosen terrain, with what the chosen design sees drawn on the ground.">
+        <path class="terrain" id="ground"/>
+        <g id="under"></g>
+        <g id="walker">
+          <path class="limb far" id="legF"/><path class="foot far" id="footF"/><path class="limb far arm" id="armF"/>
+          <path class="limb torso" id="torso"/><circle class="headc" id="head" r="14"/>
+          <path class="limb near" id="legN"/><path class="foot near" id="footN"/><path class="limb near arm" id="armN"/>
+        </g>
+        <g id="over"></g>
+        <text class="hud" x="18" y="30" id="hud1"></text>
+        <text class="hud2" x="18" y="52" id="hud2"></text>
+        <text class="illus" x="1186" y="430">Illustration: hand-set footsteps, not a simulation</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span style="--c:var(--blue)">full map (L0)</span>
+      <span style="--c:var(--teal-soft); --b:var(--teal)">patch at a guessed foothold</span>
+      <span style="--c:var(--wire)">terrain the guesser or planner reads</span>
+      <span style="--c:transparent; --b:var(--amber)">target the policy must hit</span>
+      <span style="--c:var(--amber-soft); --b:var(--amber)">centre-of-mass band</span>
+      <span style="--c:transparent; --b:var(--blue)">how far ahead the policy sees</span>
+    </div>
+    <div class="below">
+      <div class="scroll">
+        <svg class="dia" id="flow" viewBox="0 0 1040 410" role="img" aria-label="Data flow for the chosen design." style="min-width:640px">
+          <defs>
+            <marker id="fw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+          </defs>
+          <path class="e data" data-arms="0123456" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
+          <text class="el" data-arms="0123456" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
+          <path class="e data" data-arms="0123456" d="M860 200 H890" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="0123456" d="M860 362 H959 V246" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="123456" d="M540 200 H606" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="123456" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="123456" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
+          <path class="e terr" data-arms="23456" d="M226 278 C262 278 262 222 296 222" marker-end="url(#ft)"/>
+          <path class="e terr" data-arms="01234" d="M226 294 H735 V246" marker-end="url(#ft)"/>
+          <text class="el terr" data-arms="1234" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
+          <text class="el terr" data-arms="0" x="420" y="316" text-anchor="middle">all 693 heights</text>
+          <path class="e train" data-arms="12" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
+          <text class="el" data-arms="12" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
+          <path class="e hum" data-arms="3456" d="M420 116 V154" marker-end="url(#fa)"/>
+          <text class="el hum" data-arms="3456" x="430" y="140">labels</text>
+          <path class="e train" data-arms="6" d="M930 158 V84 H544" marker-end="url(#fw)"/>
+          <text class="el" data-arms="6" x="737" y="76" text-anchor="middle">runs that pass the checks</text>
+          <g class="fn" data-node="body"><rect x="16" y="70" width="210" height="64" rx="12"/><text class="t1" x="121" y="96">Body state</text><text class="t2" x="121" y="118">joints, speeds, muscles</text></g>
+          <g class="fn" data-node="cmd"><rect x="16" y="158" width="210" height="64" rx="12"/><text class="t1" x="121" y="184">Command</text><text class="t2" x="121" y="206">speed, turn</text></g>
+          <g class="fn key" data-node="map"><rect x="16" y="246" width="210" height="64" rx="12"/><text class="t1" x="121" y="272">Height map</text><text class="t2" x="121" y="294">1.6 × 1.0 m, 5 cm cells</text></g>
+          <g class="fn hum" data-node="human"><rect x="300" y="52" width="240" height="64" rx="12"/><text class="t1" x="420" y="78">Human footsteps</text><text class="t2" x="420" y="100">AB01, Camargo, PARC</text></g>
+          <g class="fn" data-node="mod"><rect x="300" y="158" width="240" height="84" rx="12"/><text class="t1" x="420" y="194" id="modT"></text><text class="t2" x="420" y="216" id="modS"></text></g>
+          <g class="fn key" data-node="inp"><rect x="610" y="158" width="250" height="84" rx="12"/><text class="t1" x="735" y="194" id="inpT"></text><text class="t2" x="735" y="216" id="inpS"></text></g>
+          <g class="fn pol" data-node="pol"><rect x="894" y="158" width="130" height="84" rx="12"/><text class="t1" x="959" y="183">Muscle</text><text class="t1" x="959" y="205">policy</text><text class="t2" x="959" y="227">90 muscles</text></g>
+          <g class="fn dash" data-node="rew"><rect x="610" y="330" width="250" height="64" rx="12"/><text class="t1" x="735" y="356">Rewards</text><text class="t2" x="735" y="378" id="rewS"></text></g>
+        </svg>
+      </div>
+      <div class="cap" aria-live="polite">
+        <h3 id="capT"></h3>
+        <dl>
+          <div><dt>What you're watching</dt><dd id="capW"></dd></div>
+          <div><dt>Changed from the rung below</dt><dd id="capC"></dd></div>
+          <div><dt>Expected</dt><dd id="capE"></dd></div>
+          <div><dt>Cost</dt><dd id="capK"></dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-glance">
+  <div class="sec-head">
+    <h2 id="s-glance">All seven at a glance</h2>
+    <p>Highlighted cells are the one thing that changes from the row above. Each row's question is answered by comparing it with that row.</p>
+  </div>
+  <div class="panel tbl">
+    <table>
+      <thead><tr><th>Design</th><th>Footholds come from</th><th>Guesser sees terrain</th><th>Trained on</th><th>Policy sees ahead</th><th>Must step there</th><th>Question it answers</th></tr></thead>
+      <tbody>
+        <tr><td>L0</td><td>none; the policy reads the full map</td><td>–</td><td>–</td><td>0.8 m, the map edge</td><td>–</td><td class="q">the reference for everything below</td></tr>
+        <tr><td>L1</td><td class="chg">blind guesser, 2 patches</td><td>no</td><td>the policy's own landings</td><td>2 footholds</td><td>no, it only looks</td><td class="q">does looking only where the feet go learn faster on our body?</td></tr>
+        <tr><td>L2</td><td>guesser, 2 patches</td><td class="chg">yes, a strip ahead</td><td>own landings</td><td>2 footholds</td><td>no</td><td class="q">does the guesser need terrain?</td></tr>
+        <tr><td>L3</td><td>guesser, 2 patches</td><td>yes</td><td class="chg">human footsteps</td><td>2 footholds</td><td>no</td><td class="q">does human data make placement human-like?</td></tr>
+        <tr><td>L4</td><td>guesser, 2 patches</td><td>yes</td><td>human footsteps</td><td>2 footholds</td><td class="chg">yes, rewarded</td><td class="q">is looking enough, or must it step there?</td></tr>
+        <tr><td>L5</td><td class="chg">planner: footholds, timing, centre-of-mass band</td><td>yes</td><td>human plans</td><td class="chg">about 1.5 s, 3 to 4 steps</td><td>yes</td><td class="q">does anticipation need a longer horizon?</td></tr>
+        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs</td><td>about 1.5 s</td><td>yes</td><td class="q">can it grow past the clips without drifting from human?</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="s-judge">
+  <div class="sec-head">
+    <h2 id="s-judge">How we'd judge them</h2>
+    <p>Human-likeness only means something on terrain we have people walking on, and against subjects held out from training.</p>
+  </div>
+  <div class="meas">
+    <div class="panel" style="display:grid; gap:12px">
+      <h3>Step length before the first stair <span class="sketch-tag">sketch</span></h3>
+      <div class="scroll">
+        <svg class="dia" viewBox="0 0 560 300" role="img" aria-labelledby="ant-t" style="min-width:420px">
+          <title id="ant-t">Sketch of the hypothesis: people shorten their steps gradually over the three steps before the first stair; a reactive design keeps a normal stride and shortens late; a planner should look like people. Not measured.</title>
+          <line class="ax" x1="60" y1="250" x2="540" y2="250"/>
+          <line class="ax" x1="60" y1="40" x2="60" y2="250"/>
+          <line x1="432" y1="40" x2="432" y2="250" stroke="var(--wire)" stroke-width="1.5" stroke-dasharray="4 5"/>
+          <text class="axl" x="438" y="54">first stair</text>
+          <text class="axl" x="66" y="34">step length</text>
+          <text class="axl" x="80" y="272" text-anchor="middle">−4</text><text class="axl" x="168" y="272" text-anchor="middle">−3</text><text class="axl" x="256" y="272" text-anchor="middle">−2</text><text class="axl" x="344" y="272" text-anchor="middle">−1</text><text class="axl" x="432" y="272" text-anchor="middle">0</text><text class="axl" x="520" y="272" text-anchor="middle">+1</text>
+          <text class="axl" x="300" y="294" text-anchor="middle">steps relative to the first foot on the stairs</text>
+          <polyline class="ln rea" points="80,79 168,79 256,79 344,88 432,159 520,225"/>
+          <polyline class="ln ppl" points="80,79 168,88 256,107 344,135 432,173 520,225"/>
+          <polyline class="ln pla" points="80,79 168,90 256,110 344,138 432,176 520,225"/>
+          <text class="dl rea" x="168" y="68">reactive (expected for L0 to L4)</text>
+          <text class="dl ppl" x="250" y="150" text-anchor="end">people (Camargo transitions)</text>
+          <text class="dl pla" x="250" y="168" text-anchor="end">planned (expected for L5, L6)</text>
+        </svg>
+      </div>
+      <p class="note">No numbers on purpose: the human curve will come from Camargo's level-to-stair trials. This is the measure that should split the reactive designs from the planned ones.</p>
+    </div>
+    <div class="mgrid">
+      <div class="card"><h3>Foot placement</h3><p>Step length and width against speed; where the foot lands on a tread and how far it clears the nosing; take-off distance from a platform edge.</p></div>
+      <div class="card"><h3>Anticipation</h3><p>Step length over the 3 steps before a terrain change, against Camargo's transition trials (the sketch).</p></div>
+      <div class="card"><h3>Biomechanics</h3><p>Joint angles, ground forces, joint moments and EMG against Camargo, terrain by terrain.</p></div>
+      <div class="card"><h3>Task</h3><p>Falls, terrain level reached, and how fast each design learns.</p></div>
+      <div class="card"><h3>Guesser misses</h3><p>Foothold error by terrain, and how often the foot lands outside its patch. This is where L1 should fail first.</p></div>
+      <div class="card"><h3>Test terrain</h3>
+        <div class="tchips"><span>level + ramps: AB01, Camargo</span><span>stairs + transitions: Camargo</span><span>platforms: PARC captured clips</span><span>held-out subjects</span></div>
+        <p>Stones, boxes and pits have no human footstep data. Judge them on task only.</p></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-order">
+  <div class="sec-head">
+    <h2 id="s-order">Order and cost</h2>
+    <p>The ladder follows the plan's B-then-A route, with three cheap rungs slotted in between.</p>
+  </div>
+  <ol class="road">
+    <li class="now"><span class="st">B1</span><b>L0 + L1</b><span>on AB01 clips</span><span class="cost">next build</span></li>
+    <li><span class="st">B2</span><b>L0 + L1</b><span>add Camargo stairs and PARC jumps</span><span class="cost">more clips</span></li>
+    <li><span class="st">L2, L3</span><b>Guesser variants</b><span>terrain strip; human labels</span><span class="cost">cheap</span></li>
+    <li><span class="st">L4</span><b>Follow the footholds</b><span>add a following reward</span><span class="cost">small</span></li>
+    <li><span class="st">A1</span><b>L5 planner</b><span>footholds, timing, centre-of-mass band</span><span class="cost">the big build</span></li>
+    <li><span class="st">A2</span><b>L6 PARC loop</b><span>run, check, retrain the planner</span><span class="cost">loop rounds</span></li>
+  </ol>
+  <div class="cards">
+    <div class="card"><span class="tag">Caveat</span><h3>Copied isn't predicted</h3><p>From L3 up, foot placement comes from human data, so it can't be claimed as a prediction. The claims are what wasn't copied: forces, moments, EMG, and behaviour on terrain past the clips.</p></div>
+    <div class="card"><span class="tag">Data</span><h3>No SEED in footstep models</h3><p>Guessers and planners train on AB01, Camargo and the captured PARC clips only. A model that predicts human footsteps is too close to a motion generator for SEED's licence.</p></div>
+    <div class="card"><span class="tag">Coverage</span><h3>Past the clips</h3><p>Stepping stones, boxes and pits have no human footstep data, so L3 to L6 extrapolate there. That's where L6's loop has to earn its place.</p></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(() => {
+  const reduce = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+  if (reduce) { const d = document.getElementById('loopdot'); if (d) d.remove(); }
+
+  // ---------- designs ----------
+  const ARMS = [
+    { k: 'L0', n: 'Full map', title: 'L0 · Full map, no footholds',
+      w: 'Blue dots are the whole local map: 33 × 21 heights, from 0.8 m behind to 0.8 m ahead of the pelvis. No guesses, no patches.',
+      c: 'Nothing. This is the reference.',
+      e: 'Works, but learns slower. In the paper the full map reached terrain level 5 at 26.1k iterations, against 7.5k with patches.',
+      k2: 'Part of the stage-1 build.',
+      mod: ['no footstep module', ''], inp: ['Full map', '693 heights'], rew: 'task + style judge' },
+    { k: 'L1', n: 'Blind guess', title: 'L1 · Blind guesser (Watch Your Step)',
+      w: 'Teal patches sit at the guessed next landing of each foot. Patch 1 slides toward the foot during the swing: that is the guess being redone from the body. The badge says whether the foot landed inside the patch it saw at take-off. Here the guess just repeats the last step; the real one reads the whole body.',
+      c: 'A guesser that sees only the body picks two 30 × 30 cm patches. The policy sees those 98 heights instead of the map.',
+      e: 'Faster learning. Misses where a landing is far from a normal stride (try the wide gap) and near-misses at the first step onto stairs.',
+      k2: 'Part of the stage-1 build.',
+      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+    { k: 'L2', n: '+ terrain', title: 'L2 · Guesser that sees terrain',
+      w: 'The grey strip ahead goes into the guesser, so the patches land on the right spots before the foot commits.',
+      c: 'The guesser also reads a height strip along the heading (length still to set).',
+      e: 'Fewer misses on stairs, gaps and boxes. Placement no more human than L1: it still learns the policy’s own habits.',
+      k2: 'Cheap: one extra guesser input.',
+      mod: ['Guesser', 'body + strip ahead'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+    { k: 'L3', n: 'Human-trained', title: 'L3 · Guesser trained on people',
+      w: 'Same picture as L2. The change is in training: the guesser’s labels are human footsteps from the clips, not the policy’s own landings.',
+      c: 'Labels come from human footsteps.',
+      e: 'Placement moves toward human step length, step width and tread position.',
+      k2: 'Cheap: footstep labels from the clips.',
+      mod: ['Guesser', 'trained on people'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+    { k: 'L4', n: 'Follow', title: 'L4 · Follow the footholds',
+      w: 'The amber rings are targets. Landing inside one earns a following reward (green flash).',
+      c: 'The guessed footholds become targets the policy is rewarded for hitting.',
+      e: 'Closer biomechanics where the human plan suits this body; less robust where it doesn’t.',
+      k2: 'A following reward.',
+      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: 'task + style + following' },
+    { k: 'L5', n: 'Planner', title: 'L5 · Planner with a longer horizon',
+      w: 'The planner lays out every foothold in the next 1.5 s, with the time to each touchdown and a band the centre of mass should stay in.',
+      c: 'A planner replaces the guesser: 3 to 4 footholds, contact timing and a centre-of-mass band.',
+      e: 'The only design that should change step length 2 to 3 steps before stairs, as people do.',
+      k2: 'Build the planner (route A, step A1).',
+      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task + style + following' },
+    { k: 'L6', n: '+ loop', title: 'L6 · Planner + PARC loop',
+      w: 'Green ticks mark finished steps that passed the checks. Those runs go back into the planner’s training data.',
+      c: 'Rounds of: run, check, add the good runs, retrain the planner.',
+      e: 'Covers terrain past the clips. Watch for drift away from human placement.',
+      k2: 'Loop rounds (step A2).',
+      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task + style + following' },
+  ];
+
+  // ---------- terrains (metres; x forward, h up) ----------
+  const PIT = -0.42;
+  const inAny = (x, iv) => iv.some(([a, b]) => x >= a && x < b);
+  const stonePits = [[2.08, 2.29], [2.61, 2.82], [3.14, 3.45], [3.77, 3.97], [4.29, 4.59], [4.91, 5.17], [5.49, 5.75], [6.07, 6.26]];
+  const TER = {
+    stones: { feet: [-0.6, 0, 0.6, 1.2, 1.8, 2.42, 2.95, 3.58, 4.1, 4.72, 5.3, 5.88, 6.5, 7.1, 7.7, 8.3],
+              h: x => inAny(x, stonePits) ? PIT : 0, label: 'Stepping stones', feature: 6 },
+    stairs: { feet: [-0.27, 0.35, 0.97, 1.57, 2.15, 2.7, 3.13, 3.43, 3.73, 4.1, 4.55, 5.12, 5.72, 6.32, 6.92, 7.52, 8.12],
+              h: x => x < 3.0 ? 0 : 0.16 * Math.min(4, Math.floor((x - 3.0) / 0.3 + 1e-9) + 1), label: 'Stairs, 16 cm rise', feature: 6 },
+    gap:    { feet: [-0.27, 0.35, 0.97, 1.59, 2.2, 2.8, 3.86, 4.45, 5.05, 5.65, 6.25, 6.85, 7.45, 8.05],
+              h: x => (x >= 3.0 && x < 3.7) ? PIT : 0, label: 'Wide gap, 70 cm', feature: 6 },
+  };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const smooth = s => s * s * (3 - 2 * s);
+  for (const T of Object.values(TER)) {
+    const f = T.feet, h = T.h; T.t0 = []; T.dur = []; T.bump = []; T.g1 = []; T.g2 = [];
+    let t = 0;
+    for (let k = 2; k < f.length; k++) {
+      const a = f[k - 2], b = f[k - 1], c = f[k], l = c - b;
+      T.t0[k] = t; T.dur[k] = 0.38 + 0.28 * Math.min(l, 1.0); t += T.dur[k];
+      const ha = h(a), hc = h(c); let bump = 0.07;
+      for (let i = 2; i <= 18; i++) {
+        const s = i / 20, e = smooth(s), x = a + (c - a) * e;
+        let ht = -9; for (let d = -0.09; d <= 0.151; d += 0.03) ht = Math.max(ht, h(x + d));
+        bump = Math.max(bump, (ht + 0.04 - (ha + (hc - ha) * e)) / Math.sin(Math.PI * s));
+      }
+      T.bump[k] = bump + (l > 0.9 ? 0.06 : 0);
+      const L = clamp(b - a, 0.25, 0.72);                  // the blind guess: repeat the last step
+      T.g1[k] = b + L; T.g2[k] = b + 2 * L;
+    }
+    T.total = t;
+    const pts = [[-0.4, -0.8]]; let prev = h(-0.4); pts.push([-0.4, prev]);
+    for (let i = -40; i <= 880; i++) { const x = i / 100, v = h(x); if (v !== prev) { pts.push([x, prev], [x, v]); prev = v; } }
+    pts.push([8.8, prev], [8.8, -0.8]);
+    T.path = 'M' + pts.map(([x, y]) => X(x) + ' ' + Y(y)).join(' L') + ' Z';
+  }
+  function X(x) { return (30 + x * 140).toFixed(1); }
+  function Y(h) { return (352 - h * 140).toFixed(1); }
+
+  function stepAt(T, t) { const f = T.feet; let k = 2; while (k < f.length - 1 && t >= T.t0[k] + T.dur[k]) k++; return [k, clamp((t - T.t0[k]) / T.dur[k], 0, 1)]; }
+  function pose(T, t) {
+    const f = T.feet, h = T.h, [k, s] = stepAt(T, t), e = smooth(s);
+    const a = f[k - 2], b = f[k - 1], c = f[k], ha = h(a), hb = h(b), hc = h(c);
+    const sw = [a + (c - a) * e, ha + (hc - ha) * e + T.bump[k] * Math.sin(Math.PI * s)];
+    const px = (a + b) / 2 + (c - a) / 2 * s, R = 0.855;
+    let py = ((ha + hb) / 2) * (1 - s) + ((hb + hc) / 2) * s + 0.86 + 0.02 * Math.sin(Math.PI * s);
+    const reach = (ax, ay) => { const d = px - ax; return Math.abs(d) < R ? ay + 0.07 + Math.sqrt(R * R - d * d) : 9; };
+    py = Math.min(py, reach(b, hb), reach(sw[0], sw[1]));
+    return { k, s, e, sw, st: [b, hb], pel: [px, py] };
+  }
+  function knee(hip, ank) {
+    const l1 = 0.43, l2 = 0.44; let dx = ank[0] - hip[0], dy = ank[1] - hip[1], d = Math.hypot(dx, dy); const dm = l1 + l2 - 1e-4;
+    if (d > dm) { dx *= dm / d; dy *= dm / d; d = dm; ank = [hip[0] + dx, hip[1] + dy]; }
+    const a = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1)), base = Math.atan2(dy, dx);
+    const k1 = [hip[0] + l1 * Math.cos(base + a), hip[1] + l1 * Math.sin(base + a)], k2 = [hip[0] + l1 * Math.cos(base - a), hip[1] + l1 * Math.sin(base - a)];
+    return [k1[0] > k2[0] ? k1 : k2, ank];
+  }
+  const P = (p) => X(p[0]) + ' ' + Y(p[1]);
+
+  // ---------- state ----------
+  let arm = 1, ter = 'stairs', tau = 0, playing = !reduce;
+  const $ = id => document.getElementById(id);
+  const el = { ground: $('ground'), under: $('under'), over: $('over'), legN: $('legN'), legF: $('legF'), footN: $('footN'), footF: $('footF'),
+               armN: $('armN'), armF: $('armF'), torso: $('torso'), head: $('head'), hud1: $('hud1'), hud2: $('hud2') };
+  if (reduce) { const T = TER[ter]; tau = T.t0[T.feature] + T.dur[T.feature] * 0.55; }
+
+  function drawLeg(hip, sole, legEl, footEl) {
+    const ank = [sole[0], sole[1] + 0.07], [kn, an] = knee(hip, ank);
+    legEl.setAttribute('d', 'M' + P(hip) + ' L' + P(kn) + ' L' + P(an));
+    footEl.setAttribute('d', 'M' + P(an) + ' L' + P([an[0] - 0.08, an[1] - 0.07]) + ' L' + P([an[0] + 0.16, an[1] - 0.07]) + ' Z');
+  }
+  function drawArm(sh, ang, armEl) {
+    const el1 = [sh[0] + 0.29 * Math.sin(ang), sh[1] - 0.29 * Math.cos(ang)], a2 = ang + 0.4;
+    armEl.setAttribute('d', 'M' + P(sh) + ' L' + P(el1) + ' L' + P([el1[0] + 0.26 * Math.sin(a2), el1[1] - 0.26 * Math.cos(a2)]));
+  }
+  function patch(T, x, n, ghost) {
+    const pts = []; for (let i = -3; i <= 3; i++) { const xx = x + 0.05 * i; pts.push([xx, T.h(xx)]); }
+    const top = Math.max(...pts.map(p => p[1])), bot = Math.min(...pts.map(p => p[1]));
+    let s = `<rect class="pband${ghost ? ' ghost' : ''}" x="${X(x - 0.18)}" y="${Y(top + 0.07)}" width="${(0.36 * 140).toFixed(1)}" height="${((top - bot + 0.1) * 140).toFixed(1)}" rx="6"/>`;
+    if (!ghost) { s += pts.map(p => `<circle class="patchdot" cx="${X(p[0])}" cy="${Y(p[1])}" r="3.6"/>`).join(''); s += `<text class="plab" x="${X(x)}" y="${(+Y(top + 0.07) - 7).toFixed(1)}">${n}</text>`; }
+    return s;
+  }
+  function badge(x, y, cls, txt) {
+    const w = txt.length * 7.4 + 20;
+    return `<g class="badge ${cls}"><rect x="${(+X(x) - w / 2).toFixed(1)}" y="${(+Y(y) - 15).toFixed(1)}" width="${w.toFixed(1)}" height="26" rx="13"/><text x="${X(x)}" y="${(+Y(y) + 3).toFixed(1)}">${txt}</text></g>`;
+  }
+  const ring = (T, x, cls) => `<ellipse class="ring ${cls || ''}" cx="${X(x + 0.03)}" cy="${Y(T.h(x))}" rx="${(0.17 * 140).toFixed(1)}" ry="8"/>`;
+
+  function frame() {
+    const T = TER[ter], f = T.feet, h = T.h, Q = pose(T, tau), k = Q.k, s = Q.s, pel = Q.pel, pelx = pel[0];
+    // walker: left foot = even foothold index = near side
+    const swingNear = k % 2 === 0;
+    drawLeg(pel, Q.sw, swingNear ? el.legN : el.legF, swingNear ? el.footN : el.footF);
+    drawLeg(pel, Q.st, swingNear ? el.legF : el.legN, swingNear ? el.footF : el.footN);
+    const sh = [pel[0] + 0.05, pel[1] + 0.5], hd = [sh[0] + 0.04, sh[1] + 0.18];
+    el.torso.setAttribute('d', 'M' + P(pel) + ' L' + P(sh));
+    el.head.setAttribute('cx', X(hd[0])); el.head.setAttribute('cy', Y(hd[1]));
+    const p = 2 * Q.e - 1;
+    drawArm(sh, swingNear ? -0.35 * p : 0.35 * p, el.armN); drawArm(sh, swingNear ? 0.35 * p : -0.35 * p, el.armF);
+
+    let u = '', o = '', far = null, hud2 = '';
+    for (let i = 0; i < k - 1; i++) {
+      u += `<line class="print" x1="${X(f[i] - 0.08)}" x2="${X(f[i] + 0.16)}" y1="${Y(h(f[i]))}" y2="${Y(h(f[i]))}"/>`;
+      if (arm === 6 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
+    }
+    if (arm === 0) {
+      for (let j = -16; j <= 16; j++) { const x = pelx + 0.05 * j; u += `<circle class="mapdot" cx="${X(x)}" cy="${Y(h(x))}" r="3.4"/>`; }
+      far = pelx + 0.8; hud2 = 'the map ends 0.8 m ahead of the pelvis';
+    } else if (arm <= 4) {
+      if (arm >= 2) for (let j = 0; j <= 30; j++) { const x = pelx + 0.05 * j; u += `<circle class="stripdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
+      const next = f[k], after = f[k + 1] !== undefined ? f[k + 1] : f[k] + 0.6;
+      let g1, g2;
+      if (arm === 1) { g1 = T.g1[k] + (next - T.g1[k]) * 0.5 * s; g2 = T.g2[k] + (after - T.g2[k]) * 0.3 * s; }
+      else if (arm === 2) { g1 = next + 0.03; g2 = after - 0.04; }
+      else { g1 = next; g2 = after; }
+      u += patch(T, g2, 2) + patch(T, g1, 1);
+      if (arm === 4) { u += ring(T, next) + ring(T, after, 'faint'); }
+      far = Math.max(g1, g2) + 0.15;
+      // what happened at the last landing
+      const last = k - 1;
+      if (last >= 2 && s < 0.7) {
+        if (arm === 1) {
+          const err = Math.abs(f[last] - T.g1[last]);
+          const [cls, txt] = err <= 0.10 ? ['ok', '✓ inside the patch'] : err <= 0.15 ? ['edge', 'near the patch edge'] : ['out', '✕ outside the patch'];
+          o += badge(f[last] + 0.04, h(f[last]) - 0.15, cls, txt);
+          if (cls === 'out') u += patch(T, T.g1[last], 1, true);
+        } else if (arm === 4) { u += ring(T, f[last], 'hit'); o += badge(f[last] + 0.04, h(f[last]) - 0.15, 'ok', '+ following reward'); }
+      }
+      hud2 = arm === 1 ? 'the guesser sees only the body' : arm === 2 ? 'the guesser also reads the strip ahead' : arm === 3 ? 'guesser trained on human footsteps' : 'land in the ring to earn the following reward';
+    } else {
+      for (let j = -3; j <= 22; j++) { const x = pelx + 0.1 * j; u += `<circle class="pdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
+      const band = [], H = Math.min(1.5, T.total - tau);
+      for (let d = 0; d <= H + 1e-6; d += 0.05) band.push(pose(T, tau + d).pel);
+      if (band.length > 1) {
+        const up = band.map(q => P([q[0], q[1] + 0.05])), dn = band.slice().reverse().map(q => P([q[0], q[1] - 0.05]));
+        u += `<path class="comband" d="M${up.join(' L')} L${dn.join(' L')} Z"/>`;
+      }
+      for (let j = k; j < f.length; j++) {
+        const td = T.t0[j] + T.dur[j] - tau; if (td > 1.5) break;
+        u += ring(T, f[j]); o += `<text class="tlab" x="${X(f[j] + 0.03)}" y="${(+Y(h(f[j])) + 26).toFixed(1)}">${td.toFixed(1)} s</text>`;
+        far = f[j] + 0.15;
+      }
+      if (far === null) far = pelx;
+      hud2 = arm === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : 'ticks: finished steps that passed the checks';
+    }
+    if (far !== null) {
+      o += `<line class="horizon" x1="${X(far)}" x2="${X(far)}" y1="70" y2="${Y(h(far))}"/>`;
+      o += `<text class="hlab" x="${(+X(far) + 6).toFixed(1)}" y="84">${(far - pelx).toFixed(1)} m ahead</text>`;
+    }
+    el.under.innerHTML = u; el.over.innerHTML = o;
+    el.hud1.textContent = ARMS[arm].k + ' · ' + ARMS[arm].n + ' · ' + T.label;
+    el.hud2.textContent = hud2;
+  }
+
+  // ---------- flow diagram + caption ----------
+  const flow = $('flow');
+  const nodeOn = {
+    body: () => true, cmd: () => true, pol: () => true, rew: () => true, inp: () => true,
+    map: () => true, mod: a => a >= 1, human: a => a >= 3,
+  };
+  function setArm(a) {
+    arm = a; const A = ARMS[a];
+    document.querySelectorAll('#armSeg button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === a)));
+    flow.querySelectorAll('[data-arms]').forEach(n => n.classList.toggle('on', n.dataset.arms.includes(String(a))));
+    flow.querySelectorAll('[data-node]').forEach(n => n.classList.toggle('off', !nodeOn[n.dataset.node](a)));
+    $('modT').textContent = A.mod[0]; $('modT').setAttribute('y', A.mod[1] ? '194' : '206'); $('modS').textContent = A.mod[1];
+    $('inpT').textContent = A.inp[0]; $('inpS').textContent = A.inp[1]; $('rewS').textContent = A.rew;
+    $('capT').textContent = A.title; $('capW').textContent = A.w; $('capC').textContent = A.c; $('capE').textContent = A.e; $('capK').textContent = A.k2;
+    frame();
+  }
+  function setTer(t) {
+    ter = t; $('ground').setAttribute('d', TER[t].path);
+    document.querySelectorAll('#terSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ter === t)));
+    const T = TER[t]; tau = playing ? 0 : T.t0[T.feature] + T.dur[T.feature] * 0.55; frame();
+  }
+  const seg = $('armSeg');
+  ARMS.forEach((A, i) => { const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${A.k}</b>${A.n}`; b.addEventListener('click', () => setArm(i)); seg.appendChild(b); });
+  document.querySelectorAll('#terSeg button').forEach(b => b.addEventListener('click', () => setTer(b.dataset.ter)));
+  const playBtn = $('play');
+  function setPlay(v) { playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; playBtn.setAttribute('aria-pressed', String(v)); }
+  playBtn.addEventListener('click', () => setPlay(!playing));
+  document.querySelectorAll('[data-show]').forEach(b => b.addEventListener('click', () => {
+    const [a, t] = b.dataset.show.split(','); setPlay(true); setTer(t); setArm(+a);
+    const T = TER[t]; tau = Math.max(0, T.t0[T.feature] - 1.4);
+    $('sceneWrap').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  }));
+
+  setPlay(playing); setTer(ter); setArm(arm);
+  let last = null;
+  function loop(ts) {
+    if (last !== null && playing && !document.hidden) {
+      tau += Math.min(0.05, (ts - last) / 1000) * 0.8;
+      const T = TER[ter]; if (tau > T.total + 0.6) tau = 0;
+      frame();
+    }
+    last = ts; requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
