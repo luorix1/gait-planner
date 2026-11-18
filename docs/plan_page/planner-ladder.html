@@ -185,10 +185,6 @@ td.q { color:var(--muted) }
 .lkey .k.mix::before { background:linear-gradient(90deg, var(--amber-soft), var(--teal-soft)) }
 .lkey .k.new::before { box-shadow:inset 5px 0 0 var(--blue) }
 
-/* setup + runs */
-.runs-h { margin:24px 0 12px }
-.road.runs { grid-template-columns:repeat(4, minmax(0, 1fr)) }
-@media (max-width:1000px) { .road.runs { grid-template-columns:repeat(2, minmax(0, 1fr)) } .road.runs li::after { content:none !important } }
 
 /* road */
 .road { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:14px }
@@ -251,14 +247,14 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <svg class="dia loopsvg" viewBox="0 0 760 390" role="img" aria-labelledby="loop-t">
         <title id="loop-t">The loop: body state goes to the blind guesser, which picks where two patches go; the patches give the policy terrain heights; the policy's muscles change the body, and the next guess moves.</title>
         <defs>
-          <marker id="lw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
-          <marker id="lt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="lw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="lt" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
         </defs>
-        <path class="w" d="M260 75 H366" marker-end="url(#lw)"/>
-        <path class="w" d="M485 114 V268" marker-end="url(#lw)"/>
-        <path class="w terr" d="M370 311 H264" marker-end="url(#lt)"/>
-        <path class="w terr" d="M145 272 V118" marker-end="url(#lt)"/>
-        <path class="w train" d="M680 150 V75 H604" marker-end="url(#lw)"/>
+        <path class="w" d="M260 75 H350.25" marker-end="url(#lw)"/>
+        <path class="w" d="M485 114 V252.25" marker-end="url(#lw)"/>
+        <path class="w terr" d="M370 311 H279.75" marker-end="url(#lt)"/>
+        <path class="w terr" d="M145 272 V133.75" marker-end="url(#lt)"/>
+        <path class="w train" d="M680 150 V75 H619.75" marker-end="url(#lw)"/>
         <text class="lab" x="315" y="62" text-anchor="middle">every 20 ms</text>
         <text class="lab" x="497" y="188">where</text><text class="lab" x="497" y="206">to look</text>
         <text class="lab terr" x="315" y="338" text-anchor="middle">terrain</text><text class="lab terr" x="315" y="356" text-anchor="middle">gets in here</text>
@@ -343,28 +339,28 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <div class="scroll">
         <svg class="dia" id="flow" viewBox="0 0 1040 410" role="img" aria-label="Data flow for the chosen design." style="min-width:640px">
           <defs>
-            <marker id="fw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
-            <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
-            <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="fw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="ft" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
+            <marker id="fa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
           </defs>
-          <path class="e data" data-arms="01234567h" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="01234567h" d="M121 70 V24 H959 V138.25" marker-end="url(#fw)"/>
           <text class="el" data-arms="01234" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
           <text class="el" data-arms="567h" x="540" y="16" text-anchor="middle">body and muscle states (no command)</text>
-          <path class="e data" data-arms="01234567h" d="M860 200 H890" marker-end="url(#fw)"/>
-          <path class="e train" data-arms="01234567h" d="M860 362 H959 V246" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M540 200 H606" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
-          <path class="e terr" data-arms="234567" d="M226 278 C262 278 262 222 296 222" marker-end="url(#ft)"/>
-          <path class="e terr" data-arms="01234h" d="M226 294 H735 V246" marker-end="url(#ft)"/>
+          <path class="e data" data-arms="01234567h" d="M860 200 H874.25" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="01234567h" d="M860 362 H959 V261.75" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M540 200 H590.25" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M226 102 C262 102 262 178 280.25 178" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M226 190 C262 190 262 200 280.25 200" marker-end="url(#fw)"/>
+          <path class="e terr" data-arms="234567" d="M226 278 C262 278 262 222 280.25 222" marker-end="url(#ft)"/>
+          <path class="e terr" data-arms="01234h" d="M226 294 H735 V261.75" marker-end="url(#ft)"/>
           <text class="el terr" data-arms="1234h" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
           <text class="el terr" data-arms="0" x="420" y="316" text-anchor="middle">all 693 heights</text>
-          <path class="e train" data-arms="126h" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="126h" d="M930 158 V138 H480 V138.25" marker-end="url(#fw)"/>
           <text class="el" data-arms="12h" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
           <text class="el" data-arms="6" x="705" y="130" text-anchor="middle">labels off the clips: the policy's own landings</text>
-          <path class="e hum" data-arms="34567" d="M420 116 V154" marker-end="url(#fa)"/>
+          <path class="e hum" data-arms="34567" d="M420 116 V138.25" marker-end="url(#fa)"/>
           <text class="el hum" data-arms="34567" x="430" y="140">labels</text>
-          <path class="e train" data-arms="7" d="M930 158 V84 H544" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="7" d="M930 158 V84 H559.75" marker-end="url(#fw)"/>
           <text class="el" data-arms="7" x="737" y="76" text-anchor="middle">runs that pass the checks</text>
           <g class="fn" data-node="body"><rect x="16" y="70" width="210" height="64" rx="12"/><text class="t1" x="121" y="96">Body state</text><text class="t2" x="121" y="118">joints, speeds, muscles</text></g>
           <g class="fn" data-node="cmd"><rect x="16" y="158" width="210" height="64" rx="12"/><text class="t1" x="121" y="184">Command</text><text class="t2" x="121" y="206">speed, turn</text></g>
@@ -454,13 +450,6 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <div class="card"><span class="tag">Disturbances</span><h3>Pushes and falls</h3><p>Friction ×0.5–2 per world, a constant push of up to 7 N per episode, a velocity kick every 4 s. A fall (tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching) ends the episode with no penalty.</p></div>
     <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Muscles start at 0.05 drive, and each muscle's mean drive is kept at 0.05 or above.</p></div>
   </div>
-  <h3 class="runs-h">Runs so far</h3>
-  <ol class="road runs">
-    <li><span class="st">b1_L1 · 122M</span><b>Paper-style task, recipe effort</b><span>Effort took 29–39 % early. Walkers collapsed within 2 s; the leg extensors sank to 0.02 drive.</span><span class="cost">stopped</span></li>
-    <li><span class="st">b1_L1_share · 43M</span><b>Effort held at 6.5 %</b><span>Same path: extensors sinking by 35M. Effort alone wasn't the cause.</span><span class="cost">stopped</span></li>
-    <li><span class="st">b1_L1_gaitamp · 100M</span><b>GAIT_amp's conditions</b><span>Flat, no delays, noise or pushes. Calves kept, knee extensors died; 2 s episodes against GAIT_amp's 25 s.</span><span class="cost">done</span></li>
-    <li class="now"><span class="st">b1_L1_v2 · running</span><b>Speed × heading, fixed effort, drive floor</b><span>Full conditions. Checked at 50M; done about 21:00.</span><span class="cost">running</span></li>
-  </ol>
 </section>
 
 <section aria-labelledby="s-glance">
