@@ -7,7 +7,8 @@ Changes from gp.wys (plan v2 and the ladder page):
   max isometric force) and the excitation it receives after the motor delay: the imitation recipe's muscle state.
   The critic reads them too.
 - **Reward** = w_task x the paper's terms (their weights x ``task_scale``, so speed tracking tops out at 1 like the
-  style reward; without the hip and waist joint-deviation terms, which penalise human posture) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs 25 ms apart) - the
+  style reward; without the hip and waist joint-deviation terms, which penalise human posture, the joint-torque
+  penalty and the standing bonus) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs 25 ms apart) - the
   recipe's effort, as our other muscle studies use it (metabolic power 0.02 per W/kg, summed cubed activation 0.02,
   compartment balance 0.02).
 - **Episodes start** from a random frame of a level AB01 clip (walking, start-stop, standing) on the world's tile,
@@ -52,10 +53,14 @@ class LadderConfig(WysConfig):
     w_task: float = 0.5
     w_style: float = 0.5
     task_scale: float = 0.5               # the paper's weights x this: the two tracking terms sum to at most 1
-    #: The paper's weights without its two joint-deviation terms (hip adduction/rotation and waist held at the G1's
-    #: nominal): on AB01's own walking they cost 0.55 + 0.31 rad per step (hips rotated ~10 deg in, lumbar flexed
-    #: ~12 deg), still 0.37 + 0.32 from AB01's standing pose, so they would penalise the posture the style judge rewards.
-    w: dict = field(default_factory=lambda: {**WysConfig().w, "joint_deviation_legs": 0.0, "joint_deviation_waist": 0.0})
+    #: The paper's weights without four terms. Its two joint-deviation terms (hip adduction/rotation and waist held at
+    #: the G1's nominal): on AB01's own walking they cost 0.55 + 0.31 rad per step (hips rotated ~10 deg in, lumbar
+    #: flexed ~12 deg), still 0.37 + 0.32 from AB01's standing pose, so they would penalise the posture the style judge
+    #: rewards. Its joint-torque penalty (user 2026-11-18): the recipe's effort terms already price the muscles. Its
+    #: standing bonus (2.5 x closeness to the nominal pose at a zero command; user 2026-11-18): tracking a zero command
+    #: already rewards standing still, and the style judge (with AB01's standing) shapes how.
+    w: dict = field(default_factory=lambda: {**WysConfig().w, "joint_deviation_legs": 0.0, "joint_deviation_waist": 0.0,
+                                             "joint_torques": 0.0, "stand_still": 0.0})
     w_metabolic: float = 0.02             # the imitation recipe's effort (ImitationConfig.recommended)
     w_activation_cubed_sum: float = 0.02
     w_balance: float = 0.02

@@ -383,7 +383,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <text class="seg-n" x="776" y="38">= 1.06 a step</text>
       </svg>
     </div>
-    <p class="note">The most a walking step can earn, to scale. At a zero command, standing still adds up to 0.625; a fall costs 5, once; the effort and the penalties below come off.</p>
+    <p class="note">The most a walking step can earn, to scale. A fall costs 5, once; the effort and the penalties below come off.</p>
     <div class="rcols">
       <div>
         <h3>Task <small>the paper's terms, each at a quarter of its weight (half for the task's share, half so tracking tops out like style)</small></h3>
@@ -391,15 +391,15 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
           <tbody>
             <tr><td>Speed tracking</td><td>exp(−error² / 0.25), forward and sideways</td><td class="w">+0.25</td></tr>
             <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25)</td><td class="w">+0.25</td></tr>
-            <tr><td>Standing still</td><td>exp(−Σ |joint − nominal| / 2), only at a zero command</td><td class="w">+0.625</td></tr>
             <tr><td>Upright</td><td>full while the pelvis stays at least 95 % of its standing height above the lowest foot</td><td class="w">+0.0625</td></tr>
             <tr><td>Vertical speed</td><td>pelvis speed up or down, squared</td><td class="w">−0.125</td></tr>
             <tr><td>Roll and pitch rates</td><td>squared</td><td class="w">−0.0125</td></tr>
-            <tr><td>Joint torques</td><td>Σ τ² of the muscles' torques, (N m)²</td><td class="w">−2.5e-6</td></tr>
             <tr><td>Joint accelerations</td><td>Σ q̈²</td><td class="w">−6.25e-9</td></tr>
             <tr><td>Excitation change</td><td>Σ (change per step)² over the 90 muscles</td><td class="w">−0.0025</td></tr>
             <tr><td>Thigh or shank on the ground</td><td>per body touching (over 1 N)</td><td class="w">−0.25</td></tr>
             <tr><td>Fall</td><td>tilt over 40°, or pelvis under 0.5 m above the ground</td><td class="w">−5</td></tr>
+            <tr class="off"><td>Standing still</td><td class="why">dropped: at a zero command, tracking already rewards standing still</td><td class="w">0</td></tr>
+            <tr class="off"><td>Joint torques</td><td class="why">dropped: the effort terms already price the muscles</td><td class="w">0</td></tr>
             <tr class="off"><td>Hips and waist off nominal</td><td class="why">dropped: AB01's own walking would pay 0.21 a step</td><td class="w">0</td></tr>
           </tbody>
         </table>
