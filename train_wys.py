@@ -63,6 +63,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--hours", type=float, required=True)
+    ap.add_argument("--steps", type=float, default=float("inf"), help="also stop at this many environment steps (total, resumes included)")
     ap.add_argument("--worlds", type=int, default=8192)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda")
@@ -137,7 +138,7 @@ def main() -> None:
         torch.save(ts, out / "task_state.pt")
 
     last = time.time()
-    while time.time() < deadline:
+    while time.time() < deadline and agent.env_steps < a.steps:
         agent.train(10, on_log=log, deadline=deadline)
         if time.time() - last > 600:
             save()

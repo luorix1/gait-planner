@@ -6,16 +6,16 @@ Changes from gp.wys (plan v2 and the ladder page):
 - **Policy inputs** add each muscle's activation, fiber length and speed (per optimal fiber length), tendon force (per
   max isometric force) and the excitation it receives after the motor delay: the imitation recipe's muscle state.
   The critic reads them too.
-- **Reward** = w_task x the paper's terms (their weights x ``task_scale``, so speed tracking tops out at 1 like the
-  style reward; without the hip and waist joint-deviation terms, which penalise human posture, the joint-torque
-  penalty and the standing bonus) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs 25 ms apart) - the
-  recipe's effort, as our other muscle studies use it (metabolic power 0.02 per W/kg, summed cubed activation 0.02,
-  compartment balance 0.02).
+- **Reward** = w_task x the paper's speed and turn-rate tracking only (their weights x ``task_scale``, so the two top
+  out at 1 like the style reward) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs
+  25 ms apart) - the recipe's effort, as our other muscle studies use it (metabolic power 0.02 per W/kg, summed cubed
+  activation 0.02, compartment balance 0.02). As GAIT_amp: no fall penalty, no other robot terms.
 - **Episodes start** from a random frame of a level AB01 clip (walking, start-stop, standing) on the world's tile,
   with the clip's own velocities; the command starts at that frame's forward speed and heading.
 - **40 Hz control** (the clips' rate; the paper's is 50 Hz), commands forward only (0 to the fastest walking clip,
   1.5 m/s) with heading turns, stage-1 terrain (rough, slopes, stepping stones), no helper pull by default, and a
-  fall when the pelvis drops below ``fall_height`` over the ground (the paper's 0.7 rad tilt misses a collapse).
+  fall when the pelvis drops below ``fall_height`` over the ground (the paper's 0.7 rad tilt misses a collapse)
+  or a thigh or shank touches the ground.
 
 The style judge's input, one pair per control step (a policy step, or two consecutive clip frames): each frame's
 pelvis height over the ground under it, the up axis in the pelvis frame, the 17 joint angles, and both calcanei
@@ -53,14 +53,14 @@ class LadderConfig(WysConfig):
     w_task: float = 0.5
     w_style: float = 0.5
     task_scale: float = 0.5               # the paper's weights x this: the two tracking terms sum to at most 1
-    #: The paper's weights without four terms. Its two joint-deviation terms (hip adduction/rotation and waist held at
-    #: the G1's nominal): on AB01's own walking they cost 0.55 + 0.31 rad per step (hips rotated ~10 deg in, lumbar
-    #: flexed ~12 deg), still 0.37 + 0.32 from AB01's standing pose, so they would penalise the posture the style judge
-    #: rewards. Its joint-torque penalty (user 2026-11-18): the recipe's effort terms already price the muscles. Its
-    #: standing bonus (2.5 x closeness to the nominal pose at a zero command; user 2026-11-18): tracking a zero command
-    #: already rewards standing still, and the style judge (with AB01's standing) shapes how.
-    w: dict = field(default_factory=lambda: {**WysConfig().w, "joint_deviation_legs": 0.0, "joint_deviation_waist": 0.0,
-                                             "joint_torques": 0.0, "stand_still": 0.0})
+    #: Of the paper's terms only speed and turn-rate tracking are paid (user 2026-11-18, as GAIT_amp: task + style +
+    #: effort, a fall ends the episode with no penalty). Dropped: the standing bonus (tracking a zero command already
+    #: pays for standing still), upright, vertical speed, roll and pitch rates, joint acceleration, excitation change and
+    #: leg contact (the style judge and the effort cover posture, smoothness and cost; a leg on the ground is a fall),
+    #: the joint-torque penalty (the effort prices the muscles) and the hip/waist deviation terms (they cost AB01's own
+    #: walking 0.55 + 0.31 rad per step). The dropped terms are still computed and logged.
+    w: dict = field(default_factory=lambda: {k: v if k.startswith("track_") else 0.0 for k, v in WysConfig().w.items()})
+    fall_on_leg_contact: bool = True      # a thigh or shank on the ground ends the episode (kneeling, sitting, a trip)
     w_metabolic: float = 0.02             # the imitation recipe's effort (ImitationConfig.recommended)
     w_activation_cubed_sum: float = 0.02
     w_balance: float = 0.02
@@ -212,6 +212,8 @@ class Ladder(WatchYourStep):
         gy = self._pelvis_ground(s)
         low = (s.body_pos[:, self.root, 1] - gy) < c.fall_height
         self._fell = self._fell | low
+        if c.fall_on_leg_contact:
+            self._fell = self._fell | (terms["undesired_contacts"] > 0)
         terms["termination"] = self._fell.float()
         task = c.task_scale * sum(c.w[k] * v for k, v in terms.items())
         pair = self.pair(self._prev, self.pose(s.qpos, s.body_pos, s.body_quat, gy)).nan_to_num(0.0, 0.0, 0.0)
