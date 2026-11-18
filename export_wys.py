@@ -68,7 +68,9 @@ def main() -> None:
                   resample_s=a.seconds + 1, xy_drift=0.0, z_drift=0.0, scan_noise=0.0,
                   n_lin=0.0, n_ang=0.0, n_grav=0.0, n_q=0.0, n_qd=0.0, spike_p=0.0)
     env, task = build(1, 0, a.device, None, cfg, foot_model=str(models[-1]) if models else None, kind=kind,
-                      dataset=args.get("dataset", "ab01"), delays=not args.get("no_delays", False))
+                      dataset=args.get("dataset", "ab01"),
+                      delays=not (args.get("no_delays", False) or args.get("gaitamp_conditions", False)),
+                      flat=args.get("gaitamp_conditions", False))
     it = rec.get("iterations")
     state = run / "task_state.pt"
     if state.exists():

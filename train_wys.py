@@ -27,6 +27,7 @@ import time
 from dataclasses import asdict, replace
 from pathlib import Path
 
+import numpy as np
 import sprint
 import torch
 from sprint.recipes.ppo import PPO
@@ -39,19 +40,34 @@ from gp.ladder import Ladder, LadderConfig
 from gp.tasks import recipe_config
 from gp.wys import WatchYourStep, WysConfig
 
+#: --gaitamp-conditions (ladder, diagnostic): GAIT_amp's walking runs' training conditions on our body and learner,
+#: to split body + learner from conditions (b1_L1 parked its leg extensors; GAIT_amp's walkers did not). Plus flat
+#: ground and no motor delays (build's ``flat``, ``delays``). Rewards stay ours (effort at its share).
+GAITAMP = dict(n_lin=0.0, n_ang=0.0, n_grav=0.0, n_q=0.0, n_qd=0.0, spike_p=0.0, scan_noise=0.0, xy_drift=0.0, z_drift=0.0,
+               disturbance_n=0.0, friction_scale=(1.0, 1.0), push_s=1e9,           # no pushes, friction spread, noise
+               fall_tilt=1.05, fall_on_leg_contact=False, fall_height=0.6,         # their 60 deg, 0.6 m pelvis
+               start_modes=("walk",), style_modes=("walk",),                       # walking clips only (their judge's)
+               start_speed_in_range=True,                                          # start mid-stride at 0.5-1.5 m/s
+               lin_x=(0.5, 1.5), resample_s=1e9, standing_frac=0.0, turning_frac=0.0)  # one straight speed per episode
+
 
 def build(worlds: int, seed: int, device: str, out: Path | None = None, config: WysConfig | None = None,
-          foot_model: str | None = None, kind: str = "wys", dataset: str = "ab01", delays: bool = True):
-    """``kind`` "wys" (gp.wys) or "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig)."""
+          foot_model: str | None = None, kind: str = "wys", dataset: str = "ab01", delays: bool = True, flat: bool = False):
+    """``kind`` "wys" (gp.wys) or "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig);
+    ``flat``: every tile levelled."""
+    T = WT.build()
+    if flat:
+        T.heights[:] = 0.0
+        T.block[:] = np.nan
     model = data.load_model(device)
     c = recipe_config()
     if kind == "ladder":
         cfg = config or LadderConfig()
         D = data.load("train", src=data.ROOT / "data" / dataset)
-        task: WatchYourStep = Ladder(WT.build(), D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
+        task: WatchYourStep = Ladder(T, D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
     else:
         cfg = config or WysConfig()
-        task = WatchYourStep(WT.build(), cfg, seed=seed, log_dir=out, foot_model=foot_model)
+        task = WatchYourStep(T, cfg, seed=seed, log_dir=out, foot_model=foot_model)
     opts = sprint.StepOptions(dt_ctrl=cfg.dt, n_sub=int(round(cfg.dt * 3000)), implicit_friction=True,
                               implicit_normal=c.implicit_normal, strict=False, average_fext=True)
     env = sprint.VecEnv(model, worlds, task=task, seed=seed, step_options=opts, device=device,
@@ -71,13 +87,17 @@ def main() -> None:
     ap.add_argument("--perception", choices=("patches", "map"), default="patches", help="ladder: L1 patches, L0 map")
     ap.add_argument("--dataset", default="ab01", help="ladder: the clips (data/<dataset>)")
     ap.add_argument("--no-delays", action="store_true", help="no motor delays (default: the recipe's SCONE delays)")
+    ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
     a = ap.parse_args()
     out = Path(a.out)
     resume = (out / "checkpoint.pt").exists()
     out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(a.seed)
     config = LadderConfig(perception=a.perception) if a.task == "ladder" else None
-    env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset, delays=not a.no_delays)
+    if a.gaitamp_conditions:
+        config = replace(config, **GAITAMP)
+    env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset,
+                      delays=not (a.no_delays or a.gaitamp_conditions), flat=a.gaitamp_conditions)
     cfg = replace(default_ppo(), rollout_steps=task.c.steps_per_iter)
     agent = PPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")
     if resume:

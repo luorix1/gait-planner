@@ -74,6 +74,9 @@ class LadderConfig(WysConfig):
     effort_share: float = 0.065
     fall_height: float = 0.5              # m, pelvis over the ground under it
     start_modes: tuple = ("walk", "start_stop", "stand")      # level clips only
+    #: Start only from frames whose forward speed is inside ``lin_x`` (uniform over those frames), so the command
+    #: never starts away from the body's speed; False = a uniform clip, then a uniform frame in it.
+    start_speed_in_range: bool = False
     style_modes: tuple = ("walk", "start_stop", "stand")      # all grades
     amp: AMPConfig = field(default_factory=AMPConfig)
 
@@ -151,6 +154,11 @@ class Ladder(WatchYourStep):
         level = np.isin(D["mode"][clips], c.start_modes) & (D["terrain_class"][clips] == "level")
         self.st_start = torch.as_tensor(pstart[:-1][level], device=dev)
         self.st_count = torch.as_tensor(np.diff(pstart)[level], device=dev)
+        self.st_pool = None
+        if c.start_speed_in_range:
+            idx = torch.cat([torch.arange(s, s + m, device=dev) for s, m in zip(self.st_start.tolist(), self.st_count.tolist(), strict=True)])
+            v = self.ex_vf[idx]
+            self.st_pool = idx[(v >= c.lin_x[0]) & (v <= c.lin_x[1])]
         self.amp = AMP(c.amp, pairs, pstart, self.pair_mirror(), device=dev)
         print(f"[ladder] style judge: {len(clips)} clips, {len(pairs)} pairs of {pairs.shape[1]} numbers; "
               f"starts from {int(level.sum())} level clips", flush=True)
@@ -264,8 +272,11 @@ class Ladder(WatchYourStep):
         centre (+-0.5 m) at the clip's own height over its ground (plus its reset lift), on the highest ground under
         the feet's reach."""
         c, k = self.c, len(i)
-        sc = torch.randint(len(self.st_start), (k,), device=self.dev, generator=self.gen)
-        j = self.st_start[sc] + (torch.rand(k, device=self.dev, generator=self.gen) * self.st_count[sc]).long()
+        if self.st_pool is not None:
+            j = self.st_pool[torch.randint(len(self.st_pool), (k,), device=self.dev, generator=self.gen)]
+        else:
+            sc = torch.randint(len(self.st_start), (k,), device=self.dev, generator=self.gen)
+            j = self.st_start[sc] + (torch.rand(k, device=self.dev, generator=self.gen) * self.st_count[sc]).long()
         f = self.ex_frame[j]
         q, qd = self.ex_q[f].clone(), self.ex_qd[f].clone()
         dx, dz = self._sym((k,), c.reset_pos), self._sym((k,), c.reset_pos)
