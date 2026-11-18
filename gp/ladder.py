@@ -6,8 +6,9 @@ Changes from gp.wys (plan v2 and the ladder page):
 - **Policy inputs** add each muscle's activation, fiber length and speed (per optimal fiber length), tendon force (per
   max isometric force) and the excitation it receives after the motor delay: the imitation recipe's muscle state.
   The critic reads them too.
-- **Reward** = w_task x the paper's speed and turn-rate tracking only (their weights x ``task_scale``, so the two top
-  out at 1 like the style reward) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs
+- **Reward** = w_task x speed x heading (GAIT_amp's task: its lenient speed kernel times a turn-rate factor, so a
+  body that does not move earns little and the heading pays only while moving; tops out at 1 like the style reward)
+  + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs
   25 ms apart) - the recipe's effort, as our other muscle studies use it (metabolic power 0.02 per W/kg, summed cubed
   activation 0.02, compartment balance 0.02, as relative weights), its total rescaled every step to ``effort_share``
   of the step's task + style reward, as in our GAIT_amp runs. As GAIT_amp: no fall penalty, no other robot terms.
@@ -53,25 +54,26 @@ class LadderConfig(WysConfig):
     types: tuple = STAGE1                 # terrain columns worlds are spread over
     w_task: float = 0.5
     w_style: float = 0.5
-    task_scale: float = 0.5               # the paper's weights x this: the two tracking terms sum to at most 1
-    #: Of the paper's terms only speed and turn-rate tracking are paid (user 2026-11-18, as GAIT_amp: task + style +
-    #: effort, a fall ends the episode with no penalty). Dropped: the standing bonus (tracking a zero command already
-    #: pays for standing still), upright, vertical speed, roll and pitch rates, joint acceleration, excitation change and
-    #: leg contact (the style judge and the effort cover posture, smoothness and cost; a leg on the ground is a fall),
-    #: the joint-torque penalty (the effort prices the muscles) and the hip/waist deviation terms (they cost AB01's own
-    #: walking 0.55 + 0.31 rad per step). The dropped terms are still computed and logged.
-    w: dict = field(default_factory=lambda: {k: v if k.startswith("track_") else 0.0 for k, v in WysConfig().w.items()})
+    #: Task = speed x heading (user 2026-11-18: raise both). Speed: exp(-k_speed max(0, |v error| - deadband)^2) on the
+    #: commanded forward speed and zero sideways speed (GAIT_amp's kernel). Heading: exp(-k_heading (yaw-rate error)^2),
+    #: the yaw-rate command steering toward the target heading. The product replaces the paper's sum of two 0.25 terms
+    #: (b1 runs): there a body that stood still earned the whole turn term, 0.25 of the 0.5 a step can earn from the task,
+    #: and 0.5 m/s short of the command earned 0.09 of speed's 0.25; here it earns 0.10 and 0.36 of 0.5. None of the
+    #: paper's other terms is paid (the style judge and the effort cover posture, smoothness and cost; a fall ends the
+    #: episode with no penalty, as GAIT_amp); they are still computed and logged.
+    k_speed: float = 2.0                  # GAIT_amp (Walk_AMP 0.01 / 0.07^2)
+    speed_deadband: float = 0.1           # m/s
+    k_heading: float = 1.0                # (rad/s)^-2; GAIT_amp's 0.1 had no turn commands to track
     fall_on_leg_contact: bool = True      # a thigh or shank on the ground ends the episode (kneeling, sitting, a trip)
     w_metabolic: float = 0.02             # the imitation recipe's effort (ImitationConfig.recommended)
     w_activation_cubed_sum: float = 0.02
     w_balance: float = 0.02
     balance_eps: float = 0.01
     #: Each step the effort (the weights above, as relative weights) is scaled so its mean over the worlds is this
-    #: share of their mean task + style reward (0 = the weights as given). Our GAIT_amp walking runs (fixed 0.0075 per
-    #: W/kg) paid 5.6-7 % at the start, 7.5-11 % near 50M steps and 4.6-7 % later. At the fixed weights above from step
-    #: 0 (b1_L1, 11-18) it was 39 %, then ~12 %: the policy turned every muscle down and parked the leg extensors in
-    #: tanh's flat tail (excitation ~0.02, 15-40x less gradient), where neither exploration nor learning brings them back.
-    effort_share: float = 0.065
+    #: share of their mean task + style reward (0 = the weights as given). Our GAIT_amp walking runs (0.0075 per W/kg
+    #: inside a task term weighted 0.5) paid 2.9-3.2 % at the start, 3.9-5.7 % near 50M steps and 2.4-4.1 % at 400M
+    #: (user rule: match them). At the fixed weights above from step 0 b1_L1 (11-18) paid 29-39 %, then ~12 %.
+    effort_share: float = 0.035
     fall_height: float = 0.5              # m, pelvis over the ground under it
     start_modes: tuple = ("walk", "start_stop", "stand")      # level clips only
     #: Start only from frames whose forward speed is inside ``lin_x`` (uniform over those frames), so the command
@@ -230,7 +232,11 @@ class Ladder(WatchYourStep):
         if c.fall_on_leg_contact:
             self._fell = self._fell | (terms["undesired_contacts"] > 0)
         terms["termination"] = self._fell.float()
-        task = c.task_scale * sum(c.w[k] * v for k, v in terms.items())
+        v_left = -b["lin"][:, 2]
+        e_v = ((self.cmd[:, 0] - b["lin"][:, 0]) ** 2 + (self.cmd[:, 1] - v_left) ** 2).sqrt()
+        r_speed = torch.exp(-c.k_speed * (e_v - c.speed_deadband).clamp(min=0.0) ** 2)
+        r_heading = torch.exp(-c.k_heading * (self.cmd[:, 2] - b["ang"][:, 1]) ** 2)
+        task = r_speed * r_heading
         pair = self.pair(self._prev, self.pose(s.qpos, s.body_pos, s.body_quat, gy)).nan_to_num(0.0, 0.0, 0.0)
         style = self.amp.reward(pair)
         metabolic = s.metabolic_power.sum(1) / s.total_mass
@@ -251,7 +257,7 @@ class Ladder(WatchYourStep):
         self.advance(s, b, terms)
         if learn and self.steps % c.steps_per_iter == 0:
             self.amp_stats = self.amp.train(self.amp_buf[self.amp_ok])
-        self.metrics.update(r_task=task, r_style=style, metabolic=metabolic, activation_cubed_sum=a3, balance=balance,
+        self.metrics.update(r_task=task, r_speed=r_speed, r_heading=r_heading, r_style=style, metabolic=metabolic, activation_cubed_sum=a3, balance=balance,
                             effort=effort, effort_scale=k, fell_low=low.float(),
                             **{k_: torch.tensor(v) for k_, v in self.amp_stats.items()})
         return r

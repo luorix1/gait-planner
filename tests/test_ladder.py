@@ -1,13 +1,17 @@
 """The ladder task (gp.ladder) on a few clips, on the CPU: the style judge's input is the same function of a pose on
 the simulation's side as on the clips', its mirror map is an involution, and a step gives finite rewards."""
 
+from dataclasses import replace
+
 import numpy as np
 import torch
 from sprint.dynamics import forward_kinematics
+from sprint.recipes.study import default_ppo
 
 from gp import data
 from gp import wys_terrain as WT
 from gp.ladder import Ladder, LadderConfig
+from train_wys import FloorPPO
 
 
 def test_ladder_pairs_and_step() -> None:
@@ -40,3 +44,11 @@ def test_ladder_pairs_and_step() -> None:
     paid = (m["effort_scale"] * m["effort"]).mean()
     earned = (task.c.w_task * m["r_task"] + task.c.w_style * m["r_style"]).mean()
     assert torch.isclose(paid / earned, torch.tensor(task.c.effort_share), rtol=1e-4)
+    # the drive floor: silent while every muscle's mean is above it (a fresh policy sits at 0.05), active below
+    agent = FloorPPO(env, replace(default_ppo(), rollout_steps=24, compile_actor=False), device="cpu")
+    obs = env.torch(env.obs)
+    base = agent._symmetry_loss(obs)
+    agent.floor = 0.04
+    assert torch.allclose(agent._symmetry_loss(obs), base)
+    agent.floor = 0.2
+    assert agent._symmetry_loss(obs) > base + 1e-3

@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import subprocess
 import time
 from dataclasses import asdict, replace
@@ -49,6 +50,26 @@ GAITAMP = dict(n_lin=0.0, n_ang=0.0, n_grav=0.0, n_q=0.0, n_qd=0.0, spike_p=0.0,
                start_modes=("walk",), style_modes=("walk",),                       # walking clips only (their judge's)
                start_speed_in_range=True,                                          # start mid-stride at 0.5-1.5 m/s
                lin_x=(0.5, 1.5), resample_s=1e9, standing_frac=0.0, turning_frac=0.0)  # one straight speed per episode
+
+
+class FloorPPO(PPO):
+    """SPRINT's PPO plus a floor under each muscle's mean drive: ``floor_coef x (pre-squash floor - mean)^2`` wherever
+    the actor's deterministic excitation is below ``floor``, added through the symmetry-loss hook (one call per actor
+    minibatch; the logged ``symmetry`` includes it). Under tanh a mean at excitation 0.02 moves 15-40x less per update
+    than one mid-range, and the b1 runs parked their leg extensors there for good (11-18); the floor keeps every muscle
+    where learning can still raise it. 0 = off."""
+
+    floor: float = 0.0
+    floor_coef: float = 1.0
+
+    def _symmetry_loss(self, obs: torch.Tensor) -> torch.Tensor:
+        loss = super()._symmetry_loss(obs)
+        if self.floor <= 0.0:
+            return loss
+        lo = self.cfg.excitation_min
+        pre = math.atanh(2.0 * (self.floor - lo) / (1.0 - lo) - 1.0)
+        below = (pre - self.net.actor(obs)).clamp(min=0.0).pow(2).mean()
+        return loss + self.floor_coef / self.cfg.symmetry_coef * below
 
 
 def build(worlds: int, seed: int, device: str, out: Path | None = None, config: WysConfig | None = None,
@@ -88,6 +109,7 @@ def main() -> None:
     ap.add_argument("--dataset", default="ab01", help="ladder: the clips (data/<dataset>)")
     ap.add_argument("--no-delays", action="store_true", help="no motor delays (default: the recipe's SCONE delays)")
     ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
+    ap.add_argument("--drive-floor", type=float, default=0.05, help="lowest mean excitation per muscle (FloorPPO; 0 = off)")
     a = ap.parse_args()
     out = Path(a.out)
     resume = (out / "checkpoint.pt").exists()
@@ -99,7 +121,8 @@ def main() -> None:
     env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset,
                       delays=not (a.no_delays or a.gaitamp_conditions), flat=a.gaitamp_conditions)
     cfg = replace(default_ppo(), rollout_steps=task.c.steps_per_iter)
-    agent = PPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")
+    agent = FloorPPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")
+    agent.floor = a.drive_floor
     if resume:
         agent.load(str(out / "checkpoint.pt"))
         ts = torch.load(out / "task_state.pt", map_location=task.dev, weights_only=False)
@@ -143,7 +166,7 @@ def main() -> None:
             if isinstance(v, (int, float)) and k != "env_steps":
                 tb.add_scalar(k, v, s["env_steps"])
         if len(rows) % 20 == 1:
-            keys = [k for k in ("task/level", "task/r_track_lin_vel_xy", "task/r_style", "task/metabolic",
+            keys = [k for k in ("task/level", "task/r_speed", "task/r_heading", "task/r_track_lin_vel_xy", "task/r_style", "task/metabolic",
                                 "task/amp_accuracy", "task/effort_scale", "task/assist", "episode_length",
                                 "terminated_frac", "steps_per_s") if k in s]
             print(f"it {s['iteration']:6d}  {s['env_steps'] / 1e6:7.1f}M  {s['seconds']:6d} s  "

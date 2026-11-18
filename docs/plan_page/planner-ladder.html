@@ -386,18 +386,16 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-reward">
   <div class="sec-head">
     <h2 id="s-reward">The reward in B1 (L0 and L1)</h2>
-    <p>One number per control step, 40 times a second: half the paper's task terms, half the style judge's score, minus what the muscles cost. L4 adds a following term and L5 to L6 the plan's own terms; those are still to design.</p>
+    <p>One number per control step, 40 times a second: half the task (speed × heading), half the style judge's score, minus what the muscles cost. L4 adds a following term and L5 to L6 the plan's own terms; those are still to design.</p>
   </div>
   <div class="panel rw">
     <div class="formula"><span>r =</span><span class="fk task">½ × task</span><span>+</span><span class="fk style">½ × style</span><span>−</span><span class="fk eff">effort</span></div>
     <div class="scroll">
       <svg class="dia" viewBox="0 0 900 96" role="img" aria-labelledby="bud-t" style="min-width:560px; max-width:900px">
-        <title id="bud-t">The most a walking step can earn, to scale: speed tracking 0.25, turn tracking 0.25, style 0.5.</title>
-        <rect x="20" y="16" width="173" height="34" rx="6" fill="var(--blue)"/>
-        <rect x="195" y="16" width="173" height="34" rx="6" fill="var(--blue)" opacity=".7"/>
+        <title id="bud-t">The most a walking step can earn, to scale: speed × heading 0.5, style 0.5.</title>
+        <rect x="20" y="16" width="348" height="34" rx="6" fill="var(--blue)"/>
         <rect x="370" y="16" width="348" height="34" rx="6" fill="var(--teal)"/>
-        <text class="seg-l" x="106" y="72" text-anchor="middle">speed tracking</text><text class="seg-n" x="106" y="90" text-anchor="middle">0.25</text>
-        <text class="seg-l" x="281" y="72" text-anchor="middle">turn tracking</text><text class="seg-n" x="281" y="90" text-anchor="middle">0.25</text>
+        <text class="seg-l" x="194" y="72" text-anchor="middle">speed × heading</text><text class="seg-n" x="194" y="90" text-anchor="middle">0.5</text>
         <text class="seg-l" x="544" y="72" text-anchor="middle">style</text><text class="seg-n" x="544" y="90" text-anchor="middle">0.5</text>
         <text class="seg-n" x="734" y="38">= 1.0 a step</text>
       </svg>
@@ -405,11 +403,11 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <p class="note">The most a step can earn, to scale; the effort comes off. A fall ends the episode with no penalty: it loses what the rest of the episode would have paid.</p>
     <div class="rcols">
       <div>
-        <h3>Task <small>only the paper's speed and turn tracking, as GAIT_amp did: falls end the episode with no penalty</small></h3>
+        <h3>Task <small>speed × heading, GAIT_amp's form: standing still earns little, and the heading pays only while moving. Falls end the episode with no penalty</small></h3>
         <table class="rt">
           <tbody>
-            <tr><td>Speed tracking</td><td>exp(−error² / 0.25): the commanded forward speed, and no sideways speed</td><td class="w">+0.25</td></tr>
-            <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25): turning at the rate the command asks for, 0.5 × the gap to a target heading, at most 1 rad/s</td><td class="w">+0.25</td></tr>
+            <tr><td>Speed</td><td>exp(−2 × (error − 0.1)²), the first 0.1 m/s free: the commanded forward speed, and no sideways speed. Half the speed still earns 0.73</td><td class="w" rowspan="2">×, up to +0.5</td></tr>
+            <tr><td>Heading</td><td>exp(−error²): turning at the rate the command asks for, 0.5 × the gap to a target heading, at most 1 rad/s</td></tr>
             <tr><td>Fall</td><td>ends the episode, no penalty: tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank on the ground</td><td class="w">end</td></tr>
           </tbody>
         </table>
@@ -421,7 +419,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <p class="note">It learns to score 75,334 pairs from 198 AB01 clips (walking, start-stop, standing; mirrored half the time) toward +1 and the policy's latest pairs toward −1, in 80 updates per iteration.</p>
       </div>
       <div>
-        <h3>Effort <small>always 6.5 % of what a step earns, as in our GAIT_amp runs</small></h3>
+        <h3>Effort <small>always 3.5 % of what a step earns, as in our GAIT_amp runs</small></h3>
         <table class="rt">
           <tbody>
             <tr><td>Metabolic power</td><td>W per kg of body mass</td><td class="w">−0.02</td></tr>
@@ -430,7 +428,8 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
           </tbody>
         </table>
         <p class="note">Without the balance term, the near-linear metabolic cost lets one compartment do its group's work.</p>
-        <p class="note">The weights set the mix of the three terms. Every step their total is rescaled to 6.5 % of the task + style reward; our GAIT_amp walking runs paid 5 to 11 %. At these fixed weights the first L1 run paid 39 % early on, turned every muscle down and never turned its leg extensors back on, so it collapsed within 2 s.</p>
+        <p class="note">The weights set the mix of the three terms. Every step their total is rescaled to 3.5 % of the task + style reward; our GAIT_amp walking runs paid 2.4 to 5.7 %. At these fixed weights the first L1 run paid 29 to 39 % early on.</p>
+        <p class="note">Learner: each muscle's mean drive is kept at 0.05 or above. In the first runs the leg extensors sank to about 0.02, where learning can barely raise them again, and the walkers collapsed within 2 s.</p>
       </div>
     </div>
   </div>
