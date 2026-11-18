@@ -167,7 +167,7 @@ def main() -> None:
                 tb.add_scalar(k, v, s["env_steps"])
         if len(rows) % 20 == 1:
             keys = [k for k in ("task/level", "task/r_speed", "task/r_heading", "task/r_track_lin_vel_xy", "task/r_style", "task/metabolic",
-                                "task/amp_accuracy", "task/effort_scale", "task/assist", "episode_length",
+                                "task/amp_accuracy", "task/effort", "task/assist", "episode_length",
                                 "terminated_frac", "steps_per_s") if k in s]
             print(f"it {s['iteration']:6d}  {s['env_steps'] / 1e6:7.1f}M  {s['seconds']:6d} s  "
                   + "  ".join(f"{k} {s[k]:.3g}" for k in keys), flush=True)
