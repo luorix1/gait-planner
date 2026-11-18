@@ -173,14 +173,20 @@ class WatchYourStep(TorchTask):
         body = [("lin_vel", 3, *polar), ("ang_vel", 3, *axial), ("gravity", 3, *polar),
                 ("command", 3, [0, 1, 2], [1.0, -1.0, -1.0]), ("joint_pos", self.nj, jperm, jsign),
                 ("joint_vel", self.nj, jperm, jsign), ("last_action", self.nmus, mperm, [1.0] * self.nmus)]
-        self.blocks = ([*body, ("foothold_scan", 2 * n1, scan_perm, scan_sign)]
-                       + [("critic_" + b[0], *b[1:]) for b in body]
-                       + [("critic_height_scan", self.nx * self.ny, map_perm, [1.0] * len(map_perm)),
-                          ("critic_foothold_scan", 2 * n1, scan_perm, scan_sign)])
+        self.body_blocks = body
+        self.scan_block = ("foothold_scan", 2 * n1, scan_perm, scan_sign)
+        self.map_block = ("height_scan", self.nx * self.ny, map_perm, [1.0] * len(map_perm))
+        self.mperm, self.jperm, self.jsign = mperm, jperm, jsign
+        self.state_dim = 12 + 2 * self.nj                                             # the predictor's input
+        self.blocks = self.layout()
         self._obs_dim = sum(b[1] for b in self.blocks)
         self.n_actor = sum(b[1] for b in self.blocks if not b[0].startswith("critic_"))
-        self.mperm = mperm
-        self.state_dim = 12 + 2 * self.nj                                             # the predictor's input
+
+    def layout(self) -> list[tuple]:
+        """Observation blocks ``(name, size, mirror permutation, sign)``: the actor's, then the critic's (``critic_``)."""
+        body, scan, hmap = self.body_blocks, self.scan_block, self.map_block
+        return ([*body, scan] + [("critic_" + b[0], *b[1:]) for b in body]
+                + [("critic_" + hmap[0], *hmap[1:]), ("critic_" + scan[0], *scan[1:])])
 
     def actor_columns(self) -> np.ndarray:
         return np.arange(self.n_actor, dtype=np.int64)
@@ -341,9 +347,14 @@ class WatchYourStep(TorchTask):
 
     # -- hooks -----------------------------------------------------------------------------------------------------
     def observation(self, s: Any) -> torch.Tensor:
-        c = self.c
         b = self.body_state(s)
         hmap, scan_a, scan_c = self.scans(s, b)
+        noisy, clean = self.body_obs(b)
+        return torch.cat([*noisy, scan_a, *clean, hmap, scan_c], 1).nan_to_num(0.0, 0.0, 0.0)
+
+    def body_obs(self, b: dict[str, torch.Tensor]) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        """The body blocks, with the actor's noise and without (the critic's)."""
+        c = self.c
         sp = lambda x, p, amp: x + amp * (torch.rand(x.shape, device=self.dev, generator=self.gen) < p) * (2 * torch.rand(x.shape, device=self.dev, generator=self.gen) - 1)  # noqa: E731
         noisy = [sp(b["lin"] + self._sym(b["lin"].shape, c.n_lin), c.spike_p, c.spike_lin),
                  sp(0.2 * b["ang"] + self._sym(b["ang"].shape, c.n_ang), c.spike_p, c.spike_ang),
@@ -351,7 +362,7 @@ class WatchYourStep(TorchTask):
                  b["qrel"] + self._sym(b["qrel"].shape, c.n_q), 0.05 * b["qd"] + self._sym(b["qd"].shape, c.n_qd),
                  self.prev_action.clamp(-10, 10)]
         clean = [b["lin"], 0.2 * b["ang"], b["grav"], self.cmd, b["qrel"], 0.05 * b["qd"], self.prev_action.clamp(-10, 10)]
-        return torch.cat([*noisy, scan_a, *clean, hmap, scan_c], 1).nan_to_num(0.0, 0.0, 0.0)
+        return noisy, clean
 
     def before_step(self, s: Any) -> None:
         c = self.c
@@ -406,8 +417,15 @@ class WatchYourStep(TorchTask):
         return tau[:, self.jidx]
 
     def reward(self, s: Any) -> torch.Tensor:
-        c, W = self.c, self.c.w
         b = self.body_state(s)
+        terms = self.terms(s, b)
+        r = sum(self.c.w[k] * v for k, v in terms.items()) * self.c.dt
+        self.advance(s, b, terms)
+        return r
+
+    def terms(self, s: Any, b: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        """Their reward terms, unweighted; sets the fall flag (``termination``)."""
+        c = self.c
         act = s.excitation
         v_left = -b["lin"][:, 2]
         e_lin = (self.cmd[:, 0] - b["lin"][:, 0]) ** 2 + (self.cmd[:, 1] - v_left) ** 2
@@ -433,17 +451,19 @@ class WatchYourStep(TorchTask):
         )
         self._fell = self._tilt(b) > c.fall_tilt
         terms["termination"] = self._fell.float()
-        r = sum(W[k] * v for k, v in terms.items()) * c.dt
+        return terms
+
+    def advance(self, s: Any, b: dict[str, torch.Tensor], terms: dict[str, torch.Tensor]) -> None:
+        """After the reward: log the terms, keep this step's action and speeds, count the step, feed the predictor."""
         for k, v in terms.items():
             self.metrics[f"r_{k}"] = v
         self.metrics["level"] = self.level.float()
         self.metrics["fpm_val_loss"] = torch.tensor(self.fpm_val)
-        self.prev_action = act.clone()
+        self.prev_action = s.excitation.clone()
         self.prev_qvel = s.qvel.clone()
         self.steps += 1
-        if c.training:
+        if self.c.training:
             self._fpm_step(s, b)
-        return r
 
     def _tilt(self, b: dict[str, torch.Tensor]) -> torch.Tensor:
         return torch.acos((-b["grav"][:, 1]).clamp(-1, 1))
@@ -472,7 +492,24 @@ class WatchYourStep(TorchTask):
             hi = torch.randint(0, ROWS, (k,), device=self.dev, generator=self.gen)
             self.level[i] = torch.where(lv >= ROWS, hi, lv.clamp(min=0))
         self._offset[i] = self.centres[self.level[i], self.col[i]]
-        # pose: nominal joints, root on the tile +-0.5 m, any yaw, random root velocity
+        self.place(s, i)
+        self._resample(i)
+        self.push_timer[i] = c.push_s
+        self.xy_drift[i] = self._sym((k, 2), c.xy_drift)
+        self.z_drift[i] = self._sym((k, 1), c.z_drift)
+        self.disturb[i] = self._sym((k, 3), c.disturbance_n) if c.training else 0.0
+
+    def ground_max(self, i: torch.Tensor, dx: torch.Tensor, dz: torch.Tensor) -> torch.Tensor:
+        """The highest ground in a 0.6 m square around ``(dx, dz)`` on worlds ``i``'s tiles (feet's reach)."""
+        o = torch.linspace(-0.3, 0.3, 7, device=self.dev)
+        px = (dx[:, None] + o.repeat_interleave(7)[None])
+        pz = (dz[:, None] + o.repeat(7)[None])
+        off = self._offset[i]
+        return hf_height(self.hf_h, self.hf_b, self.T.cell, self.T.origin, px + off[:, :1], pz + off[:, 1:]).max(1).values
+
+    def place(self, s: Any, i: torch.Tensor) -> None:
+        """The reset pose on worlds ``i``: nominal joints, root on the tile +-0.5 m, any yaw, random root velocity."""
+        c, k = self.c, len(i)
         q = self.q0.expand(k, -1).clone()
         self.nominal[i] = self.q0[self.jidx] + self._sym((k, self.nj), c.nominal_jitter)
         q[:, self.jidx] = self.nominal[i]
@@ -480,13 +517,8 @@ class WatchYourStep(TorchTask):
         yaw = self._sym((k,), math.pi)
         p = self.pel
         q[:, p["tx"]], q[:, p["tz"]], q[:, p["rotation"]] = dx, dz, yaw
-        # stand on the highest ground under the feet's reach (a 0.6 m square), so no sphere starts inside it
-        o = torch.linspace(-0.3, 0.3, 7, device=self.dev)
-        px = (dx[:, None] + o.repeat_interleave(7)[None])
-        pz = (dz[:, None] + o.repeat(7)[None])
-        off = self._offset[i]
-        gh = hf_height(self.hf_h, self.hf_b, self.T.cell, self.T.origin, px + off[:, :1], pz + off[:, 1:]).max(1).values
-        q[:, p["ty"]] = self.pelvis_ty0 + gh + 0.02
+        # stand on the highest ground under the feet's reach, so no sphere starts inside it
+        q[:, p["ty"]] = self.pelvis_ty0 + self.ground_max(i, dx, dz) + 0.02
         qd = torch.zeros_like(q)
         lin, ang = self._sym((k, 3), c.reset_lin), self._sym((k, 3), c.reset_ang)
         qd[:, p["tx"]], qd[:, p["tz"]], qd[:, p["ty"]] = lin[:, 0], lin[:, 1], lin[:, 2]
@@ -494,11 +526,6 @@ class WatchYourStep(TorchTask):
         s.qpos[i], s.qvel[i] = q, qd
         self.prev_qvel[i] = qd
         self.prev_action[i] = 0.0
-        self._resample(i)
-        self.push_timer[i] = c.push_s
-        self.xy_drift[i] = self._sym((k, 2), c.xy_drift)
-        self.z_drift[i] = self._sym((k, 1), c.z_drift)
-        self.disturb[i] = self._sym((k, 3), c.disturbance_n) if c.training else 0.0
 
     # -- the predictor's refits ---------------------------------------------------------------------------------------
     def _fpm_step(self, s: Any, b: dict[str, torch.Tensor]) -> None:

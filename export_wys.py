@@ -23,6 +23,7 @@ from sprint.export.rollout import FrameSource
 from sprint.recipes.ppo import ActorCritic, PPOConfig, env_action_bounds
 
 from gp import data
+from gp.ladder import LadderConfig
 from gp.wys import WysConfig
 from train_wys import build
 
@@ -55,14 +56,20 @@ def main() -> None:
     run = Path(a.run)
     models = sorted(run.glob("foot_model_*.pt"), key=lambda p: int(re.findall(r"\d+", p.stem)[0]))
     from gp import wys_terrain as WT
+    rec = json.loads((run / "record.json").read_text())
+    args = rec.get("args", {})
+    kind = args.get("task", "wys")                     # a ladder run (gp.ladder): its rung, clips and delays as trained
+    base = LadderConfig(perception=args.get("perception", "patches")) if kind == "ladder" else WysConfig()
     types = WT.column_types()
-    tiles = tuple((a.level, types.index(t)) for t in dict.fromkeys(types))           # first column of each type
-    cfg = replace(WysConfig(), training=False, eval_assist=a.assist, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
+    kinds = [t for t in dict.fromkeys(types) if kind != "ladder" or t in base.types]
+    tiles = tuple((a.level, types.index(t)) for t in kinds)                         # first column of each type
+    cfg = replace(base, training=False, eval_assist=a.assist, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
                   ang_z=(0.0, 0.0), heading_stiffness=0.0, standing_frac=0.0, turning_frac=0.0,
                   resample_s=a.seconds + 1, xy_drift=0.0, z_drift=0.0, scan_noise=0.0,
                   n_lin=0.0, n_ang=0.0, n_grav=0.0, n_q=0.0, n_qd=0.0, spike_p=0.0)
-    env, task = build(1, 0, a.device, None, cfg, foot_model=str(models[-1]) if models else None)
-    it = json.loads((run / "record.json").read_text()).get("iterations")
+    env, task = build(1, 0, a.device, None, cfg, foot_model=str(models[-1]) if models else None, kind=kind,
+                      dataset=args.get("dataset", "ab01"), delays=not args.get("no_delays", False))
+    it = rec.get("iterations")
     state = run / "task_state.pt"
     if state.exists():
         it = torch.load(state, weights_only=False)["steps"] // task.c.steps_per_iter
@@ -77,7 +84,7 @@ def main() -> None:
                                tiles={f"ep{k:03d}": types[c] for k, (_, c) in enumerate(tiles)}, level=a.level, assist=a.assist,
                                speed_mps=a.speed),
                    sim={"model": str((out / "model.osim").resolve())}, src=FrameSource(env, meshes=bake(data.MODEL)))
-    print(f"-> {out}  ({len(tiles)} episodes: {', '.join(dict.fromkeys(types))})")
+    print(f"-> {out}  ({len(tiles)} episodes: {', '.join(kinds)})")
     if a.to_studio:
         dest = fmt.results_dir() / f"{run.name}.{out.name}"
         if dest.exists():
