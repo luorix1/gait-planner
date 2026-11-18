@@ -36,7 +36,7 @@ def test_ladder_pairs_and_step() -> None:
     _, r, *_ = env.step(torch.full((4, task.nmus), 0.05))
     assert torch.isfinite(torch.as_tensor(r)).all()
     assert env.obs.shape[-1] == sum(b[1] for b in task.blocks)
-    task.steps = 0
-    assert task.effort_scale() == 0.0
-    task.steps = int(task.c.effort_ramp)
-    assert task.effort_scale() == 1.0
+    m = task.metrics                    # the effort takes effort_share of the task + style reward
+    paid = (m["effort_scale"] * m["effort"]).mean()
+    earned = (task.c.w_task * m["r_task"] + task.c.w_style * m["r_style"]).mean()
+    assert torch.isclose(paid / earned, torch.tensor(task.c.effort_share), rtol=1e-4)

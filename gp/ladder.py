@@ -9,8 +9,8 @@ Changes from gp.wys (plan v2 and the ladder page):
 - **Reward** = w_task x the paper's speed and turn-rate tracking only (their weights x ``task_scale``, so the two top
   out at 1 like the style reward) + w_style x the AMP style reward (gp.amp: GAIT_amp's judge, on AB01 pose pairs
   25 ms apart) - the recipe's effort, as our other muscle studies use it (metabolic power 0.02 per W/kg, summed cubed
-  activation 0.02, compartment balance 0.02), phased in over the first ``effort_ramp`` environment steps. As
-  GAIT_amp: no fall penalty, no other robot terms.
+  activation 0.02, compartment balance 0.02, as relative weights), its total rescaled every step to ``effort_share``
+  of the step's task + style reward, as in our GAIT_amp runs. As GAIT_amp: no fall penalty, no other robot terms.
 - **Episodes start** from a random frame of a level AB01 clip (walking, start-stop, standing) on the world's tile,
   with the clip's own velocities; the command starts at that frame's forward speed and heading.
 - **40 Hz control** (the clips' rate; the paper's is 50 Hz), commands forward only (0 to the fastest walking clip,
@@ -66,11 +66,12 @@ class LadderConfig(WysConfig):
     w_activation_cubed_sum: float = 0.02
     w_balance: float = 0.02
     balance_eps: float = 0.01
-    #: The effort's weights rise linearly from 0 to the values above over this many environment steps (0 = full from
-    #: the start). At full weight from step 0 (b1_L1, 11-18) the effort was ~40 % of the early gross reward (GAIT_amp:
-    #: ~6 %); the policy turned every muscle down and parked the leg extensors in tanh's flat tail (pre-squash -2.2 to
-    #: -2.7, excitation ~0.02, 15-40x less gradient), where neither exploration nor learning brings them back.
-    effort_ramp: float = 1e8
+    #: Each step the effort (the weights above, as relative weights) is scaled so its mean over the worlds is this
+    #: share of their mean task + style reward (0 = the weights as given). Our GAIT_amp walking runs (fixed 0.0075 per
+    #: W/kg) paid 5.6-7 % at the start, 7.5-11 % near 50M steps and 4.6-7 % later. At the fixed weights above from step
+    #: 0 (b1_L1, 11-18) it was 39 %, then ~12 %: the policy turned every muscle down and parked the leg extensors in
+    #: tanh's flat tail (excitation ~0.02, 15-40x less gradient), where neither exploration nor learning brings them back.
+    effort_share: float = 0.065
     fall_height: float = 0.5              # m, pelvis over the ground under it
     start_modes: tuple = ("walk", "start_stop", "stand")      # level clips only
     style_modes: tuple = ("walk", "start_stop", "stand")      # all grades
@@ -232,8 +233,9 @@ class Ladder(WatchYourStep):
         var = ((ag - mean[..., None]).pow(2) * self.bal_mask).sum(2) / k
         balance = (var / (mean.pow(2) + c.balance_eps ** 2)).sum(1)
         effort = c.w_metabolic * metabolic + c.w_activation_cubed_sum * a3 + c.w_balance * balance
-        ramp = self.effort_scale()
-        r = c.w_task * task + c.w_style * style - ramp * effort
+        gross = c.w_task * task + c.w_style * style
+        k = self.effort_scale(gross, effort)
+        r = gross - k * effort
         learn = c.training and c.amp.train_disc
         if learn:
             t = self.steps % c.steps_per_iter
@@ -242,16 +244,16 @@ class Ladder(WatchYourStep):
         if learn and self.steps % c.steps_per_iter == 0:
             self.amp_stats = self.amp.train(self.amp_buf[self.amp_ok])
         self.metrics.update(r_task=task, r_style=style, metabolic=metabolic, activation_cubed_sum=a3, balance=balance,
-                            effort=effort, effort_scale=torch.tensor(ramp), fell_low=low.float(),
+                            effort=effort, effort_scale=k, fell_low=low.float(),
                             **{k_: torch.tensor(v) for k_, v in self.amp_stats.items()})
         return r
 
-    def effort_scale(self) -> float:
-        """The effort weights' share of their full value now (1 in evaluation)."""
-        c = self.c
-        if not c.training or c.effort_ramp <= 0:
-            return 1.0
-        return min(1.0, self.steps * self.n / c.effort_ramp)
+    def effort_scale(self, gross: torch.Tensor, effort: torch.Tensor) -> torch.Tensor:
+        """The factor on the effort that makes it ``effort_share`` of the reward earned, over the finite worlds."""
+        if self.c.effort_share <= 0:
+            return torch.ones((), device=effort.device)
+        ok = torch.isfinite(gross) & torch.isfinite(effort)
+        return self.c.effort_share * gross[ok].mean() / effort[ok].mean().clamp_min(1e-6)
 
     def _fpm_step(self, s: Any, b: dict[str, torch.Tensor]) -> None:
         if self.c.perception == "patches":                  # L0 has no guesser to refit
