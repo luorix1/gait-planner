@@ -173,6 +173,26 @@ td.q { color:var(--muted) }
 .road span { font-size:14px; color:var(--muted) }
 .road .cost { font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:4px }
 
+
+/* reward */
+.formula { font:600 clamp(20px, 2.4vw, 28px) var(--display); display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline }
+.formula .fk { padding:2px 12px; border-radius:10px }
+.fk.task { background:var(--blue-soft); color:var(--blue) } .fk.style { background:var(--teal-soft); color:var(--teal) }
+.fk.eff { background:var(--amber-soft); color:var(--ink) }
+.rw { display:grid; gap:20px }
+.rcols { display:grid; grid-template-columns:minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); gap:24px; align-items:start }
+.rcols > * { min-width:0; display:grid; gap:10px; align-content:start }
+.rcols h3 small { display:block; font:400 14px var(--body); color:var(--muted); margin-top:2px }
+table.rt { min-width:0; font-size:14.5px }
+table.rt td { padding:7px 8px }
+table.rt td:first-child { font:600 14.5px var(--body); white-space:normal }
+table.rt td.w { font:500 14px var(--mono); white-space:nowrap; text-align:right }
+table.rt tr.off td { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--wire) }
+table.rt tr.off td.why { text-decoration:none }
+.seg-l { font:600 14px var(--body); fill:var(--ink) }
+.seg-n { font:500 13px var(--mono); fill:var(--muted) }
+a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
+@media (max-width:900px) { .rcols { grid-template-columns:minmax(0, 1fr) } }
 @media (max-width:1000px) { .road { grid-template-columns:repeat(3, minmax(0, 1fr)) } .road li:nth-child(3)::after { content:none } }
 @media (max-width:900px) {
   .split, .meas, .cards, .cap dl { grid-template-columns:minmax(0, 1fr) }
@@ -326,7 +346,7 @@ td.q { color:var(--muted) }
           <g class="fn" data-node="mod"><rect x="300" y="158" width="240" height="84" rx="12"/><text class="t1" x="420" y="194" id="modT"></text><text class="t2" x="420" y="216" id="modS"></text></g>
           <g class="fn key" data-node="inp"><rect x="610" y="158" width="250" height="84" rx="12"/><text class="t1" x="735" y="194" id="inpT"></text><text class="t2" x="735" y="216" id="inpS"></text></g>
           <g class="fn pol" data-node="pol"><rect x="894" y="158" width="130" height="84" rx="12"/><text class="t1" x="959" y="183">Muscle</text><text class="t1" x="959" y="205">policy</text><text class="t2" x="959" y="227">90 muscles</text></g>
-          <g class="fn dash" data-node="rew"><rect x="610" y="330" width="250" height="64" rx="12"/><text class="t1" x="735" y="356">Rewards</text><text class="t2" x="735" y="378" id="rewS"></text></g>
+          <a class="rewlink" href="#s-reward"><g class="fn dash" data-node="rew"><rect x="610" y="330" width="250" height="64" rx="12"/><text class="t1" x="735" y="356">Rewards</text><text class="t2" x="735" y="378" id="rewS"></text></g></a>
         </svg>
       </div>
       <div class="cap" aria-live="polite">
@@ -337,6 +357,69 @@ td.q { color:var(--muted) }
           <div><dt>Expected</dt><dd id="capE"></dd></div>
           <div><dt>Cost</dt><dd id="capK"></dd></div>
         </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-reward">
+  <div class="sec-head">
+    <h2 id="s-reward">The reward in B1 (L0 and L1)</h2>
+    <p>One number per control step, 40 times a second: half the paper's task terms, half the style judge's score, minus what the muscles cost. L4 adds a following term and L5, L6 the plan's own terms; those are still to design.</p>
+  </div>
+  <div class="panel rw">
+    <div class="formula"><span>r =</span><span class="fk task">½ × task</span><span>+</span><span class="fk style">½ × style</span><span>−</span><span class="fk eff">effort</span></div>
+    <div class="scroll">
+      <svg class="dia" viewBox="0 0 900 96" role="img" aria-labelledby="bud-t" style="min-width:560px; max-width:900px">
+        <title id="bud-t">The most a walking step can earn, to scale: speed tracking 0.25, turn tracking 0.25, style 0.5, upright 0.0625.</title>
+        <rect x="20" y="16" width="173" height="34" rx="6" fill="var(--blue)"/>
+        <rect x="195" y="16" width="173" height="34" rx="6" fill="var(--blue)" opacity=".7"/>
+        <rect x="370" y="16" width="348" height="34" rx="6" fill="var(--teal)"/>
+        <rect x="720" y="16" width="42" height="34" rx="6" fill="var(--blue)" opacity=".45"/>
+        <text class="seg-l" x="106" y="72" text-anchor="middle">speed tracking</text><text class="seg-n" x="106" y="90" text-anchor="middle">0.25</text>
+        <text class="seg-l" x="281" y="72" text-anchor="middle">turn tracking</text><text class="seg-n" x="281" y="90" text-anchor="middle">0.25</text>
+        <text class="seg-l" x="544" y="72" text-anchor="middle">style</text><text class="seg-n" x="544" y="90" text-anchor="middle">0.5</text>
+        <text class="seg-l" x="741" y="72" text-anchor="middle">upright</text><text class="seg-n" x="741" y="90" text-anchor="middle">0.06</text>
+        <text class="seg-n" x="776" y="38">= 1.06 a step</text>
+      </svg>
+    </div>
+    <p class="note">The most a walking step can earn, to scale. At a zero command, standing still adds up to 0.625; a fall costs 5, once; the effort and the penalties below come off.</p>
+    <div class="rcols">
+      <div>
+        <h3>Task <small>the paper's terms, each at a quarter of its weight (half for the task's share, half so tracking tops out like style)</small></h3>
+        <table class="rt">
+          <tbody>
+            <tr><td>Speed tracking</td><td>exp(−error² / 0.25), forward and sideways</td><td class="w">+0.25</td></tr>
+            <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25)</td><td class="w">+0.25</td></tr>
+            <tr><td>Standing still</td><td>exp(−Σ |joint − nominal| / 2), only at a zero command</td><td class="w">+0.625</td></tr>
+            <tr><td>Upright</td><td>full while the pelvis stays at least 95 % of its standing height above the lowest foot</td><td class="w">+0.0625</td></tr>
+            <tr><td>Vertical speed</td><td>pelvis speed up or down, squared</td><td class="w">−0.125</td></tr>
+            <tr><td>Roll and pitch rates</td><td>squared</td><td class="w">−0.0125</td></tr>
+            <tr><td>Joint torques</td><td>Σ τ² of the muscles' torques, (N m)²</td><td class="w">−2.5e-6</td></tr>
+            <tr><td>Joint accelerations</td><td>Σ q̈²</td><td class="w">−6.25e-9</td></tr>
+            <tr><td>Excitation change</td><td>Σ (change per step)² over the 90 muscles</td><td class="w">−0.0025</td></tr>
+            <tr><td>Thigh or shank on the ground</td><td>per body touching (over 1 N)</td><td class="w">−0.25</td></tr>
+            <tr><td>Fall</td><td>tilt over 40°, or pelvis under 0.5 m above the ground</td><td class="w">−5</td></tr>
+            <tr class="off"><td>Hips and waist off nominal</td><td class="why">dropped: AB01's own walking would pay 0.21 a step</td><td class="w">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Style <small>the judge, retrained every iteration</small></h3>
+        <table class="rt"><tbody><tr><td>Style</td><td>max(0, 1 − ¼ (D − 1)²), D the judge's score</td><td class="w">+0.5</td></tr></tbody></table>
+        <p class="note">The judge sees two poses 25 ms apart: pelvis height over the ground, the pelvis's up axis, the 17 joint angles and both heels relative to the pelvis, plus how far the pelvis moved and turned between them.</p>
+        <p class="note">It learns to score 75,334 pairs from 198 AB01 clips (walking, start-stop, standing; mirrored half the time) toward +1 and the policy's latest pairs toward −1, in 80 updates per iteration.</p>
+      </div>
+      <div>
+        <h3>Effort <small>as our other muscle studies weigh it</small></h3>
+        <table class="rt">
+          <tbody>
+            <tr><td>Metabolic power</td><td>W per kg of body mass</td><td class="w">−0.02</td></tr>
+            <tr><td>Cubed activation</td><td>Σ a³ over the 90 muscles</td><td class="w">−0.02</td></tr>
+            <tr><td>Compartment balance</td><td>Σ variance / mean² within a split muscle (gluteus maximus 1–3, …)</td><td class="w">−0.02</td></tr>
+          </tbody>
+        </table>
+        <p class="note">Without the balance term, the near-linear metabolic cost lets one compartment do its group's work.</p>
       </div>
     </div>
   </div>
@@ -438,43 +521,43 @@ td.q { color:var(--muted) }
       c: 'Nothing. This is the reference.',
       e: 'Works, but learns slower. In the paper the full map reached terrain level 5 at 26.1k iterations, against 7.5k with patches.',
       k2: 'Part of the stage-1 build.',
-      mod: ['no footstep module', ''], inp: ['Full map', '693 heights'], rew: 'task + style judge' },
+      mod: ['no footstep module', ''], inp: ['Full map', '693 heights'], rew: '½ task + ½ style − effort' },
     { k: 'L1', n: 'Blind guess', title: 'L1 · Blind guesser (Watch Your Step)',
       w: 'Teal patches sit at the guessed next landing of each foot. Patch 1 slides toward the foot during the swing: that is the guess being redone from the body. The badge says whether the foot landed inside the patch it saw at take-off. Here the guess just repeats the last step; the real one reads the whole body.',
       c: 'A guesser that sees only the body picks two 30 × 30 cm patches. The policy sees those 98 heights instead of the map.',
       e: 'Faster learning. Misses where a landing is far from a normal stride (try the wide gap) and near-misses at the first step onto stairs.',
       k2: 'Part of the stage-1 build.',
-      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
     { k: 'L2', n: '+ terrain', title: 'L2 · Guesser that sees terrain',
       w: 'The grey strip ahead goes into the guesser, so the patches land on the right spots before the foot commits.',
       c: 'The guesser also reads a height strip along the heading (length still to set).',
       e: 'Fewer misses on stairs, gaps and boxes. Placement no more human than L1: it still learns the policy’s own habits.',
       k2: 'Cheap: one extra guesser input.',
-      mod: ['Guesser', 'body + strip ahead'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+      mod: ['Guesser', 'body + strip ahead'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
     { k: 'L3', n: 'Human-trained', title: 'L3 · Guesser trained on people',
       w: 'Same picture as L2. The change is in training: the guesser’s labels are human footsteps from the clips, not the policy’s own landings.',
       c: 'Labels come from human footsteps.',
       e: 'Placement moves toward human step length, step width and tread position.',
       k2: 'Cheap: footstep labels from the clips.',
-      mod: ['Guesser', 'trained on people'], inp: ['2 patches', '98 heights'], rew: 'task + style judge' },
+      mod: ['Guesser', 'trained on people'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
     { k: 'L4', n: 'Follow', title: 'L4 · Follow the footholds',
       w: 'The amber rings are targets. Landing inside one earns a following reward (green flash).',
       c: 'The guessed footholds become targets the policy is rewarded for hitting.',
       e: 'Closer biomechanics where the human plan suits this body; less robust where it doesn’t.',
       k2: 'A following reward.',
-      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: 'task + style + following' },
+      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: 'task, style, following, effort' },
     { k: 'L5', n: 'Planner', title: 'L5 · Planner with a longer horizon',
       w: 'The planner lays out every foothold in the next 1.5 s, with the time to each touchdown and a band the centre of mass should stay in.',
       c: 'A planner replaces the guesser: 3 to 4 footholds, contact timing and a centre-of-mass band.',
       e: 'The only design that should change step length 2 to 3 steps before stairs, as people do.',
       k2: 'Build the planner (route A, step A1).',
-      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task + style + following' },
+      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
     { k: 'L6', n: '+ loop', title: 'L6 · Planner + PARC loop',
       w: 'Green ticks mark finished steps that passed the checks. Those runs go back into the planner’s training data.',
       c: 'Rounds of: run, check, add the good runs, retrain the planner.',
       e: 'Covers terrain past the clips. Watch for drift away from human placement.',
       k2: 'Loop rounds (step A2).',
-      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task + style + following' },
+      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
   ];
 
   // ---------- terrains (metres; x forward, h up) ----------
