@@ -421,7 +421,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <p class="note">It learns to score 75,334 pairs from 198 AB01 clips (walking, start-stop, standing; mirrored half the time) toward +1 and the policy's latest pairs toward −1, in 80 updates per iteration.</p>
       </div>
       <div>
-        <h3>Effort <small>as our other muscle studies weigh it</small></h3>
+        <h3>Effort <small>as our other muscle studies weigh it, phased in from zero over the first 100M steps</small></h3>
         <table class="rt">
           <tbody>
             <tr><td>Metabolic power</td><td>W per kg of body mass</td><td class="w">−0.02</td></tr>
@@ -430,6 +430,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
           </tbody>
         </table>
         <p class="note">Without the balance term, the near-linear metabolic cost lets one compartment do its group's work.</p>
+        <p class="note">Why phased in: at full weight from the start, the effort was about 40 % of what an early step earned (GAIT_amp: about 6 %). The first L1 run turned every muscle down and never turned its leg extensors back on, so it collapsed within 2 s.</p>
       </div>
     </div>
   </div>

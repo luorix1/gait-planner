@@ -36,3 +36,7 @@ def test_ladder_pairs_and_step() -> None:
     _, r, *_ = env.step(torch.full((4, task.nmus), 0.05))
     assert torch.isfinite(torch.as_tensor(r)).all()
     assert env.obs.shape[-1] == sum(b[1] for b in task.blocks)
+    task.steps = 0
+    assert task.effort_scale() == 0.0
+    task.steps = int(task.c.effort_ramp)
+    assert task.effort_scale() == 1.0
