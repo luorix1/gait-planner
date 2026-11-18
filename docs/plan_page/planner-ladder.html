@@ -163,7 +163,7 @@ td.q { color:var(--muted) }
 .tchips span { font-size:13.5px; padding:3px 10px; border-radius:999px; background:var(--grey-soft); color:var(--ink) }
 
 /* glance lanes */
-.lanes { display:grid; grid-template-columns:140px repeat(8, minmax(118px, 1fr)); gap:8px 6px; min-width:1100px; align-items:stretch }
+.lanes { display:grid; grid-template-columns:140px repeat(9, minmax(112px, 1fr)); gap:8px 6px; min-width:1180px; align-items:stretch }
 .lanes .lh { font:600 13px var(--body); color:var(--muted); letter-spacing:.04em; text-transform:uppercase; align-self:center; position:sticky; left:0; background:var(--panel); padding-right:8px; z-index:1 }
 .lanes .lh.corner { grid-row:1; grid-column:1 }
 .lanes .rung { grid-row:1; display:grid; gap:2px; align-content:start; text-align:left; font:inherit; color:var(--ink); background:none; border:0; border-bottom:2px solid var(--line); padding:4px 6px 10px; cursor:pointer; border-radius:8px 8px 0 0 }
@@ -231,7 +231,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <header>
   <p class="eyebrow">gait_planner · footstep planner study · draft, 18 Nov 2026</p>
   <h1>Footstep planner ladder</h1>
-  <p class="lede">Eight designs for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
+  <p class="lede">Eight designs and one ablation (L0.5) for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
   <div class="chips">
     <span class="chip next"><i></i>L1 training now (run b1_L1_v2)</span>
     <span class="chip todo"><i></i>L2, L3 are cheap variants</span>
@@ -295,8 +295,8 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     </div>
   </div>
   <div class="cards">
-    <div class="card"><span class="tag">Where it breaks</span><h3>A landing far from the guess</h3><p>Wide gaps, high step-ups, the first step onto a big feature. The guess assumes a normal stride, so the patch can show the pit instead of the far edge.</p><button class="btn" type="button" data-show="1,gap">Watch L1 on the wide gap</button></div>
-    <div class="card"><span class="tag">Where it breaks</span><h3>Planning past two steps</h3><p>People change step length two or three steps before stairs or an obstacle. Two patches show two footholds, so the policy reacts. It can succeed while correcting later than a person would.</p><button class="btn" type="button" data-show="1,stairs">Watch L1 on stairs</button></div>
+    <div class="card"><span class="tag">Where it breaks</span><h3>A landing far from the guess</h3><p>Wide gaps, high step-ups, the first step onto a big feature. The guess assumes a normal stride, so the patch can show the pit instead of the far edge.</p><button class="btn" type="button" data-show="2,gap">Watch L1 on the wide gap</button></div>
+    <div class="card"><span class="tag">Where it breaks</span><h3>Planning past two steps</h3><p>People change step length two or three steps before stairs or an obstacle. Two patches show two footholds, so the policy reacts. It can succeed while correcting later than a person would.</p><button class="btn" type="button" data-show="2,stairs">Watch L1 on stairs</button></div>
     <div class="card"><span class="tag">What it never tested</span><h3>Human-like placement</h3><p>The paper's claims are faster training and better transfer on a G1 robot with joint position control. Whether the feet land where a person's would is our question, not theirs.</p></div>
   </div>
 </section>
@@ -347,19 +347,20 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
             <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
             <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
           </defs>
-          <path class="e data" data-arms="01234567" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
-          <text class="el" data-arms="01234567" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
-          <path class="e data" data-arms="01234567" d="M860 200 H890" marker-end="url(#fw)"/>
-          <path class="e train" data-arms="01234567" d="M860 362 H959 V246" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567" d="M540 200 H606" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="01234567h" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
+          <text class="el" data-arms="01234" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
+          <text class="el" data-arms="567h" x="540" y="16" text-anchor="middle">body and muscle states (no command)</text>
+          <path class="e data" data-arms="01234567h" d="M860 200 H890" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="01234567h" d="M860 362 H959 V246" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M540 200 H606" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567h" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
           <path class="e terr" data-arms="234567" d="M226 278 C262 278 262 222 296 222" marker-end="url(#ft)"/>
-          <path class="e terr" data-arms="01234" d="M226 294 H735 V246" marker-end="url(#ft)"/>
-          <text class="el terr" data-arms="1234" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
+          <path class="e terr" data-arms="01234h" d="M226 294 H735 V246" marker-end="url(#ft)"/>
+          <text class="el terr" data-arms="1234h" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
           <text class="el terr" data-arms="0" x="420" y="316" text-anchor="middle">all 693 heights</text>
-          <path class="e train" data-arms="126" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
-          <text class="el" data-arms="12" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
+          <path class="e train" data-arms="126h" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
+          <text class="el" data-arms="12h" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
           <text class="el" data-arms="6" x="705" y="130" text-anchor="middle">labels off the clips: the policy's own landings</text>
           <path class="e hum" data-arms="34567" d="M420 116 V154" marker-end="url(#fa)"/>
           <text class="el hum" data-arms="34567" x="430" y="140">labels</text>
@@ -464,51 +465,58 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 
 <section aria-labelledby="s-glance">
   <div class="sec-head">
-    <h2 id="s-glance">All eight at a glance</h2>
-    <p>Read left to right. A bar runs for as long as a choice stays the same; a blue edge marks the rung where it changes. Each rung's question compares it with the rung to its left. Click a rung to watch it above.</p>
+    <h2 id="s-glance">All nine at a glance</h2>
+    <p>Read left to right. A bar runs for as long as a choice stays the same; a blue edge marks the rung where it changes. Each rung's question compares it with the rung to its left, except L0.5: an ablation of L1 that only drops the command, so compare it with L1. Click a rung to watch it above.</p>
   </div>
   <div class="panel scroll">
-    <div class="lanes" role="img" aria-label="Five design choices across the eight rungs; each rung starts one new choice.">
+    <div class="lanes" role="img" aria-label="Six design choices across the nine rungs.">
       <div class="lh corner"></div>
       <button type="button" class="rung" data-arm="0" style="grid-column:2"><b>L0</b><span>Full map</span><em>the reference</em></button>
-      <button type="button" class="rung" data-arm="1" style="grid-column:3"><b>L1</b><span>Blind guess</span><em>+ blind guesser</em></button>
-      <button type="button" class="rung" data-arm="2" style="grid-column:4"><b>L2</b><span>+ terrain</span><em>guesser sees terrain</em></button>
-      <button type="button" class="rung" data-arm="3" style="grid-column:5"><b>L3</b><span>Human-trained</span><em>human labels</em></button>
-      <button type="button" class="rung" data-arm="4" style="grid-column:6"><b>L4</b><span>Follow</span><em>rewarded to follow</em></button>
-      <button type="button" class="rung" data-arm="5" style="grid-column:7"><b>L5</b><span>Planner</span><em>planner, 1.5 s</em></button>
-      <button type="button" class="rung" data-arm="6" style="grid-column:8"><b>L5.5</b><span>Mixed labels</span><em>mixed labels</em></button>
-      <button type="button" class="rung" data-arm="7" style="grid-column:9"><b>L6</b><span>+ loop</span><em>+ checked loop</em></button>
+      <button type="button" class="rung" data-arm="1" style="grid-column:3"><b>L0.5</b><span>No command</span><em>ablation of L1</em></button>
+      <button type="button" class="rung" data-arm="2" style="grid-column:4"><b>L1</b><span>Blind guess</span><em>+ blind guesser</em></button>
+      <button type="button" class="rung" data-arm="3" style="grid-column:5"><b>L2</b><span>+ terrain</span><em>guesser sees terrain</em></button>
+      <button type="button" class="rung" data-arm="4" style="grid-column:6"><b>L3</b><span>Human-trained</span><em>human labels</em></button>
+      <button type="button" class="rung" data-arm="5" style="grid-column:7"><b>L4</b><span>Follow</span><em>rewarded to follow</em></button>
+      <button type="button" class="rung" data-arm="6" style="grid-column:8"><b>L5</b><span>Planner</span><em>planner, 1.5 s</em></button>
+      <button type="button" class="rung" data-arm="7" style="grid-column:9"><b>L5.5</b><span>Mixed labels</span><em>mixed labels</em></button>
+      <button type="button" class="rung" data-arm="8" style="grid-column:10"><b>L6</b><span>+ loop</span><em>+ checked loop</em></button>
       <div class="lh" style="grid-row:2">Policy sees</div>
-      <div class="bar map" style="grid-row:2; grid-column:2 / span 1">the full map, 0.8 m ahead</div>
-      <div class="bar pat new" style="grid-row:2; grid-column:3 / span 4">2 patches at the guessed footholds</div>
-      <div class="bar plan new" style="grid-row:2; grid-column:7 / span 3">the plan: footholds, timing, centre-of-mass band, about 1.5 s</div>
-      <div class="lh" style="grid-row:3">Footholds picked by</div>
-      <div class="bar none" style="grid-row:3; grid-column:2 / span 1">nobody</div>
-      <div class="bar pat new" style="grid-row:3; grid-column:3 / span 1">a guesser that sees only the body</div>
-      <div class="bar pat new" style="grid-row:3; grid-column:4 / span 3">a guesser that also reads a terrain strip</div>
-      <div class="bar plan new" style="grid-row:3; grid-column:7 / span 3">a planner</div>
-      <div class="lh" style="grid-row:4">Trained on</div>
-      <div class="bar none" style="grid-row:4; grid-column:2 / span 1">–</div>
-      <div class="bar own new" style="grid-row:4; grid-column:3 / span 2">the policy’s own landings</div>
-      <div class="bar hum new" style="grid-row:4; grid-column:5 / span 3">human footsteps</div>
-      <div class="bar mix new" style="grid-row:4; grid-column:8 / span 1">human where the clips cover the terrain, its own landings elsewhere</div>
-      <div class="bar mix new" style="grid-row:4; grid-column:9 / span 1">human + its own checked runs, in rounds</div>
-      <div class="lh" style="grid-row:5">Must step there</div>
-      <div class="bar none" style="grid-row:5; grid-column:2 / span 4">no, it only looks</div>
-      <div class="bar plan new" style="grid-row:5; grid-column:6 / span 4">yes, rewarded for landing there</div>
-      <div class="lh" style="grid-row:6">Policy’s reward</div>
-      <div class="bar base" style="grid-row:6; grid-column:2 / span 4">speed × heading + style − effort</div>
-      <div class="bar plan new" style="grid-row:6; grid-column:6 / span 1">+ landing on the footholds</div>
-      <div class="bar plan new" style="grid-row:6; grid-column:7 / span 3">the plan’s terms + style − effort</div>
-      <div class="lh q" style="grid-row:7">Question</div>
-      <div class="qq" style="grid-row:7; grid-column:2">the reference for everything to its right</div>
-      <div class="qq" style="grid-row:7; grid-column:3">does looking only where the feet go learn faster on our body?</div>
-      <div class="qq" style="grid-row:7; grid-column:4">does the guesser need terrain?</div>
-      <div class="qq" style="grid-row:7; grid-column:5">does human data make placement human-like?</div>
-      <div class="qq" style="grid-row:7; grid-column:6">is looking enough, or must it step there?</div>
-      <div class="qq" style="grid-row:7; grid-column:7">does anticipation need a longer horizon?</div>
-      <div class="qq" style="grid-row:7; grid-column:8">is mixing in its own landings enough to leave the clips?</div>
-      <div class="qq" style="grid-row:7; grid-column:9">do the checks and rounds beat L5.5 past the clips, without drifting from human?</div>
+      <div class="bar base" style="grid-row:2; grid-column:2 / span 1">the full map, 0.8 m ahead</div>
+      <div class="bar base new" style="grid-row:2; grid-column:3 / span 5">2 patches at the guessed footholds</div>
+      <div class="bar base new" style="grid-row:2; grid-column:8 / span 3">the plan: footholds, timing, centre-of-mass band, about 1.5 s</div>
+      <div class="lh" style="grid-row:3">Policy sees the command</div>
+      <div class="bar base" style="grid-row:3; grid-column:2 / span 1">yes</div>
+      <div class="bar none new" style="grid-row:3; grid-column:3 / span 1">no; only where the patches go</div>
+      <div class="bar base new" style="grid-row:3; grid-column:4 / span 4">yes</div>
+      <div class="bar none new" style="grid-row:3; grid-column:8 / span 3">no; the plan carries it</div>
+      <div class="lh" style="grid-row:4">Footholds picked by</div>
+      <div class="bar none" style="grid-row:4; grid-column:2 / span 1">nobody</div>
+      <div class="bar base new" style="grid-row:4; grid-column:3 / span 2">a guesser that sees only the body</div>
+      <div class="bar base new" style="grid-row:4; grid-column:5 / span 3">a guesser that also reads a terrain strip</div>
+      <div class="bar base new" style="grid-row:4; grid-column:8 / span 3">a planner</div>
+      <div class="lh" style="grid-row:5">Trained on</div>
+      <div class="bar none" style="grid-row:5; grid-column:2 / span 1">–</div>
+      <div class="bar own new" style="grid-row:5; grid-column:3 / span 3">the policy’s own landings</div>
+      <div class="bar hum new" style="grid-row:5; grid-column:6 / span 3">human footsteps</div>
+      <div class="bar mix new" style="grid-row:5; grid-column:9 / span 1">human where the clips cover the terrain, its own landings elsewhere</div>
+      <div class="bar mix new" style="grid-row:5; grid-column:10 / span 1">human + its own checked runs, in rounds</div>
+      <div class="lh" style="grid-row:6">Must step there</div>
+      <div class="bar none" style="grid-row:6; grid-column:2 / span 5">no, it only looks</div>
+      <div class="bar base new" style="grid-row:6; grid-column:7 / span 4">yes, rewarded for landing there</div>
+      <div class="lh" style="grid-row:7">Policy’s reward</div>
+      <div class="bar base" style="grid-row:7; grid-column:2 / span 5">speed × heading + style − effort</div>
+      <div class="bar base new" style="grid-row:7; grid-column:7 / span 1">+ landing on the footholds</div>
+      <div class="bar base new" style="grid-row:7; grid-column:8 / span 3">the plan’s terms + style − effort</div>
+      <div class="lh q" style="grid-row:8">Question</div>
+      <div class="qq" style="grid-row:8; grid-column:2">the reference for everything to its right</div>
+      <div class="qq" style="grid-row:8; grid-column:3">can the patches alone tell the policy where to go? (compare with L1)</div>
+      <div class="qq" style="grid-row:8; grid-column:4">does looking only where the feet go learn faster on our body? (compare with L0)</div>
+      <div class="qq" style="grid-row:8; grid-column:5">does the guesser need terrain?</div>
+      <div class="qq" style="grid-row:8; grid-column:6">does human data make placement human-like?</div>
+      <div class="qq" style="grid-row:8; grid-column:7">is looking enough, or must it step there?</div>
+      <div class="qq" style="grid-row:8; grid-column:8">does anticipation need a longer horizon?</div>
+      <div class="qq" style="grid-row:8; grid-column:9">is mixing in its own landings enough to leave the clips?</div>
+      <div class="qq" style="grid-row:8; grid-column:10">do the checks and rounds beat L5.5 past the clips, without drifting from human?</div>
     </div>
     <div class="lkey"><span class="k hum">human data</span><span class="k own">the policy’s own landings</span><span class="k mix">both</span><span class="k new">changes at this rung</span></div>
   </div>
@@ -561,7 +569,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <p>The ladder follows the plan's B-then-A route, with four cheap rungs slotted in between.</p>
   </div>
   <ol class="road">
-    <li class="now"><span class="st">B1</span><b>L0 + L1</b><span>on AB01 clips</span><span class="cost">next build</span></li>
+    <li class="now"><span class="st">B1</span><b>L0, L1, L0.5</b><span>on AB01 clips; L0.5 drops the command</span><span class="cost">next build</span></li>
     <li><span class="st">B2</span><b>L0 + L1</b><span>add Camargo stairs and PARC jumps</span><span class="cost">more clips</span></li>
     <li><span class="st">L2, L3</span><b>Guesser variants</b><span>terrain strip; human labels</span><span class="cost">cheap</span></li>
     <li><span class="st">L4</span><b>Follow the footholds</b><span>add a following reward</span><span class="cost">small</span></li>
@@ -591,6 +599,12 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       e: 'Works, but learns slower. In the paper the full map reached terrain level 5 at 26.1k iterations, against 7.5k with patches.',
       k2: 'Part of the stage-1 build.',
       mod: ['no footstep module', ''], inp: ['Full map', '693 heights'], rew: '½ task + ½ style − effort' },
+    { k: 'L0.5', n: 'No command', title: 'L0.5 · Blind guesser, no command for the policy (an ablation of L1)',
+      w: 'Same picture as L1. The change is in the policy’s input: it no longer sees the commanded speed and heading. The guesser still does, so the only hint of where to go is where the patches land.',
+      c: 'The policy’s command input reads zero. The guesser and the critic still get the command, and the reward still pays for tracking it.',
+      e: 'If the patches carry the intent, it tracks speed and heading about as well as L1. If not, tracking drops, worst at the start, when the guesser still places the patches at fixed offsets.',
+      k2: 'Tiny: one input switched off (run.sh --ladder L0.5).',
+      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights, no command'], rew: '½ task + ½ style − effort' },
     { k: 'L1', n: 'Blind guess', title: 'L1 · Blind guesser (Watch Your Step)',
       w: 'Teal patches sit at the guessed next landing of each foot. Patch 1 slides toward the foot during the swing: that is the guess being redone from the body. The badge says whether the foot landed inside the patch it saw at take-off. Here the guess just repeats the last step; the real one reads the whole body.',
       c: 'A guesser that sees only the body picks two 30 × 30 cm patches. The policy sees those 98 heights instead of the map.',
@@ -695,7 +709,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   const P = (p) => X(p[0]) + ' ' + Y(p[1]);
 
   // ---------- state ----------
-  let arm = 1, ter = 'stairs', tau = 0, playing = !reduce;
+  let arm = 2, ter = 'stairs', tau = 0, playing = !reduce;
   const $ = id => document.getElementById(id);
   const el = { ground: $('ground'), under: $('under'), over: $('over'), legN: $('legN'), legF: $('legF'), footN: $('footN'), footF: $('footF'),
                armN: $('armN'), armF: $('armF'), torso: $('torso'), head: $('head'), hud1: $('hud1'), hud2: $('hud2') };
@@ -735,35 +749,36 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     const p = 2 * Q.e - 1;
     drawArm(sh, swingNear ? -0.35 * p : 0.35 * p, el.armN); drawArm(sh, swingNear ? 0.35 * p : -0.35 * p, el.armF);
 
+    const D = arm <= 1 ? arm : arm - 1;               // the drawing as before L0.5 (L0.5 draws as L1)
     let u = '', o = '', far = null, hud2 = '';
     for (let i = 0; i < k - 1; i++) {
       u += `<line class="print" x1="${X(f[i] - 0.08)}" x2="${X(f[i] + 0.16)}" y1="${Y(h(f[i]))}" y2="${Y(h(f[i]))}"/>`;
-      if (arm === 7 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
+      if (D === 7 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
     }
-    if (arm === 0) {
+    if (D === 0) {
       for (let j = -16; j <= 16; j++) { const x = pelx + 0.05 * j; u += `<circle class="mapdot" cx="${X(x)}" cy="${Y(h(x))}" r="3.4"/>`; }
       far = pelx + 0.8; hud2 = 'the map ends 0.8 m ahead of the pelvis';
-    } else if (arm <= 4) {
-      if (arm >= 2) for (let j = 0; j <= 30; j++) { const x = pelx + 0.05 * j; u += `<circle class="stripdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
+    } else if (D <= 4) {
+      if (D >= 2) for (let j = 0; j <= 30; j++) { const x = pelx + 0.05 * j; u += `<circle class="stripdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
       const next = f[k], after = f[k + 1] !== undefined ? f[k + 1] : f[k] + 0.6;
       let g1, g2;
-      if (arm === 1) { g1 = T.g1[k] + (next - T.g1[k]) * 0.5 * s; g2 = T.g2[k] + (after - T.g2[k]) * 0.3 * s; }
-      else if (arm === 2) { g1 = next + 0.03; g2 = after - 0.04; }
+      if (D === 1) { g1 = T.g1[k] + (next - T.g1[k]) * 0.5 * s; g2 = T.g2[k] + (after - T.g2[k]) * 0.3 * s; }
+      else if (D === 2) { g1 = next + 0.03; g2 = after - 0.04; }
       else { g1 = next; g2 = after; }
       u += patch(T, g2, 2) + patch(T, g1, 1);
-      if (arm === 4) { u += ring(T, next) + ring(T, after, 'faint'); }
+      if (D === 4) { u += ring(T, next) + ring(T, after, 'faint'); }
       far = Math.max(g1, g2) + 0.15;
       // what happened at the last landing
       const last = k - 1;
       if (last >= 2 && s < 0.7) {
-        if (arm === 1) {
+        if (D === 1) {
           const err = Math.abs(f[last] - T.g1[last]);
           const [cls, txt] = err <= 0.10 ? ['ok', '✓ inside the patch'] : err <= 0.15 ? ['edge', 'near the patch edge'] : ['out', '✕ outside the patch'];
           o += badge(f[last] + 0.04, h(f[last]) - 0.15, cls, txt);
           if (cls === 'out') u += patch(T, T.g1[last], 1, true);
-        } else if (arm === 4) { u += ring(T, f[last], 'hit'); o += badge(f[last] + 0.04, h(f[last]) - 0.15, 'ok', '+ following reward'); }
+        } else if (D === 4) { u += ring(T, f[last], 'hit'); o += badge(f[last] + 0.04, h(f[last]) - 0.15, 'ok', '+ following reward'); }
       }
-      hud2 = arm === 1 ? 'the guesser sees only the body' : arm === 2 ? 'the guesser also reads the strip ahead' : arm === 3 ? 'guesser trained on human footsteps' : 'land in the ring to earn the following reward';
+      hud2 = D === 1 ? 'the guesser sees only the body' : D === 2 ? 'the guesser also reads the strip ahead' : D === 3 ? 'guesser trained on human footsteps' : 'land in the ring to earn the following reward';
     } else {
       for (let j = -3; j <= 22; j++) { const x = pelx + 0.1 * j; u += `<circle class="pdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
       const band = [], H = Math.min(1.5, T.total - tau);
@@ -778,8 +793,9 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         far = f[j] + 0.15;
       }
       if (far === null) far = pelx;
-      hud2 = arm === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : arm === 6 ? 'trained on people where the clips cover the terrain, on its own steps elsewhere' : 'ticks: finished steps that passed the checks';
+      hud2 = D === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : D === 6 ? 'trained on people where the clips cover the terrain, on its own steps elsewhere' : 'ticks: finished steps that passed the checks';
     }
+    if (arm === 1) hud2 = 'no command: only where the patches go hints at speed and heading';
     if (far !== null) {
       o += `<line class="horizon" x1="${X(far)}" x2="${X(far)}" y1="70" y2="${Y(h(far))}"/>`;
       o += `<text class="hlab" x="${(+X(far) + 6).toFixed(1)}" y="84">${(far - pelx).toFixed(1)} m ahead</text>`;
@@ -793,12 +809,13 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   const flow = $('flow');
   const nodeOn = {
     body: () => true, cmd: () => true, pol: () => true, rew: () => true, inp: () => true,
-    map: () => true, mod: a => a >= 1, human: a => a >= 3,
+    map: () => true, mod: a => a >= 1, human: a => a >= 4,
   };
   function setArm(a) {
     arm = a; const A = ARMS[a];
     document.querySelectorAll('#armSeg button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === a)));
-    flow.querySelectorAll('[data-arms]').forEach(n => n.classList.toggle('on', n.dataset.arms.includes(String(a))));
+    const key = a === 1 ? 'h' : String(a <= 1 ? a : a - 1);     // data-arms use the indices before L0.5; L0.5 is 'h'
+    flow.querySelectorAll('[data-arms]').forEach(n => n.classList.toggle('on', n.dataset.arms.includes(key)));
     flow.querySelectorAll('[data-node]').forEach(n => n.classList.toggle('off', !nodeOn[n.dataset.node](a)));
     $('modT').textContent = A.mod[0]; $('modT').setAttribute('y', A.mod[1] ? '194' : '206'); $('modS').textContent = A.mod[1];
     $('inpT').textContent = A.inp[0]; $('inpS').textContent = A.inp[1]; $('rewS').textContent = A.rew;

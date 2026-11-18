@@ -109,13 +109,14 @@ def main() -> None:
     ap.add_argument("--dataset", default="ab01", help="ladder: the clips (data/<dataset>)")
     ap.add_argument("--no-delays", action="store_true", help="no motor delays (default: the recipe's SCONE delays)")
     ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
+    ap.add_argument("--no-policy-command", action="store_true", help="ladder L0.5: the policy does not see the command")
     ap.add_argument("--drive-floor", type=float, default=0.05, help="lowest mean excitation per muscle (FloorPPO; 0 = off)")
     a = ap.parse_args()
     out = Path(a.out)
     resume = (out / "checkpoint.pt").exists()
     out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(a.seed)
-    config = LadderConfig(perception=a.perception) if a.task == "ladder" else None
+    config = LadderConfig(perception=a.perception, policy_command=not a.no_policy_command) if a.task == "ladder" else None
     if a.gaitamp_conditions:
         config = replace(config, **GAITAMP)
     env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset,

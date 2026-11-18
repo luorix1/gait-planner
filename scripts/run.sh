@@ -6,7 +6,8 @@
 #   --name     the run directory runs/NAME/; running the same name again continues it (train_wys.py resumes)
 #   --hours    training wall-clock for this start (default 12); a resubmitted job adds another --hours
 #   --steps    also stop at this many environment steps in total (e.g. 5e8)
-#   --ladder   a rung of the footstep planner ladder (gp.ladder, build B1) instead: L0 whole map, L1 patches
+#   --ladder   a rung of the footstep planner ladder (gp.ladder, build B1) instead: L0 whole map, L1 patches,
+#              L0.5 patches without the command in the policy's input
 #   --gaitamp  with --ladder: GAIT_amp's training conditions (flat, no delays/noise/pushes, 60 deg falls, walking starts)
 #   --smoke    a pipeline check in minutes: 256 worlds, 3 minutes of training, then the export
 #
@@ -26,10 +27,11 @@ while [[ $# -gt 0 ]]; do
     --worlds) worlds=$2; shift 2 ;;
     --seed) seed=$2; shift 2 ;;
     --ladder) case $2 in L0) ladder=(--task ladder --perception map) ;; L1) ladder=(--task ladder --perception patches) ;;
-              *) echo "--ladder takes L0 or L1" >&2; exit 1 ;; esac; shift 2 ;;
+              L0.5) ladder=(--task ladder --perception patches --no-policy-command) ;;
+              *) echo "--ladder takes L0, L0.5 or L1" >&2; exit 1 ;; esac; shift 2 ;;
     --gaitamp) extra=(--gaitamp-conditions); shift ;;
     --smoke) smoke=1; shift ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option $1 (--help)" >&2; exit 1 ;;
   esac
 done

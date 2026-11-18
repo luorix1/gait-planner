@@ -59,7 +59,8 @@ def main() -> None:
     rec = json.loads((run / "record.json").read_text())
     args = rec.get("args", {})
     kind = args.get("task", "wys")                     # a ladder run (gp.ladder): its rung, clips and delays as trained
-    base = LadderConfig(perception=args.get("perception", "patches")) if kind == "ladder" else WysConfig()
+    base = (LadderConfig(perception=args.get("perception", "patches"), policy_command=not args.get("no_policy_command", False))
+            if kind == "ladder" else WysConfig())
     types = WT.column_types()
     kinds = [t for t in dict.fromkeys(types) if kind != "ladder" or t in base.types]
     tiles = tuple((a.level, types.index(t)) for t in kinds)                         # first column of each type

@@ -50,6 +50,9 @@ class LadderConfig(WysConfig):
     lin_y: tuple = (0.0, 0.0)
     assist_offset: float = 0.0            # no helper pull (episodes start mid-stride from clip frames)
     perception: str = "patches"           # "patches" (L1) | "map" (L0)
+    #: False (L0.5): the actor's command block reads zeros. The guesser and the critic still get the command, so the
+    #: intent reaches the policy only through where the patches go (L1 minus the command; the reward is unchanged).
+    policy_command: bool = True
     types: tuple = STAGE1                 # terrain columns worlds are spread over
     w_task: float = 0.5
     w_style: float = 0.5
@@ -208,6 +211,8 @@ class Ladder(WatchYourStep):
         b = self.body_state(s)
         hmap, scan_a, scan_c = self.scans(s, b)
         noisy, clean = self.body_obs(b)
+        if not c.policy_command:
+            noisy = [torch.zeros_like(x) if x is self.cmd else x for x in noisy]
         mus = [s.activation, s.fiber_length / s.optimal_fiber_length, s.fiber_velocity / s.optimal_fiber_length,
                s.muscle_force / s.max_isometric_force, s.received]
         if c.perception == "patches":

@@ -40,6 +40,14 @@ def test_ladder_pairs_and_step() -> None:
     _, r, *_ = env.step(torch.full((4, task.nmus), 0.05))
     assert torch.isfinite(torch.as_tensor(r)).all()
     assert env.obs.shape[-1] == sum(b[1] for b in task.blocks)
+    # L0.5: the actor's command columns read zeros, the critic's keep the command
+    o = [b[0] for b in task.blocks]
+    at = lambda name: sum(b[1] for b in task.blocks[:o.index(name)])  # noqa: E731
+    task.cmd[:] = torch.tensor([1.0, 0.0, 0.3])
+    task.c = replace(task.c, policy_command=False)
+    obs = task.observation(env.state)
+    assert (obs[:, at("command"):at("command") + 3] == 0).all() and (obs[:, at("critic_command")] == 1.0).all()
+    task.c = replace(task.c, policy_command=True)
     # the drive floor: silent while every muscle's mean is above it (a fresh policy sits at 0.05), active below
     agent = FloorPPO(env, replace(default_ppo(), rollout_steps=24, compile_actor=False), device="cpu")
     obs = env.torch(env.obs)
