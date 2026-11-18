@@ -108,6 +108,7 @@ class WysConfig:
     spike_lin: float = 5.0
     spike_ang: float = 10.0
     training: bool = True                # False: no assist, pushes, disturbance or predictor refits (evaluation)
+    eval_assist: float = 0.0             # with training False: a fixed helper pull (x weight), to watch a run as it trains
     #: evaluation: the tiles (row, col) worlds take in turn at each reset, in place of the curriculum's
     eval_tiles: tuple = ()
 
@@ -363,6 +364,8 @@ class WatchYourStep(TorchTask):
         self.cmd[:, 2] = (c.heading_stiffness * _wrap(self.heading_target - psi)).clamp(*c.ang_z)
         self.cmd[self.standing] = 0.0
         self.cmd[self.turning, :2] = 0.0
+        if not c.training and c.eval_assist:
+            self._pert[0, : self.n] = torch.tensor([0.0, c.eval_assist * self.mass * 9.80665, 0.0], device=self.dev)
         if c.training:
             # helper pull (world up) and the constant pelvis push (body frame, so turned with the pelvis)
             alpha = max(0.0, min(c.assist_offset, (1 - c.assist_offset) * (1 - float(self.level.float().mean()) / c.assist_cutoff)))

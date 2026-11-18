@@ -2,8 +2,8 @@
 walking forward at 0.8 m/s, with the run's policy and its latest foothold predictor, training aids off (no helper pull,
 pushes or constant push; the authors' play settings). The folder carries the model, so it opens anywhere.
 
-Run: .venv/bin/python export_wys.py runs/wys_v1 [--level 5] [--speed 0.8] [--seconds 10] [--to-studio]
-Out: runs/<run>/studio_<iteration>/ (with --to-studio also copied into SPRINT Studio's results folder)
+Run: .venv/bin/python export_wys.py runs/wys_v1 [--level 5] [--speed 0.8] [--seconds 10] [--assist 0.5] [--to-studio]
+Out: runs/<run>/studio_<iteration>_L<level>[_pull<assist>]/ (with --to-studio also copied into SPRINT Studio's results folder)
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from pathlib import Path
 import torch
 from sprint.export import export_rollout
 from sprint.export import format as fmt
+from sprint.export.meshes import bake
+from sprint.export.rollout import FrameSource
 from sprint.recipes.ppo import ActorCritic, PPOConfig, env_action_bounds
 
 from gp import data
@@ -46,6 +48,7 @@ def main() -> None:
     ap.add_argument("--level", type=int, default=5)
     ap.add_argument("--speed", type=float, default=0.8)
     ap.add_argument("--seconds", type=float, default=10.0)
+    ap.add_argument("--assist", type=float, default=0.0, help="keep a helper pull of this x weight on (training's is 0.5 at level 0)")
     ap.add_argument("--to-studio", action="store_true", help="also copy the folder into SPRINT Studio's results folder")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
@@ -54,7 +57,7 @@ def main() -> None:
     from gp import wys_terrain as WT
     types = WT.column_types()
     tiles = tuple((a.level, types.index(t)) for t in dict.fromkeys(types))           # first column of each type
-    cfg = replace(WysConfig(), training=False, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
+    cfg = replace(WysConfig(), training=False, eval_assist=a.assist, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
                   ang_z=(0.0, 0.0), heading_stiffness=0.0, standing_frac=0.0, turning_frac=0.0,
                   resample_s=a.seconds + 1, xy_drift=0.0, z_drift=0.0, scan_noise=0.0,
                   n_lin=0.0, n_ang=0.0, n_grav=0.0, n_q=0.0, n_qd=0.0, spike_p=0.0)
@@ -63,15 +66,17 @@ def main() -> None:
     state = run / "task_state.pt"
     if state.exists():
         it = torch.load(state, weights_only=False)["steps"] // task.c.steps_per_iter
-    out = run / f"studio_{it}"
+    out = run / f"studio_{it}_L{a.level}" if not a.assist else run / f"studio_{it}_L{a.level}_pull{a.assist:g}"
     if out.exists():
         shutil.rmtree(out)
+    out.mkdir(parents=True)
+    shutil.copy2(data.MODEL, out / "model.osim")        # the folder carries its model; meshes baked from beside the source
     n = int(round(a.seconds / cfg.dt))
     export_rollout(out, env, policy(env, run / "policy.pt"), n_steps=n, episodes=len(tiles),
                    config=dict(run=str(run), iteration=it, foot_model=models[-1].name if models else "bootstrap",
-                               tiles={f"ep{k:03d}": types[c] for k, (_, c) in enumerate(tiles)}, level=a.level,
+                               tiles={f"ep{k:03d}": types[c] for k, (_, c) in enumerate(tiles)}, level=a.level, assist=a.assist,
                                speed_mps=a.speed),
-                   sim={"model": str(data.MODEL)})
+                   sim={"model": str((out / "model.osim").resolve())}, src=FrameSource(env, meshes=bake(data.MODEL)))
     print(f"-> {out}  ({len(tiles)} episodes: {', '.join(dict.fromkeys(types))})")
     if a.to_studio:
         dest = fmt.results_dir() / f"{run.name}.{out.name}"
