@@ -206,7 +206,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <header>
   <p class="eyebrow">gait_planner · footstep planner study · draft, 18 Nov 2026</p>
   <h1>Footstep planner ladder</h1>
-  <p class="lede">Seven designs for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
+  <p class="lede">Eight designs for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
   <div class="chips">
     <span class="chip next"><i></i>L0 + L1 run first (the stage-1 build)</span>
     <span class="chip todo"><i></i>L2, L3 are cheap variants</span>
@@ -322,23 +322,24 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
             <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
             <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
           </defs>
-          <path class="e data" data-arms="0123456" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
-          <text class="el" data-arms="0123456" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
-          <path class="e data" data-arms="0123456" d="M860 200 H890" marker-end="url(#fw)"/>
-          <path class="e train" data-arms="0123456" d="M860 362 H959 V246" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="123456" d="M540 200 H606" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="123456" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="123456" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
-          <path class="e terr" data-arms="23456" d="M226 278 C262 278 262 222 296 222" marker-end="url(#ft)"/>
+          <path class="e data" data-arms="01234567" d="M121 70 V24 H959 V154" marker-end="url(#fw)"/>
+          <text class="el" data-arms="01234567" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
+          <path class="e data" data-arms="01234567" d="M860 200 H890" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="01234567" d="M860 362 H959 V246" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567" d="M540 200 H606" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567" d="M226 102 C262 102 262 178 296 178" marker-end="url(#fw)"/>
+          <path class="e data" data-arms="1234567" d="M226 190 C262 190 262 200 296 200" marker-end="url(#fw)"/>
+          <path class="e terr" data-arms="234567" d="M226 278 C262 278 262 222 296 222" marker-end="url(#ft)"/>
           <path class="e terr" data-arms="01234" d="M226 294 H735 V246" marker-end="url(#ft)"/>
           <text class="el terr" data-arms="1234" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
           <text class="el terr" data-arms="0" x="420" y="316" text-anchor="middle">all 693 heights</text>
-          <path class="e train" data-arms="12" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
+          <path class="e train" data-arms="126" d="M930 158 V138 H480 V154" marker-end="url(#fw)"/>
           <text class="el" data-arms="12" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
-          <path class="e hum" data-arms="3456" d="M420 116 V154" marker-end="url(#fa)"/>
-          <text class="el hum" data-arms="3456" x="430" y="140">labels</text>
-          <path class="e train" data-arms="6" d="M930 158 V84 H544" marker-end="url(#fw)"/>
-          <text class="el" data-arms="6" x="737" y="76" text-anchor="middle">runs that pass the checks</text>
+          <text class="el" data-arms="6" x="705" y="130" text-anchor="middle">labels off the clips: the policy's own landings</text>
+          <path class="e hum" data-arms="34567" d="M420 116 V154" marker-end="url(#fa)"/>
+          <text class="el hum" data-arms="34567" x="430" y="140">labels</text>
+          <path class="e train" data-arms="7" d="M930 158 V84 H544" marker-end="url(#fw)"/>
+          <text class="el" data-arms="7" x="737" y="76" text-anchor="middle">runs that pass the checks</text>
           <g class="fn" data-node="body"><rect x="16" y="70" width="210" height="64" rx="12"/><text class="t1" x="121" y="96">Body state</text><text class="t2" x="121" y="118">joints, speeds, muscles</text></g>
           <g class="fn" data-node="cmd"><rect x="16" y="158" width="210" height="64" rx="12"/><text class="t1" x="121" y="184">Command</text><text class="t2" x="121" y="206">speed, turn</text></g>
           <g class="fn key" data-node="map"><rect x="16" y="246" width="210" height="64" rx="12"/><text class="t1" x="121" y="272">Height map</text><text class="t2" x="121" y="294">1.6 × 1.0 m, 5 cm cells</text></g>
@@ -365,7 +366,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-reward">
   <div class="sec-head">
     <h2 id="s-reward">The reward in B1 (L0 and L1)</h2>
-    <p>One number per control step, 40 times a second: half the paper's task terms, half the style judge's score, minus what the muscles cost. L4 adds a following term and L5, L6 the plan's own terms; those are still to design.</p>
+    <p>One number per control step, 40 times a second: half the paper's task terms, half the style judge's score, minus what the muscles cost. L4 adds a following term and L5 to L6 the plan's own terms; those are still to design.</p>
   </div>
   <div class="panel rw">
     <div class="formula"><span>r =</span><span class="fk task">½ × task</span><span>+</span><span class="fk style">½ × style</span><span>−</span><span class="fk eff">effort</span></div>
@@ -420,7 +421,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 
 <section aria-labelledby="s-glance">
   <div class="sec-head">
-    <h2 id="s-glance">All seven at a glance</h2>
+    <h2 id="s-glance">All eight at a glance</h2>
     <p>Highlighted cells are the one thing that changes from the row above. Each row's question is answered by comparing it with that row.</p>
   </div>
   <div class="panel tbl">
@@ -433,7 +434,8 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <tr><td>L3</td><td>guesser, 2 patches</td><td>yes</td><td class="chg">human footsteps</td><td>2 footholds</td><td>no</td><td>same as L0</td><td class="q">does human data make placement human-like?</td></tr>
         <tr><td>L4</td><td>guesser, 2 patches</td><td>yes</td><td>human footsteps</td><td>2 footholds</td><td class="chg">yes, rewarded</td><td class="chg">+ landing on the guessed footholds</td><td class="q">is looking enough, or must it step there?</td></tr>
         <tr><td>L5</td><td class="chg">planner: footholds, timing, centre-of-mass band</td><td>yes</td><td>human plans</td><td class="chg">about 1.5 s, 3 to 4 steps</td><td>yes</td><td class="chg">the plan's terms + style − effort; speed and turning move to the planner</td><td class="q">does anticipation need a longer horizon?</td></tr>
-        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">can it grow past the clips without drifting from human?</td></tr>
+        <tr><td>L5.5</td><td>planner</td><td>yes</td><td class="chg">human plans where the clips cover the terrain; its own landings elsewhere</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">is mixing in its own landings enough to leave the clips?</td></tr>
+        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs, in rounds</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">do the checks and rounds beat L5.5 past the clips, without drifting from human?</td></tr>
       </tbody>
     </table>
   </div>
@@ -462,7 +464,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
           <polyline class="ln pla" points="80,79 168,90 256,110 344,138 432,176 520,225"/>
           <text class="dl rea" x="168" y="68">reactive (expected for L0 to L4)</text>
           <text class="dl ppl" x="250" y="150" text-anchor="end">people (Camargo transitions)</text>
-          <text class="dl pla" x="250" y="168" text-anchor="end">planned (expected for L5, L6)</text>
+          <text class="dl pla" x="250" y="168" text-anchor="end">planned (expected for L5 to L6)</text>
         </svg>
       </div>
       <p class="note">No numbers on purpose: the human curve will come from Camargo's level-to-stair trials. This is the measure that should split the reactive designs from the planned ones.</p>
@@ -483,7 +485,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-order">
   <div class="sec-head">
     <h2 id="s-order">Order and cost</h2>
-    <p>The ladder follows the plan's B-then-A route, with three cheap rungs slotted in between.</p>
+    <p>The ladder follows the plan's B-then-A route, with four cheap rungs slotted in between.</p>
   </div>
   <ol class="road">
     <li class="now"><span class="st">B1</span><b>L0 + L1</b><span>on AB01 clips</span><span class="cost">next build</span></li>
@@ -491,12 +493,13 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <li><span class="st">L2, L3</span><b>Guesser variants</b><span>terrain strip; human labels</span><span class="cost">cheap</span></li>
     <li><span class="st">L4</span><b>Follow the footholds</b><span>add a following reward</span><span class="cost">small</span></li>
     <li><span class="st">A1</span><b>L5 planner</b><span>footholds, timing, centre-of-mass band</span><span class="cost">the big build</span></li>
+    <li><span class="st">A1.5</span><b>L5.5 mixed labels</b><span>human plans on the clips' terrain, own landings elsewhere</span><span class="cost">small</span></li>
     <li><span class="st">A2</span><b>L6 PARC loop</b><span>run, check, retrain the planner</span><span class="cost">loop rounds</span></li>
   </ol>
   <div class="cards">
     <div class="card"><span class="tag">Caveat</span><h3>Copied isn't predicted</h3><p>From L3 up, foot placement comes from human data, so it can't be claimed as a prediction. The claims are what wasn't copied: forces, moments, EMG, and behaviour on terrain past the clips.</p></div>
     <div class="card"><span class="tag">Data</span><h3>No SEED in footstep models</h3><p>Guessers and planners train on AB01, Camargo and the captured PARC clips only. A model that predicts human footsteps is too close to a motion generator for SEED's licence.</p></div>
-    <div class="card"><span class="tag">Coverage</span><h3>Past the clips</h3><p>Stepping stones, boxes and pits have no human footstep data, so L3 to L6 extrapolate there. That's where L6's loop has to earn its place.</p></div>
+    <div class="card"><span class="tag">Coverage</span><h3>Past the clips</h3><p>Stepping stones, boxes and pits have no human footstep data, so L3 to L5 extrapolate there. L5.5 falls back on the policy's own landings there, and L6's loop has to beat that.</p></div>
   </div>
 </section>
 
@@ -545,6 +548,12 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       e: 'The only design that should change step length 2 to 3 steps before stairs, as people do.',
       k2: 'Build the planner (route A, step A1).',
       mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
+    { k: 'L5.5', n: 'Mixed labels', title: 'L5.5 · Planner on mixed labels',
+      w: 'Same picture as L5. The change is in training: where the clips cover the terrain, the labels are human plans; everywhere else they are the policy’s own steps.',
+      c: 'The planner’s labels come from people on terrain the clips cover (level, ramps, stairs) and from the policy’s own landings elsewhere, as in L2.',
+      e: 'Human placement where people have walked, and no human-style targets pulling a foot into a gap. Off the clips the plan copies the policy’s habits, so following it there costs nothing.',
+      k2: 'Small: a per-terrain switch on the planner’s labels. No checks, no rounds.',
+      mod: ['Planner', 'mixed labels'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
     { k: 'L6', n: '+ loop', title: 'L6 · Planner + PARC loop',
       w: 'Green ticks mark finished steps that passed the checks. Those runs go back into the planner’s training data.',
       c: 'Rounds of: run, check, add the good runs, retrain the planner.',
@@ -656,7 +665,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     let u = '', o = '', far = null, hud2 = '';
     for (let i = 0; i < k - 1; i++) {
       u += `<line class="print" x1="${X(f[i] - 0.08)}" x2="${X(f[i] + 0.16)}" y1="${Y(h(f[i]))}" y2="${Y(h(f[i]))}"/>`;
-      if (arm === 6 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
+      if (arm === 7 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
     }
     if (arm === 0) {
       for (let j = -16; j <= 16; j++) { const x = pelx + 0.05 * j; u += `<circle class="mapdot" cx="${X(x)}" cy="${Y(h(x))}" r="3.4"/>`; }
@@ -696,7 +705,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         far = f[j] + 0.15;
       }
       if (far === null) far = pelx;
-      hud2 = arm === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : 'ticks: finished steps that passed the checks';
+      hud2 = arm === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : arm === 6 ? 'trained on people where the clips cover the terrain, on its own steps elsewhere' : 'ticks: finished steps that passed the checks';
     }
     if (far !== null) {
       o += `<line class="horizon" x1="${X(far)}" x2="${X(far)}" y1="70" y2="${Y(h(far))}"/>`;
