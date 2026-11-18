@@ -142,7 +142,7 @@ svg.dia { width:100%; height:auto; display:block }
 
 /* table */
 .tbl { overflow-x:auto }
-table { border-collapse:collapse; width:100%; font-size:15px; min-width:860px }
+table { border-collapse:collapse; width:100%; font-size:15px; min-width:1040px }
 th, td { text-align:left; vertical-align:top; padding:10px 10px; border-bottom:1px solid var(--line) }
 th { font-weight:600; color:var(--muted); font-size:12.5px; text-transform:uppercase; letter-spacing:.06em }
 td:first-child { font:600 14px var(--mono); white-space:nowrap }
@@ -389,8 +389,8 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <h3>Task <small>the paper's terms, each at a quarter of its weight (half for the task's share, half so tracking tops out like style)</small></h3>
         <table class="rt">
           <tbody>
-            <tr><td>Speed tracking</td><td>exp(−error² / 0.25), forward and sideways</td><td class="w">+0.25</td></tr>
-            <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25)</td><td class="w">+0.25</td></tr>
+            <tr><td>Speed tracking</td><td>exp(−error² / 0.25): the commanded forward speed, and no sideways speed</td><td class="w">+0.25</td></tr>
+            <tr><td>Turn-rate tracking</td><td>exp(−error² / 0.25): turning at the rate the command asks for, 0.5 × the gap to a target heading, at most 1 rad/s</td><td class="w">+0.25</td></tr>
             <tr><td>Upright</td><td>full while the pelvis stays at least 95 % of its standing height above the lowest foot</td><td class="w">+0.0625</td></tr>
             <tr><td>Vertical speed</td><td>pelvis speed up or down, squared</td><td class="w">−0.125</td></tr>
             <tr><td>Roll and pitch rates</td><td>squared</td><td class="w">−0.0125</td></tr>
@@ -432,15 +432,15 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   </div>
   <div class="panel tbl">
     <table>
-      <thead><tr><th>Design</th><th>Footholds come from</th><th>Guesser sees terrain</th><th>Trained on</th><th>Policy sees ahead</th><th>Must step there</th><th>Question it answers</th></tr></thead>
+      <thead><tr><th>Design</th><th>Footholds come from</th><th>Guesser sees terrain</th><th>Trained on</th><th>Policy sees ahead</th><th>Must step there</th><th>Policy's reward</th><th>Question it answers</th></tr></thead>
       <tbody>
-        <tr><td>L0</td><td>none; the policy reads the full map</td><td>–</td><td>–</td><td>0.8 m, the map edge</td><td>–</td><td class="q">the reference for everything below</td></tr>
-        <tr><td>L1</td><td class="chg">blind guesser, 2 patches</td><td>no</td><td>the policy's own landings</td><td>2 footholds</td><td>no, it only looks</td><td class="q">does looking only where the feet go learn faster on our body?</td></tr>
-        <tr><td>L2</td><td>guesser, 2 patches</td><td class="chg">yes, a strip ahead</td><td>own landings</td><td>2 footholds</td><td>no</td><td class="q">does the guesser need terrain?</td></tr>
-        <tr><td>L3</td><td>guesser, 2 patches</td><td>yes</td><td class="chg">human footsteps</td><td>2 footholds</td><td>no</td><td class="q">does human data make placement human-like?</td></tr>
-        <tr><td>L4</td><td>guesser, 2 patches</td><td>yes</td><td>human footsteps</td><td>2 footholds</td><td class="chg">yes, rewarded</td><td class="q">is looking enough, or must it step there?</td></tr>
-        <tr><td>L5</td><td class="chg">planner: footholds, timing, centre-of-mass band</td><td>yes</td><td>human plans</td><td class="chg">about 1.5 s, 3 to 4 steps</td><td>yes</td><td class="q">does anticipation need a longer horizon?</td></tr>
-        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs</td><td>about 1.5 s</td><td>yes</td><td class="q">can it grow past the clips without drifting from human?</td></tr>
+        <tr><td>L0</td><td>none; the policy reads the full map</td><td>–</td><td>–</td><td>0.8 m, the map edge</td><td>–</td><td>task + style − effort (B1)</td><td class="q">the reference for everything below</td></tr>
+        <tr><td>L1</td><td class="chg">blind guesser, 2 patches</td><td>no</td><td>the policy's own landings</td><td>2 footholds</td><td>no, it only looks</td><td>same as L0</td><td class="q">does looking only where the feet go learn faster on our body?</td></tr>
+        <tr><td>L2</td><td>guesser, 2 patches</td><td class="chg">yes, a strip ahead</td><td>own landings</td><td>2 footholds</td><td>no</td><td>same as L0</td><td class="q">does the guesser need terrain?</td></tr>
+        <tr><td>L3</td><td>guesser, 2 patches</td><td>yes</td><td class="chg">human footsteps</td><td>2 footholds</td><td>no</td><td>same as L0</td><td class="q">does human data make placement human-like?</td></tr>
+        <tr><td>L4</td><td>guesser, 2 patches</td><td>yes</td><td>human footsteps</td><td>2 footholds</td><td class="chg">yes, rewarded</td><td class="chg">+ landing on the guessed footholds</td><td class="q">is looking enough, or must it step there?</td></tr>
+        <tr><td>L5</td><td class="chg">planner: footholds, timing, centre-of-mass band</td><td>yes</td><td>human plans</td><td class="chg">about 1.5 s, 3 to 4 steps</td><td>yes</td><td class="chg">the plan's terms + style − effort; speed and turning move to the planner</td><td class="q">does anticipation need a longer horizon?</td></tr>
+        <tr><td>L6</td><td>planner</td><td>yes</td><td class="chg">human plans + its own checked runs</td><td>about 1.5 s</td><td>yes</td><td>same as L5</td><td class="q">can it grow past the clips without drifting from human?</td></tr>
       </tbody>
     </table>
   </div>
