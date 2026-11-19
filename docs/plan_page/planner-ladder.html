@@ -225,6 +225,19 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 .charts figcaption { font-size:15px }
 table.kv td:first-child { width:150px }
 @media (max-width:900px) { .charts { grid-template-columns:minmax(0, 1fr) } }
+.fn.obs rect { fill:var(--grey-soft); stroke:var(--wire); stroke-width:1.5 }
+.fn.sim rect { fill:var(--panel); stroke:var(--ink); stroke-width:2 }
+.fn.frozen rect { fill:var(--blue-soft); stroke:var(--blue); stroke-width:2.5; stroke-dasharray:2 5; stroke-linecap:round }
+.fn.op rect { fill:var(--teal-soft); stroke:var(--teal); stroke-width:2 }
+.fn.goal rect { fill:var(--good-soft); stroke:var(--good); stroke-width:2.5 }
+.dkey { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13.5px; color:var(--muted); margin-bottom:14px }
+.dkey .k::before { content:""; display:inline-block; width:24px; height:14px; border-radius:4px; margin-right:7px; vertical-align:-2px; box-sizing:border-box }
+.dkey .obs::before { background:var(--grey-soft); border:1.5px solid var(--wire) }
+.dkey .sim::before { background:var(--panel); border:2px solid var(--ink) }
+.dkey .learn::before { background:var(--blue-soft); border:2.5px solid var(--blue) }
+.dkey .frozen::before { background:var(--blue-soft); border:2.5px dotted var(--blue) }
+.dkey .op::before { background:var(--teal-soft); border:2px solid var(--teal) }
+.dkey .train::before { background:transparent; border:2.5px dashed var(--amber) }
 </style>
 
 <div class="wrap">
@@ -246,6 +259,7 @@ table.kv td:first-child { width:150px }
     <p>A muscle-driven walker that goes where it is told, over ground it has not walked on, and moves like a person, using only what a person has while walking: the command, its own body's senses and the ground near its feet. Human recordings are used in training only.</p>
   </div>
   <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
     <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="goal-t" style="min-width:820px">
       <title id="goal-t">At run time the controller, a foot placement estimator plus a muscle policy, gets only the command, the body's senses and the terrain near the next footholds, and drives the 90 muscles of the body. AB01's human recordings are used in training only. The goal: walk where told, on stones, slopes and rough ground, rarely fall, and move like a human in joints, muscles and forces.</title>
       <defs>
@@ -262,12 +276,12 @@ table.kv td:first-child { width:150px }
       <path class="w" d="M900 190 H972.5" marker-end="url(#gw)"/>
       <text class="lab" x="936" y="180" text-anchor="middle">walks</text>
       <g class="fn hum"><rect x="20" y="30" width="230" height="90" rx="12"/><text class="t1" x="135" y="58">Human recordings</text><text class="t2" x="135" y="82">AB01: walking, start-stop,</text><text class="t2" x="135" y="102">standing, ramps</text></g>
-      <g class="fn"><rect x="20" y="172" width="230" height="38" rx="10"/><text class="t2" x="135" y="196" style="fill:var(--ink)">command: speed, turn</text></g>
-      <g class="fn"><rect x="20" y="222" width="230" height="38" rx="10"/><text class="t2" x="135" y="246" style="fill:var(--ink)">body senses</text></g>
-      <g class="fn key"><rect x="20" y="272" width="230" height="38" rx="10"/><text class="t2" x="135" y="296" style="fill:var(--ink)">terrain near the next steps</text></g>
+      <g class="fn obs"><rect x="20" y="172" width="230" height="38" rx="10"/><text class="t2" x="135" y="196" style="fill:var(--ink)">command: speed, turn</text></g>
+      <g class="fn obs"><rect x="20" y="222" width="230" height="38" rx="10"/><text class="t2" x="135" y="246" style="fill:var(--ink)">body senses</text></g>
+      <g class="fn obs"><rect x="20" y="272" width="230" height="38" rx="10"/><text class="t2" x="135" y="296" style="fill:var(--ink)">terrain near the next steps</text></g>
       <g class="fn pol"><rect x="360" y="120" width="260" height="140" rx="12"/><text class="t1" x="490" y="156">Controller</text><text class="t2" x="490" y="182">foot placement estimator</text><text class="t2" x="490" y="202">+ muscle policy</text><text class="t2" x="490" y="226">40 times a second</text></g>
-      <g class="fn"><rect x="720" y="140" width="180" height="100" rx="12"/><text class="t1" x="810" y="176">Body</text><text class="t2" x="810" y="200">Rajagopal,</text><text class="t2" x="810" y="220">90 muscles</text></g>
-      <g class="fn key"><rect x="980" y="50" width="200" height="270" rx="12"/><text class="t1" x="1080" y="84">The goal</text>
+      <g class="fn sim"><rect x="720" y="140" width="180" height="100" rx="12"/><text class="t1" x="810" y="176">Body</text><text class="t2" x="810" y="200">Rajagopal,</text><text class="t2" x="810" y="220">90 muscles</text></g>
+      <g class="fn goal"><rect x="980" y="50" width="200" height="270" rx="12"/><text class="t1" x="1080" y="84">The goal</text>
         <text class="t2" x="1080" y="118" style="fill:var(--ink)">walks where told</text><text class="t2" x="1080" y="140">speed and heading</text>
         <text class="t2" x="1080" y="174" style="fill:var(--ink)">on any ground</text><text class="t2" x="1080" y="196">stones, slopes, rough</text>
         <text class="t2" x="1080" y="230" style="fill:var(--ink)">rarely falls</text>
@@ -282,6 +296,7 @@ table.kv td:first-child { width:150px }
     <p>L1's two networks, both at the clip's 40 Hz. The estimator guesses where each foot will land next; the terrain is read only at those two spots; the muscle policy turns everything into 90 muscle excitations. This is what the teacher is distilled into, and what stage 1 trains.</p>
   </div>
   <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k frozen">frozen network</span><span class="k op">fixed computation</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
     <svg class="dia" viewBox="0 0 1200 570" role="img" aria-labelledby="nets-t" style="min-width:820px">
       <title id="nets-t">Body state and command go noise-free to the foot placement estimator, which outputs the next landing of each foot. A patch lookup reads 7 by 7 heights of the height map at those two spots. The muscle policy gets body state, command and muscle states with sensor noise, plus the two patches, 687 numbers, and outputs 90 excitations, which reach the muscles after 10, 20 or 40 ms. The estimator is trained on the policy's own landings.</title>
       <defs>
@@ -306,17 +321,17 @@ table.kv td:first-child { width:150px }
       <text class="lab" x="945" y="142" text-anchor="middle">90</text><text class="lab" x="945" y="160" text-anchor="middle">excitations</text>
       <!-- training labels -->
       <path class="w train" d="M460 490 V467.5" marker-end="url(#nw)"/>
-      <g class="fn"><rect x="20" y="20" width="260" height="110" rx="12"/><text class="t1" x="150" y="48">Body state</text><text class="t2" x="150" y="72">17 joint angles and speeds</text><text class="t2" x="150" y="92">pelvis velocity, turn rate, gravity</text><text class="t2" x="150" y="112">last action (90)</text></g>
-      <g class="fn"><rect x="20" y="150" width="260" height="62" rx="12"/><text class="t1" x="150" y="176">Command</text><text class="t2" x="150" y="198">forward speed, turn rate</text></g>
-      <g class="fn"><rect x="20" y="232" width="260" height="92" rx="12"/><text class="t1" x="150" y="258">Muscle states (× 90)</text><text class="t2" x="150" y="282">activation, fibre length and speed,</text><text class="t2" x="150" y="302">tendon force, excitation received</text></g>
-      <g class="fn"><rect x="330" y="360" width="260" height="90" rx="12"/><text class="t1" x="460" y="388">Foot placement estimator</text><text class="t2" x="460" y="412">in: body state + command (45)</text><text class="t2" x="460" y="432">out: next landing of each foot (4)</text></g>
-      <g class="fn key"><rect x="690" y="360" width="260" height="90" rx="12"/><text class="t1" x="820" y="388">Patch lookup</text><text class="t2" x="820" y="412">7 × 7 heights at each landing</text><text class="t2" x="820" y="432">5 cm cells, ±5 cm drift</text></g>
-      <g class="fn"><rect x="690" y="490" width="260" height="60" rx="12"/><text class="t1" x="820" y="516">Height map</text><text class="t2" x="820" y="536">the ground under the body</text></g>
-      <g class="fn dash"><rect x="345" y="490" width="230" height="60" rx="12"/><text class="t1" x="460" y="516">Training labels</text><text class="t2" x="460" y="536">the policy's own landings</text></g>
-      <g class="fn pol"><rect x="640" y="90" width="260" height="170" rx="12"/><text class="t1" x="770" y="140">Muscle policy</text><text class="t2" x="770" y="166">687 inputs → 90 outputs</text><text class="t2" x="770" y="188">network 512-2048-512-2048-512</text><text class="t2" x="770" y="210">40 times a second</text></g>
-      <g class="fn"><rect x="990" y="120" width="190" height="110" rx="12"/><text class="t1" x="1085" y="150">Muscles</text><text class="t2" x="1085" y="174">excitation arrives after</text><text class="t2" x="1085" y="194">10, 20 or 40 ms;</text><text class="t2" x="1085" y="214">they move the body</text></g>
+      <g class="fn obs"><rect x="20" y="20" width="260" height="110" rx="12"/><text class="t1" x="150" y="48">Body state</text><text class="t2" x="150" y="72">17 joint angles and speeds</text><text class="t2" x="150" y="92">pelvis velocity, turn rate, gravity</text><text class="t2" x="150" y="112">last action (90)</text></g>
+      <g class="fn obs"><rect x="20" y="150" width="260" height="62" rx="12"/><text class="t1" x="150" y="176">Command</text><text class="t2" x="150" y="198">forward speed, turn rate</text></g>
+      <g class="fn obs"><rect x="20" y="232" width="260" height="92" rx="12"/><text class="t1" x="150" y="258">Muscle states (× 90)</text><text class="t2" x="150" y="282">activation, fibre length and speed,</text><text class="t2" x="150" y="302">tendon force, excitation received</text></g>
+      <g class="fn frozen"><rect x="330" y="360" width="260" height="90" rx="12"/><text class="t1" x="460" y="388">Foot placement estimator</text><text class="t2" x="460" y="412">in: body state + command (45)</text><text class="t2" x="460" y="432">out: next landing of each foot (4)</text></g>
+      <g class="fn op"><rect x="690" y="360" width="260" height="90" rx="12"/><text class="t1" x="820" y="388">Patch lookup</text><text class="t2" x="820" y="412">7 × 7 heights at each landing</text><text class="t2" x="820" y="432">5 cm cells, ±5 cm drift</text></g>
+      <g class="fn sim"><rect x="690" y="490" width="260" height="60" rx="12"/><text class="t1" x="820" y="516">Height map</text><text class="t2" x="820" y="536">the ground under the body</text></g>
+      <g class="fn hum"><rect x="345" y="490" width="230" height="60" rx="12"/><text class="t1" x="460" y="516">Fitted beforehand</text><text class="t2" x="460" y="536">on AB01's human footsteps</text></g>
+      <g class="fn pol"><rect x="640" y="90" width="260" height="170" rx="12"/><text class="t1" x="770" y="140">Muscle policy</text><text class="t2" x="770" y="166">687 inputs → 90 outputs</text><text class="t2" x="770" y="188">network 512-2048-512-2048-512</text><text class="t2" x="770" y="210">trained; 40 times a second</text></g>
+      <g class="fn sim"><rect x="990" y="120" width="190" height="110" rx="12"/><text class="t1" x="1085" y="150">Muscles</text><text class="t2" x="1085" y="174">excitation arrives after</text><text class="t2" x="1085" y="194">10, 20 or 40 ms;</text><text class="t2" x="1085" y="214">they move the body</text></g>
     </svg>
-    <p class="note">In the student the estimator is fixed: fitted to human footsteps (below) or to where the teacher's feet land. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. During distillation each clip walks on its own ground (flat or its ramp), and the patches read it.</p>
+    <p class="note">The estimator is fitted beforehand to AB01's human footsteps (on held-out clips: 5–7 cm median error while walking, 43 cm when starting, stopping or standing) and stays frozen in distillation. Only the muscle policy is trained. A critic (training only) also gets the noise-free state and the full 33 × 21 height map.</p>
   </div>
 </section>
 
@@ -340,7 +355,7 @@ table.kv td:first-child { width:150px }
       <text class="lab" x="200" y="226" text-anchor="middle">signal: match the clip</text>
       <text class="lab" x="600" y="226" text-anchor="middle">signal: the teacher's action</text>
       <text class="lab" x="1000" y="226" text-anchor="middle">signal: speed × heading, style</text>
-      <text class="axl" x="200" y="254" text-anchor="middle">mc021 passed · all AB01 running</text>
+      <text class="axl" x="200" y="254" text-anchor="middle">mc021 passed · all AB01 training</text>
       <text class="axl" x="600" y="254" text-anchor="middle">mc021 passed</text>
       <text class="axl" x="1000" y="254" text-anchor="middle">not started</text>
     </svg>
@@ -353,6 +368,7 @@ table.kv td:first-child { width:150px }
     <p>SPRINT's port of STC's imitation reward and physics, trained with PPO and without the EMG term (AB01 has no EMG). STC itself trains this body with FlashSAC and adds error-weighted episode starts and reset priming; whether we need those is open (see Next).</p>
   </div>
   <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
     <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="tl-t" style="min-width:860px">
       <title id="tl-t">Teacher training loop. The teacher reads the body's state plus the clip's next second and sends 90 excitations to the simulated body. The reward compares the body with the clip now, minus effort, and PPO updates the teacher from it.</title>
       <defs>
@@ -369,10 +385,10 @@ table.kv td:first-child { width:150px }
       <path class="w" d="M1070 135 V270 H887.5" marker-end="url(#tw)"/><text class="lab" x="980" y="260" text-anchor="middle">state</text>
       <path class="w train" d="M760 225 V142.5" marker-end="url(#tw)"/><text class="lab" x="772" y="186">PPO update</text>
       <g class="fn hum"><rect x="20" y="45" width="220" height="90" rx="12"/><text class="t1" x="130" y="78">AB01 clip</text><text class="t2" x="130" y="102">the reference</text></g>
-      <g class="fn"><rect x="330" y="45" width="240" height="90" rx="12"/><text class="t1" x="450" y="74">Teacher's inputs</text><text class="t2" x="450" y="98">its state + the clip ahead,</text><text class="t2" x="450" y="118">as errors from now</text></g>
-      <g class="fn pol"><rect x="660" y="45" width="200" height="90" rx="12"/><text class="t1" x="760" y="84">Teacher</text><text class="t2" x="760" y="108">policy network</text></g>
-      <g class="fn"><rect x="960" y="45" width="220" height="90" rx="12"/><text class="t1" x="1070" y="74">Simulated body</text><text class="t2" x="1070" y="98">muscle delays</text><text class="t2" x="1070" y="118">10 / 20 / 40 ms</text></g>
-      <g class="fn key"><rect x="580" y="225" width="300" height="90" rx="12"/><text class="t1" x="730" y="254">Reward</text><text class="t2" x="730" y="278">match the clip now:</text><text class="t2" x="730" y="298">pose, feet, body points − effort</text></g>
+      <g class="fn obs"><rect x="330" y="45" width="240" height="90" rx="12"/><text class="t1" x="450" y="74">Teacher's inputs</text><text class="t2" x="450" y="98">its state + the clip ahead,</text><text class="t2" x="450" y="118">as errors from now</text></g>
+      <g class="fn pol"><rect x="660" y="45" width="200" height="90" rx="12"/><text class="t1" x="760" y="84">Teacher</text><text class="t2" x="760" y="108">trained by PPO</text></g>
+      <g class="fn sim"><rect x="960" y="45" width="220" height="90" rx="12"/><text class="t1" x="1070" y="74">Simulated body</text><text class="t2" x="1070" y="98">muscle delays</text><text class="t2" x="1070" y="118">10 / 20 / 40 ms</text></g>
+      <g class="fn hum"><rect x="580" y="225" width="300" height="90" rx="12"/><text class="t1" x="730" y="254">Reward</text><text class="t2" x="730" y="278">match the clip now:</text><text class="t2" x="730" y="298">pose, feet, body points − effort</text></g>
     </svg>
     <p class="note">One clip frame passes per 40 Hz control step. The clip ahead is read at 1, 2, 3, 5, 8, 14, 24 and 40 steps (25 ms to 1 s). Episodes start at a random clip frame and end when the pelvis is 30 cm from the clip or 60° off for 3 steps, when the clip ends, or after 10 s.</p>
   </div>
@@ -404,6 +420,7 @@ table.kv td:first-child { width:150px }
     <p>Supervised, not reinforcement learning. One simulated body, two views of it: the teacher's inputs and L1's. Every state is labelled with the teacher's action, whoever is driving, and the student is fitted to every label so far. Because the student increasingly drives, it collects labels in the states its own mistakes lead to, which copying only the teacher's states would never show it.</p>
   </div>
   <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k frozen">frozen network</span><span class="k op">fixed computation</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
     <svg class="dia" viewBox="0 0 1200 480" role="img" aria-labelledby="dag-t" style="min-width:860px">
       <title id="dag-t">DAgger loop. The simulated body feeds two views: the teacher's inputs, with the clip, go to the frozen teacher, whose action is the label; L1's 687 inputs go to the student. Each episode is driven by the teacher with probability beta, else by the student, and the chosen action runs the next 25 ms step. Student inputs and teacher actions fill a buffer of the last 2 million states, and the student is fitted to it after every 24 steps.</title>
       <defs>
@@ -432,13 +449,13 @@ table.kv td:first-child { width:150px }
       <text class="lab" x="455" y="222" fill="var(--amber)">inputs</text>
       <path d="M745 275 V317.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#da)"/>
       <text class="lab" x="757" y="302" fill="var(--amber)">fit (MSE)</text>
-      <g class="fn"><rect x="20" y="180" width="230" height="100" rx="12"/><text class="t1" x="135" y="210">Simulated body</text><text class="t2" x="135" y="234">the recipe's environment</text><text class="t2" x="135" y="254">mc021, 4,096 worlds</text></g>
-      <g class="fn"><rect x="330" y="35" width="230" height="90" rx="12"/><text class="t1" x="445" y="62">Teacher's inputs</text><text class="t2" x="445" y="86">body and muscle state,</text><text class="t2" x="445" y="106">the clip 1 s ahead</text></g>
-      <g class="fn"><rect x="330" y="315" width="230" height="110" rx="12"/><text class="t1" x="445" y="342">L1's inputs (687)</text><text class="t2" x="445" y="366">body and muscle state,</text><text class="t2" x="445" y="386">command from the clip,</text><text class="t2" x="445" y="406">foot patches (estimator)</text></g>
-      <g class="fn pol"><rect x="630" y="35" width="230" height="90" rx="12"/><text class="t1" x="745" y="68">Teacher</text><text class="t2" x="745" y="94">frozen snapshot</text></g>
-      <g class="fn pol"><rect x="630" y="325" width="230" height="90" rx="12"/><text class="t1" x="745" y="358">Student</text><text class="t2" x="745" y="384">stage 1's network</text></g>
+      <g class="fn sim"><rect x="20" y="180" width="230" height="100" rx="12"/><text class="t1" x="135" y="210">Simulated body</text><text class="t2" x="135" y="234">the recipe's environment</text><text class="t2" x="135" y="254">mc021, 4,096 worlds</text></g>
+      <g class="fn obs"><rect x="330" y="35" width="230" height="90" rx="12"/><text class="t1" x="445" y="62">Teacher's inputs</text><text class="t2" x="445" y="86">body and muscle state,</text><text class="t2" x="445" y="106">the clip 1 s ahead</text></g>
+      <g class="fn obs"><rect x="330" y="315" width="230" height="110" rx="12"/><text class="t1" x="445" y="342">L1's inputs (687)</text><text class="t2" x="445" y="366">body and muscle state,</text><text class="t2" x="445" y="386">command from the clip,</text><text class="t2" x="445" y="406">foot patches (estimator)</text></g>
+      <g class="fn frozen"><rect x="630" y="35" width="230" height="90" rx="12"/><text class="t1" x="745" y="68">Teacher</text><text class="t2" x="745" y="94">frozen (from phase 1)</text></g>
+      <g class="fn pol"><rect x="630" y="325" width="230" height="90" rx="12"/><text class="t1" x="745" y="358">Student</text><text class="t2" x="745" y="384">trained; stage 1's network</text></g>
       <g class="fn hum"><rect x="630" y="185" width="230" height="90" rx="12"/><text class="t1" x="745" y="214">Label buffer</text><text class="t2" x="745" y="238">L1 inputs + teacher action</text><text class="t2" x="745" y="258">last 2 million states</text></g>
-      <g class="fn key"><rect x="910" y="185" width="230" height="90" rx="12"/><text class="t1" x="1025" y="214">Who drives?</text><text class="t2" x="1025" y="238">per episode: the teacher</text><text class="t2" x="1025" y="258">with probability β</text></g>
+      <g class="fn op"><rect x="910" y="185" width="230" height="90" rx="12"/><text class="t1" x="1025" y="214">Who drives?</text><text class="t2" x="1025" y="238">per episode: the teacher</text><text class="t2" x="1025" y="258">with probability β</text></g>
     </svg>
     <p class="note">β is 1 for the first 5 iterations (they also set the student's input normaliser), then falls linearly to 0 by iteration 85. Each iteration: 24 steps of all 4,096 worlds, then 64 gradient steps of 8,192 labels on the teacher's pre-squash mean. The estimator stays fixed, fitted to AB01's footsteps; on mc021's flat ground the patches read flat anyway. Script distill.py.</p>
   </div>
@@ -871,7 +888,7 @@ table.kv td:first-child { width:150px }
   <ol class="road">
     <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps</span></li>
     <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° vs teacher 5.83°</span></li>
-    <li class="now"><span class="st">Running</span><b>Teacher, all AB01</b><span>276 windows. 7.7° at 67M, but 76 % of episodes still fall; from each window's start it falls in 95 %. Open: switch to STC's own setup (FlashSAC, error-weighted starts, reset priming)</span></li>
+    <li class="now"><span class="st">Running</span><b>Teacher, all AB01</b><span>276 windows. Falls now dropping: from each window's start it fell in 95 % at 61M, 63 % at 138M (8.1°). Hardest: start-stop. Pass at 200M: ≤ ~6°, ≤ 10 % falls</span></li>
     <li><span class="st">Next</span><b>Distil, all AB01</b><span>pass: nearly the teacher, ramps included</span></li>
     <li><span class="st">Then</span><b>Stage 1</b><span>from the student: command + style on curriculum ground</span></li>
     <li><span class="st">Then</span><b>The ladder</b><span>every rung starts from stage 1</span></li>
