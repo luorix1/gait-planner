@@ -390,7 +390,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <p>Every step has a pass mark written down before it runs and a check within about an hour; a step that misses is stopped and diagnosed, not extended.</p>
   </div>
   <div class="cards">
-    <div class="card" id="status-now"><span class="tag">Running</span><h3>Recipe teacher on mc021</h3><p>Run recipe_teacher_mc021, started 19 Nov, 6 h budget. Check at 50M steps (about 1 h). An earlier custom teacher (teacher_mc021) reached 9.9° at 50M and was stopped.</p></div>
+    <div class="card" id="status-now"><span class="tag">Running</span><h3>Teacher passed; distilling</h3><p>The recipe teacher passed its check: 6.1° joint error at 50M steps, 2 % of episodes falling (the custom teacher was at 9.9°). It keeps training. Distillation run distill_mc021 started from its 57M snapshot: 40 min, the teacher's share going from 1 to 0 over the first half, then the student and the teacher evaluated alone.</p></div>
     <div class="card"><span class="tag">Teacher passes if</span><h3>It tracks the clip</h3><p>By about 50M steps: most episodes finish the 10 s clip, joint error under about 6°, calf, knee and hip extensors working in stance. If it lags the same way the custom teacher did, the body is slower to learn than H2190 and the pass mark is recalibrated rather than the method doubted.</p></div>
     <div class="card"><span class="tag">Then</span><h3>Student, then expand</h3><p>Distil on mc021 (pass: nearly the teacher). Only then: all of AB01 (276 windows, ramps included) for teacher and student, then stage 1 from the student.</p></div>
   </div>
