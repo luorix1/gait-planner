@@ -269,6 +269,50 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   </div>
 </section>
 
+<section aria-labelledby="s-nets">
+  <div class="sec-head">
+    <h2 id="s-nets">The foot placement estimator and the muscle policy</h2>
+    <p>Two networks run 40 times a second. The estimator guesses where each foot will land next; the terrain is read only at those two spots; the muscle policy turns everything into 90 muscle excitations. The same wiring in both stages.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 570" role="img" aria-labelledby="nets-t" style="min-width:820px">
+      <title id="nets-t">Body state and command go noise-free to the foot placement estimator, which outputs the next landing of each foot. A patch lookup reads 7 by 7 heights of the height map at those two spots. The muscle policy gets body state, command and muscle states with sensor noise, plus the two patches, 688 numbers, and outputs 90 excitations, which reach the muscles after 10, 20 or 40 ms. The estimator is trained on the policy's own landings.</title>
+      <defs>
+        <marker id="nw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="nt" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <!-- policy inputs: a bus into the policy -->
+      <path class="w" d="M280 105 H560"/><path class="w" d="M280 172 H560"/><path class="w" d="M280 275 H560"/>
+      <path class="w" d="M560 105 V275"/><path class="w" d="M560 175 H622.5" marker-end="url(#nw)"/>
+      <text class="lab" x="550" y="95" text-anchor="end">with sensor noise</text>
+      <!-- estimator inputs: around the left edge, noise-free -->
+      <path class="w" d="M20 60 H8 V405 H312.5" marker-end="url(#nw)"/><path class="w" d="M20 190 H8"/>
+      <text class="lab" x="170" y="396" text-anchor="middle">noise-free</text>
+      <!-- estimator to patches, terrain to patches, patches to policy -->
+      <path class="w" d="M590 405 H672.5" marker-end="url(#nw)"/>
+      <text class="lab" x="640" y="396" text-anchor="middle">landings</text>
+      <path class="w terr" d="M820 490 V467.5" marker-end="url(#nt)"/>
+      <path class="w terr" d="M820 360 V277.5" marker-end="url(#nt)"/>
+      <text class="lab terr" x="832" y="314">two patches</text><text class="lab terr" x="832" y="332">(102 numbers)</text>
+      <!-- policy out -->
+      <path class="w" d="M900 175 H972.5" marker-end="url(#nw)"/>
+      <text class="lab" x="945" y="142" text-anchor="middle">90</text><text class="lab" x="945" y="160" text-anchor="middle">excitations</text>
+      <!-- training labels -->
+      <path class="w train" d="M460 490 V467.5" marker-end="url(#nw)"/>
+      <g class="fn"><rect x="20" y="20" width="260" height="110" rx="12"/><text class="t1" x="150" y="48">Body state</text><text class="t2" x="150" y="72">17 joint angles and speeds</text><text class="t2" x="150" y="92">pelvis velocity, turn rate, gravity</text><text class="t2" x="150" y="112">last action (90)</text></g>
+      <g class="fn"><rect x="20" y="150" width="260" height="62" rx="12"/><text class="t1" x="150" y="176">Command</text><text class="t2" x="150" y="198">speed, sideways speed, turn rate</text></g>
+      <g class="fn"><rect x="20" y="232" width="260" height="92" rx="12"/><text class="t1" x="150" y="258">Muscle states (× 90)</text><text class="t2" x="150" y="282">activation, fibre length and speed,</text><text class="t2" x="150" y="302">tendon force, excitation received</text></g>
+      <g class="fn"><rect x="330" y="360" width="260" height="90" rx="12"/><text class="t1" x="460" y="388">Foot placement estimator</text><text class="t2" x="460" y="412">in: body state + command (46)</text><text class="t2" x="460" y="432">out: next landing of each foot (4)</text></g>
+      <g class="fn key"><rect x="690" y="360" width="260" height="90" rx="12"/><text class="t1" x="820" y="388">Patch lookup</text><text class="t2" x="820" y="412">7 × 7 heights at each landing</text><text class="t2" x="820" y="432">5 cm cells, ±5 cm drift</text></g>
+      <g class="fn"><rect x="690" y="490" width="260" height="60" rx="12"/><text class="t1" x="820" y="516">Height map</text><text class="t2" x="820" y="536">the ground under the body</text></g>
+      <g class="fn dash"><rect x="345" y="490" width="230" height="60" rx="12"/><text class="t1" x="460" y="516">Training labels</text><text class="t2" x="460" y="536">the policy's own landings</text></g>
+      <g class="fn pol"><rect x="640" y="90" width="260" height="170" rx="12"/><text class="t1" x="770" y="140">Muscle policy</text><text class="t2" x="770" y="166">688 inputs → 90 outputs</text><text class="t2" x="770" y="188">network 512-2048-512-2048-512</text><text class="t2" x="770" y="210">40 times a second</text></g>
+      <g class="fn"><rect x="990" y="120" width="190" height="110" rx="12"/><text class="t1" x="1085" y="150">Muscles</text><text class="t2" x="1085" y="174">excitation arrives after</text><text class="t2" x="1085" y="194">10, 20 or 40 ms;</text><text class="t2" x="1085" y="214">they move the body</text></g>
+    </svg>
+    <p class="note">The estimator is refitted every 500 training iterations on where the policy's feet actually landed; for the first 500 it places the patches at fixed spots beside the feet. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. In stage 0 the ground is flat, so the patches read flat ground.</p>
+  </div>
+</section>
+
 <section aria-labelledby="s-why">
   <div class="sec-head">
     <h2 id="s-why">Why from scratch failed</h2>
@@ -323,9 +367,11 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-stage1">
   <div class="sec-head">
     <h2 id="s-stage1">Stage 1 in detail</h2>
-    <p>The B1 setup the from-scratch runs used, now starting from the walker. Reward per control step: ½ × speed × heading + ½ × style − effort, with speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free, heading exp(−turn-rate error²), and effort at fixed weights of 0.0025 each.</p>
+    <p>The B1 setup the from-scratch runs used, now starting from the walker.</p>
   </div>
   <div class="cards">
+    <div class="card"><span class="tag">Reward</span><h3>Per control step</h3><p>½ × speed × heading + ½ × style − effort. Speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free; heading exp(−turn-rate error²); effort at fixed weights of 0.0025 each (metabolic power, summed cubed activation, compartment balance). A fall ends the episode with no penalty.</p></div>
+    <div class="card"><span class="tag">Style</span><h3>The style judge</h3><p>GAIT_amp's adversarial judge, trained alongside the policy: it learns to score human pose pairs +1 and the policy's −1, and the style reward is max(0, 1 − ¼ (score − 1)²). Each pair is two poses 25 ms apart: pelvis height over the ground, the pelvis's up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned between them. Human pairs: 75,334 from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. It starts fresh in stage 1: stage 0 does not train it.</p></div>
     <div class="card"><span class="tag">Body</span><h3>Body and physics</h3><p>Rajagopal lower body: 90 muscles, 23 joints. 40 control steps a second, 75 physics steps each. Motor delays: 10 ms for hip and trunk muscles, 20 ms knee, 40 ms ankle and foot.</p></div>
     <div class="card"><span class="tag">World</span><h3>Ground</h3><p>8 × 8 m tiles in 10 levels. Of the 10 columns, 6 are stepping stones (50 cm stones, 10 cm gaps over 30 cm holes at the easiest level), 3 slopes (up to 3° easiest, 29° hardest), 1 rough (2–10 cm bumps at every level). Worlds start at levels 0–2, go up after walking 4 m and down after less than half the commanded distance.</p></div>
     <div class="card"><span class="tag">Senses</span><h3>What the policy senses</h3><p>Body state with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s), the command, five states per muscle, and 98 heights in two patches where the blind guesser expects the feet to land (±5 cm drift). The critic also gets the clean state and the full map.</p></div>
@@ -343,6 +389,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   <div class="cards">
     <div class="card"><span class="tag">Keep</span><h3>Clearly beyond from scratch</h3><p>Episodes well past the from-scratch runs' length at the same step count (about 57 steps at 85M), aiming for 100+ and rising; imitation reward climbing toward 0.6 or more and joint error toward 10°; calf, knee and hip extensor drive at or above the 0.05 start.</p></div>
     <div class="card"><span class="tag">Kill</span><h3>The same trap again</h3><p>Episodes still under about 70 steps, and extensor drive sunk below 0.04.</p></div>
+    <div class="card"><span class="tag">Bug found</span><h3>Too much sensor noise</h3><p>The policy's joint-speed and turn-rate readings had their noise added after scaling: 20× the intended noise on joint speeds (equivalent to ±30 rad/s) and 5× on turn rate, so the policy could barely see its joint speeds. Every run so far had it, including this stage 0. Fixed in the code (594f565); a restart of stage 0 would use the fix.</p></div>
     <div class="card" id="status-now"><span class="tag">Now</span><h3>24M steps (20:21)</h3><p>Episodes 40 steps (1 s), imitation reward 0.52 and rising, joint error 13° and falling. Metabolic power is falling (3.4 to 2.75 W/kg), the direction the failed runs took: the check decides.</p></div>
   </div>
 </section>
