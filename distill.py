@@ -15,7 +15,7 @@ critic is untrained: stage 1 trains a fresh one.
 Run (GPU, detached; a fresh --out per run):
   setsid nohup .venv/bin/python distill.py --teacher runs/recipe_teacher_mc021 --trials ab01_mc021 \\
       --out runs/distill_mc021 --minutes 30 > runs/distill_mc021.log 2>&1 < /dev/null &
-Out: record.json, progress.csv, checkpoint.pt, task_state.pt, teacher.pt (the snapshot distilled), eval.json (the
+Out: record.json, progress.csv, tb/ (TensorBoard), checkpoint.pt, task_state.pt, teacher.pt (the snapshot distilled), eval.json (the
 student and the teacher alone, deterministic, from the recipe's starts).
 """
 
@@ -37,6 +37,7 @@ import sprint
 import torch
 from sprint.recipes.ppo import PPO, ActorCritic, RunningNorm, env_action_bounds
 from sprint.recipes.study import default_ppo
+from torch.utils.tensorboard import SummaryWriter
 
 from gp import fpm as FPM
 from gp.pretrain import Pretrain, PretrainConfig
@@ -228,6 +229,7 @@ def main() -> None:
     by_teacher = torch.ones(a.worlds, dtype=torch.bool, device=dev)
     t_ep = torch.zeros(a.worlds, device=dev)
     f = (out / "progress.csv").open("w", buffering=1)
+    tb = SummaryWriter(out / "tb", flush_secs=30)
     w: csv.DictWriter | None = None
     start, it = time.time(), 0
     deadline = start + a.minutes * 60
@@ -287,8 +289,12 @@ def main() -> None:
             w = csv.DictWriter(f, fieldnames=list(row))
             w.writeheader()
         w.writerow(row)
+        for k, v in row.items():
+            if k != "iteration" and isinstance(v, (int, float)) and math.isfinite(v):
+                tb.add_scalar(k, v, it)
         if it % 10 == 1:
             print("  ".join(f"{k} {v:.4g}" if isinstance(v, float) else f"{k} {v}" for k, v in row.items()), flush=True)
+    tb.close()
     # save as stage 1 loads it (train_wys.py --init-from)
     torch.save(dict(net=S.state_dict(), distilled_from=str(a.teacher), iterations=it), out / "checkpoint.pt")
     torch.save(dict(fpm=view.fpm.state_dict(), fpm_ready=True), out / "task_state.pt")
