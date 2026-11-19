@@ -309,11 +309,11 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-teacher">
   <div class="sec-head">
     <h2 id="s-teacher">The teacher</h2>
-    <p>Ordinary imitation, the way STC trains this same body: the policy sees where the clip is going and is rewarded for following it. Run teacher_mc021.</p>
+    <p>STC's imitation recipe, unchanged except for the EMG term (AB01 has no EMG): SPRINT's recommended imitation reward, inputs, physics and PPO. The policy sees where the clip is going and is rewarded for following it. Run recipe_teacher_mc021.</p>
   </div>
   <div class="panel scroll">
     <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
-      <title id="track-t">The teacher's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis height 0.05, torso 0.05, minus effort.</title>
+      <title id="track-t">The teacher's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis position 0.05, torso 0.05, minus effort.</title>
       <rect x="20" y="40" width="208" height="30" rx="5" fill="var(--blue)"/>
       <rect x="230" y="40" width="103" height="30" rx="5" fill="var(--blue)" opacity=".8"/>
       <rect x="335" y="40" width="138" height="30" rx="5" fill="var(--teal)"/>
@@ -325,16 +325,16 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <text class="seg-l" x="281" y="90" text-anchor="middle">joint speeds 0.15</text>
       <text class="seg-l" x="404" y="90" text-anchor="middle">feet 0.20</text>
       <text class="seg-l" x="526" y="90" text-anchor="middle">body points 0.15</text>
-      <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis height 0.05 · torso 0.05</text>
+      <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis position 0.05 · torso 0.05</text>
       <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
     </svg>
-    <p class="note">SPRINT's recommended imitation terms; feet and body points relative to the pelvis in its heading frame, the pelvis by its height over the ground.</p>
+    <p class="note">SPRINT's recommended imitation terms (recommended() without EMG), as STC trains this body.</p>
   </div>
   <div class="cards">
-    <div class="card"><span class="tag">Inputs</span><h3>L1's, plus the clip</h3><p>Everything the student gets (body state, command, muscle states, two patches), plus the clip 1, 2, 3, 5, 8, 14, 24 and 40 steps ahead (up to 1 s): joint angles, pelvis height, orientation, velocity and position, and the feet relative to the pelvis, each as the error from the body now.</p></div>
+    <div class="card"><span class="tag">Inputs</span><h3>The recipe's own</h3><p>Body and muscle state, the clip 1, 2, 3, 5, 8, 14, 24 and 40 steps ahead (up to 1 s), and a height scan. The teacher never needs L1's inputs: the distillation computes those separately from the same simulated body.</p></div>
     <div class="card"><span class="tag">Timing</span><h3>The clip plays at its own rate</h3><p>One clip frame per 40 Hz control step, the same rate as the policy and the estimator. Seeing the clip ahead, the teacher can stay in step on its own.</p></div>
-    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>Starts from a random frame of the clip on flat ground (ramp clips on 5° or 10° ramp strips once all of AB01 is in). An episode ends when the pelvis is 15 cm off the clip's height or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>As before</h3><p>SPRINT's PPO with the STC settings, 8,192 worlds; effort as STC weighs it (metabolic, cubed activation, compartment balance at 0.02 each); motor delays 10/20/40 ms.</p></div>
+    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>The recipe's: a random frame of mc021's three windows on flat ground, with small reset noise. An episode ends when the pelvis is 30 cm from the clip or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
+    <div class="card"><span class="tag">Learner</span><h3>The recipe's PPO</h3><p>SPRINT's default PPO with its left-right symmetry loss, 4,096 worlds; effort as STC weighs it (metabolic, cubed activation, compartment balance at 0.02 each); motor delays 10/20/40 ms. SPRINT updated so the symmetry loss mirrors this body correctly.</p></div>
   </div>
 </section>
 
@@ -344,7 +344,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <p>Supervised, not reinforcement learning: the student learns to output the teacher's 90 excitations from L1's inputs alone.</p>
   </div>
   <div class="cards">
-    <div class="card"><span class="tag">DAgger</span><h3>Labels on the states the student visits</h3><p>Roll out a mix of teacher and student, moving toward the student; label every state with the teacher's action; fit the student to all labels so far. Copying only the teacher's own states would leave the student lost after its first mistake.</p></div>
+    <div class="card"><span class="tag">DAgger</span><h3>Labels on the states the student visits</h3><p>Roll out a mix of teacher and student, moving toward the student; label every state with the teacher's action; fit the student to all labels so far. Copying only the teacher's own states would leave the student lost after its first mistake. At each state the teacher reads its own inputs and the student reads L1's, both computed from the same simulated body.</p></div>
     <div class="card"><span class="tag">Estimator</span><h3>Fixed during distillation</h3><p>Either the estimator fitted to AB01's footsteps (held-out clips: about 5–7 cm median error while walking, 43 cm when starting, stopping or standing, against 57 cm for fixed spots) or one fitted to where the teacher's feet land. On flat ground the patches are constant, so for mc021 it does not matter.</p></div>
     <div class="card"><span class="tag">Pass</span><h3>Nearly the teacher</h3><p>Within about 30 minutes of distillation the student tracks mc021 nearly as well as the teacher: most episodes finish the clip, joint error close to the teacher's. If it cannot, L1's inputs are missing something the teacher uses, and we find out what.</p></div>
   </div>
@@ -390,8 +390,8 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <p>Every step has a pass mark written down before it runs and a check within about an hour; a step that misses is stopped and diagnosed, not extended.</p>
   </div>
   <div class="cards">
-    <div class="card" id="status-now"><span class="tag">Running</span><h3>Teacher on mc021</h3><p>Run teacher_mc021, 150M steps, started 19 Nov. Check at about 50M steps (about 1 h).</p></div>
-    <div class="card"><span class="tag">Teacher passes if</span><h3>It tracks the clip</h3><p>By about 50M steps: most episodes finish the 10 s clip, joint error under about 6°, calf, knee and hip extensors working in stance. If not, the problem is in our environment (the method is proven) and we debug it there.</p></div>
+    <div class="card" id="status-now"><span class="tag">Running</span><h3>Recipe teacher on mc021</h3><p>Run recipe_teacher_mc021, started 19 Nov, 6 h budget. Check at 50M steps (about 1 h). An earlier custom teacher (teacher_mc021) reached 9.9° at 50M and was stopped.</p></div>
+    <div class="card"><span class="tag">Teacher passes if</span><h3>It tracks the clip</h3><p>By about 50M steps: most episodes finish the 10 s clip, joint error under about 6°, calf, knee and hip extensors working in stance. If it lags the same way the custom teacher did, the body is slower to learn than H2190 and the pass mark is recalibrated rather than the method doubted.</p></div>
     <div class="card"><span class="tag">Then</span><h3>Student, then expand</h3><p>Distil on mc021 (pass: nearly the teacher). Only then: all of AB01 (276 windows, ramps included) for teacher and student, then stage 1 from the student.</p></div>
   </div>
 </section>
