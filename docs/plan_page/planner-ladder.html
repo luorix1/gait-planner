@@ -388,7 +388,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-reward">
   <div class="sec-head">
     <h2 id="s-reward">The reward in B1 (L0 and L1)</h2>
-    <p>One number per control step, 40 times a second: half the task (speed × heading), half the style judge's score, minus what the muscles cost. L4 adds a following term and L5 to L6 the plan's own terms; those are still to design.</p>
+    <p>One number per control step, 40 times a second: half the task (speed × heading), half the style judge's score, minus what the muscles cost. L4 shares the task half with following the guessed footholds, and from L5 the plan takes it over (next section).</p>
   </div>
   <div class="panel rw">
     <div class="formula"><span>r =</span><span class="fk task">½ × task</span><span>+</span><span class="fk style">½ × style</span><span>−</span><span class="fk eff">effort</span></div>
@@ -434,6 +434,41 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
         <p class="note">Learner: each muscle's mean drive is kept at 0.05 or above. In the first runs the leg extensors sank to about 0.02, where learning can barely raise them again, and the walkers collapsed within 2 s.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-rew2">
+  <div class="sec-head">
+    <h2 id="s-rew2">Rewards from L3 on</h2>
+    <p>The style half and the effort stay as in B1; only the task half changes. L3 keeps L1's reward exactly: only the guesser's labels change, to the next two human footfalls, taken at the foot centre by the same function on clips and simulation. L4 shares the task half with following the guessed footholds. From L5 the plan takes it over.</p>
+  </div>
+  <div class="panel rw">
+    <div class="scroll">
+      <svg class="dia" viewBox="0 0 900 270" role="img" aria-labelledby="rew2-t" style="min-width:600px; max-width:900px">
+        <title id="rew2-t">The most a step can earn, to scale, per rung group. L0 to L3: speed times heading 0.5, style 0.5. L4: speed times heading 0.25, following 0.25, style 0.5. L5 to L6: touchdowns 0.3, centre-of-mass band 0.2, style 0.5.</title>
+        <text class="seg-l" x="20" y="38">L0 to L3</text>
+        <rect x="120" y="16" width="298" height="34" rx="6" fill="var(--blue)"/>
+        <rect x="420" y="16" width="300" height="34" rx="6" fill="var(--teal)"/>
+        <text class="seg-n" x="269" y="70" text-anchor="middle">speed × heading 0.5</text><text class="seg-n" x="570" y="70" text-anchor="middle">style 0.5</text>
+        <text class="seg-l" x="20" y="125">L4</text>
+        <rect x="120" y="103" width="148" height="34" rx="6" fill="var(--blue)"/>
+        <rect x="270" y="103" width="148" height="34" rx="6" fill="var(--amber)"/>
+        <rect x="420" y="103" width="300" height="34" rx="6" fill="var(--teal)"/>
+        <text class="seg-n" x="194" y="157" text-anchor="middle">speed × heading 0.25</text><text class="seg-n" x="344" y="157" text-anchor="middle">following 0.25</text><text class="seg-n" x="570" y="157" text-anchor="middle">style 0.5</text>
+        <text class="seg-l" x="20" y="212">L5 to L6</text>
+        <rect x="120" y="190" width="178" height="34" rx="6" fill="var(--amber)"/>
+        <rect x="300" y="190" width="118" height="34" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+        <rect x="420" y="190" width="300" height="34" rx="6" fill="var(--teal)"/>
+        <text class="seg-n" x="209" y="244" text-anchor="middle">touchdowns 0.3</text><text class="seg-n" x="359" y="244" text-anchor="middle">CoM band 0.2</text><text class="seg-n" x="570" y="244" text-anchor="middle">style 0.5</text>
+        <text class="seg-n" x="738" y="38">− effort</text><text class="seg-n" x="738" y="125">− effort</text><text class="seg-n" x="738" y="212">− effort</text>
+      </svg>
+    </div>
+    <p class="note">The most a control step can earn, to scale; the effort comes off at the fixed weights. Touchdown terms pay for time, so their scale matches the per-step terms.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">L4</span><h3>Following the guessed footholds</h3><p>At each touchdown, hit = exp(−d²/σ²): d is the horizontal distance from the foot centre to the foothold the guesser gave for that foot when it lifted off, so a guess that keeps re-aiming at the foot can't be followed for free. σ is the L3 guesser's own error on held-out human steps. Paid for time: hit × the control steps since the last touchdown, at most 1 s, so extra short steps earn nothing more. The first touchdown after a start has no target and is skipped.</p></div>
+    <div class="card"><span class="tag">L5 on</span><h3>Touchdowns and the centre-of-mass band</h3><p>Touchdown = foothold hit × timing hit exp(−Δt²/σ_t²), both against the plan as it stood when the foot lifted off, paid for time as in L4. Every step, the centre of mass scores 1 inside the plan's band and exp(−(distance outside)²/σ_c²) outside it. σ, σ_t and σ_c are the planner's own errors on held-out human plans. No speed or heading term: the plan carries the command.</p></div>
+    <div class="card"><span class="tag">L6</span><h3>Checks for the loop</h3><p>A run enters the planner's training data only with no fall in the window, a style score at a human level, metabolic power of 2 to 5 W/kg, peak vertical ground force under 1.5 body weights and every joint within human limits. L5.5 and L6 pay the policy as L5 does; they change only what the planner learns from.</p></div>
   </div>
 </section>
 
@@ -493,9 +528,9 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <div class="bar none" style="grid-row:6; grid-column:2 / span 5">no, it only looks</div>
       <div class="bar base new" style="grid-row:6; grid-column:7 / span 4">yes, rewarded for landing there</div>
       <div class="lh" style="grid-row:7">Policy’s reward</div>
-      <div class="bar base" style="grid-row:7; grid-column:2 / span 5">speed × heading + style − effort</div>
-      <div class="bar base new" style="grid-row:7; grid-column:7 / span 1">+ landing on the footholds</div>
-      <div class="bar base new" style="grid-row:7; grid-column:8 / span 3">the plan’s terms + style − effort</div>
+      <div class="bar base" style="grid-row:7; grid-column:2 / span 5">½ speed × heading + ½ style − effort</div>
+      <div class="bar base new" style="grid-row:7; grid-column:7 / span 1">¼ speed × heading + ¼ following + ½ style − effort</div>
+      <div class="bar base new" style="grid-row:7; grid-column:8 / span 3">0.3 touchdowns + 0.2 centre-of-mass band + ½ style − effort; no speed or heading</div>
       <div class="lh q" style="grid-row:8">Question</div>
       <div class="qq" style="grid-row:8; grid-column:2">the reference for everything to its right</div>
       <div class="qq" style="grid-row:8; grid-column:3">can the patches alone tell the policy where to go? (compare with L1)</div>
@@ -617,25 +652,25 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       c: 'The guessed footholds become targets the policy is rewarded for hitting.',
       e: 'Closer biomechanics where the human plan suits this body; less robust where it doesn’t.',
       k2: 'A following reward.',
-      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: 'task, style, following, effort' },
+      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: '¼ task + ¼ follow + ½ style − effort' },
     { k: 'L5', n: 'Planner', title: 'L5 · Planner with a longer horizon',
       w: 'The planner lays out every foothold in the next 1.5 s, with the time to each touchdown and a band the centre of mass should stay in.',
       c: 'A planner replaces the guesser: 3 to 4 footholds, contact timing and a centre-of-mass band.',
       e: 'The only design that should change step length 2 to 3 steps before stairs, as people do.',
       k2: 'Build the planner (route A, step A1).',
-      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
+      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
     { k: 'L5.5', n: 'Mixed labels', title: 'L5.5 · Planner on mixed labels',
       w: 'Same picture as L5. The change is in training: where the clips cover the terrain, the labels are human plans; everywhere else they are the policy’s own steps.',
       c: 'The planner’s labels come from people on terrain the clips cover (level, ramps, stairs) and from the policy’s own landings elsewhere, as in L2.',
       e: 'Human placement where people have walked, and no human-style targets pulling a foot into a gap. Off the clips the plan copies the policy’s habits, so following it there costs nothing.',
       k2: 'Small: a per-terrain switch on the planner’s labels. No checks, no rounds.',
-      mod: ['Planner', 'mixed labels'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
+      mod: ['Planner', 'mixed labels'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
     { k: 'L6', n: '+ loop', title: 'L6 · Planner + PARC loop',
       w: 'Green ticks mark finished steps that passed the checks. Those runs go back into the planner’s training data.',
       c: 'Rounds of: run, check, add the good runs, retrain the planner.',
       e: 'Covers terrain past the clips. Watch for drift away from human placement.',
       k2: 'Loop rounds (step A2).',
-      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'task, style, following, effort' },
+      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
   ];
 
   // ---------- terrains (metres; x forward, h up) ----------
