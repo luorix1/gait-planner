@@ -229,7 +229,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   <h1>Footstep planner ladder</h1>
   <p class="lede">Eight designs and one ablation (L0.5) for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
   <div class="chips">
-    <span class="chip next"><i></i>L1 training now (run b1_L1_v2)</span>
+    <span class="chip next"><i></i>L1 stage 0 training now (run b1_pretrain)</span>
     <span class="chip todo"><i></i>L2, L3 are cheap variants</span>
     <span class="chip todo"><i></i>L4 to L6 need a following reward or a planner</span>
     <span class="chip ill"><i></i>Scenes are illustrations, not simulation output</span>
@@ -474,8 +474,13 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 
 <section aria-labelledby="s-setup">
   <div class="sec-head">
-    <h2 id="s-setup">How L1 trains now</h2>
-    <p>Run b1_L1_v2: L1 (blind guesser, two patches) on the whole stage-1 setup for 100M steps. "Full conditions" means everything the B1 design has, the terrain, delays, sensor noise and pushes, unlike the diagnostic run that stripped them out.</p>
+    <h2 id="s-setup">How L1 trains now: two stages</h2>
+    <p>Trained from scratch, L1's policy never learned to bear weight: from its untrained start no uniform muscle drive keeps this body up, so a reward for staying up pushes the extensors down. So L1 now trains in two stages. Stage 0 learns to walk by imitating AB01's level clips, as STC trains this same model. Stage 1 starts from that walker with the ladder's reward on the whole stage-1 setup (cards below). Every rung starts from the same stage-0 walker.</p>
+  </div>
+  <div class="cards" style="margin-bottom:16px">
+    <div class="card"><span class="tag">Stage 0</span><h3>Imitation pretraining (run b1_pretrain)</h3><p>L1's inputs, with no reference clip in them. Reward: SPRINT's imitation terms against AB01's level walking, start-stop and standing clips on flat ground (joint angles 0.30, joint speeds 0.15, pelvis height 0.05, pelvis orientation 0.10, feet 0.20, body points 0.15, torso 0.05), minus STC's effort (0.02 each). The command follows the clip's speed and heading; the clip's clock follows the walker's step timing, within 0.25 s of real time. An episode ends when the pelvis is 15 cm off the clip's height, or 60° off its orientation, for 3 steps. 300M steps.</p></div>
+    <div class="card"><span class="tag">Stage 1</span><h3>The ladder's reward</h3><p>Starts from stage 0's policy, critic and guesser, with a fresh optimiser. Speed × heading, style and effort at the fixed weights, on the terrain curriculum with delays, sensor noise and pushes: the setup in the cards below.</p></div>
+    <div class="card"><span class="tag">Why</span><h3>What stage 0 fixes</h3><p>Held at one drive, every muscle at 0.05 falls in 0.8 s and every muscle at 0.5 in 0.25 s, so more drive only falls faster until the policy is coordinated. Imitation pays for the right joint angles and pelvis height every step, so it never has to find standing by surviving longer.</p></div>
   </div>
   <div class="cards">
     <div class="card"><span class="tag">Body</span><h3>Body and physics</h3><p>Rajagopal lower body: 90 muscles, 23 joints. 40 control steps a second, 75 physics steps each. Motor delays: 10 ms for hip and trunk muscles, 20 ms knee, 40 ms ankle and foot.</p></div>
@@ -483,7 +488,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <div class="card"><span class="tag">Senses</span><h3>What the policy senses</h3><p>Body state with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s), the command, five states per muscle, and 98 heights in two patches where the blind guesser expects the feet to land (±5 cm drift). The critic also gets the clean state and the full map.</p></div>
     <div class="card"><span class="tag">Episodes</span><h3>Starts and commands</h3><p>A random frame of 152 level AB01 clips (walking, start-stop, standing; 28 % standing frames), with the clip's velocities. The command starts at that frame's speed and heading; every 10 s a new random speed (0–1.5 m/s) and heading. 20 s at most.</p></div>
     <div class="card"><span class="tag">Disturbances</span><h3>Pushes and falls</h3><p>Friction ×0.5–2 per world, a constant push of up to 7 N per episode, a velocity kick every 4 s. A fall (tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching) ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Muscles start at 0.05 drive, and each muscle's mean drive is kept at 0.05 or above.</p></div>
+    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Muscles start at 0.05 drive. Stage 0 has no drive floor; whether stage 1 keeps the 0.05 floor is still open.</p></div>
   </div>
 </section>
 
