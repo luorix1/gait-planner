@@ -138,18 +138,7 @@ class Pretrain(Ladder):
         self.lm = [bn.index(b) for b in c.landmarks]
         com_local = torch.as_tensor(np.asarray(env.model.host["body_com"])[: len(bn)], dtype=torch.float32, device=dev)
         self.ex_com = self.ex_xp + _rot(self.ex_xq, com_local.expand(len(self.ex_xp), -1, -1))
-        # the command's speed per frame: the pair's forward speed (a clip's last frame repeats its last pair),
-        # averaged over +-speed_window frames inside the clip
-        F = len(self.ex_q)
-        sp = torch.zeros(F, device=dev)
-        sp[self.ex_frame] = self.ex_vf
-        last = self.ex_last_f == torch.arange(F, device=dev)
-        sp[last] = sp[last.nonzero().squeeze(1) - 1]
-        cs = torch.cat([torch.zeros(1, device=dev), sp.cumsum(0)])
-        i = torch.arange(F, device=dev)
-        lo = torch.maximum(self.ex_first_f, i - c.speed_window)
-        hi = torch.minimum(self.ex_last_f, i + c.speed_window)
-        self.ex_speed_f = (cs[hi + 1] - cs[lo]) / (hi - lo + 1).float()
+        self._speed_table()
         self._ramp_setup()
         n = self.n
         self.ref_f = torch.zeros(n, dtype=torch.long, device=dev)
@@ -158,6 +147,20 @@ class Pretrain(Ladder):
         self.far = torch.zeros(n, dtype=torch.long, device=dev)
         self.tilted = torch.zeros(n, dtype=torch.long, device=dev)
         self._ended = torch.zeros(n, dtype=torch.bool, device=dev)
+
+    def _speed_table(self) -> None:
+        """The command's speed per frame: the pair's forward speed (a clip's last frame repeats its last pair),
+        averaged over +-speed_window frames inside the clip."""
+        dev, F = self.dev, len(self.ex_q)
+        sp = torch.zeros(F, device=dev)
+        sp[self.ex_frame] = self.ex_vf
+        last = self.ex_last_f == torch.arange(F, device=dev)
+        sp[last] = sp[last.nonzero().squeeze(1) - 1]
+        cs = torch.cat([torch.zeros(1, device=dev), sp.cumsum(0)])
+        i = torch.arange(F, device=dev)
+        lo = torch.maximum(self.ex_first_f, i - self.c.speed_window)
+        hi = torch.minimum(self.ex_last_f, i + self.c.speed_window)
+        self.ex_speed_f = (cs[hi + 1] - cs[lo]) / (hi - lo + 1).float()
 
     def _ramp_setup(self) -> None:
         """Start pools by ground grade (level, then each ramp grade) and every world's column and pool."""
