@@ -24,6 +24,7 @@ from sprint.recipes.ppo import ActorCritic, PPOConfig, env_action_bounds
 
 from gp import data
 from gp.ladder import LadderConfig
+from gp.pretrain import PretrainConfig
 from gp.wys import WysConfig
 from train_wys import build
 
@@ -60,10 +61,11 @@ def main() -> None:
     rec = json.loads((run / "record.json").read_text())
     args = rec.get("args", {})
     kind = args.get("task", "wys")                     # a ladder run (gp.ladder): its rung, clips and delays as trained
-    base = (LadderConfig(perception=args.get("perception", "patches"), policy_command=not args.get("no_policy_command", False))
-            if kind == "ladder" else WysConfig())
+    base = ({"ladder": LadderConfig, "pretrain": PretrainConfig}[kind](perception=args.get("perception", "patches"),
+                                                                        policy_command=not args.get("no_policy_command", False))
+            if kind in ("ladder", "pretrain") else WysConfig())
     types = WT.column_types()
-    kinds = [t for t in dict.fromkeys(types) if kind != "ladder" or t in base.types]
+    kinds = [t for t in dict.fromkeys(types) if kind not in ("ladder", "pretrain") or t in base.types]
     tiles = tuple((a.level, types.index(t)) for t in kinds) * a.per_tile            # first column of each type
     cfg = replace(base, training=False, eval_assist=a.assist, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
                   ang_z=(0.0, 0.0), heading_stiffness=0.0, standing_frac=0.0, turning_frac=0.0,

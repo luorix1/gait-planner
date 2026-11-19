@@ -38,6 +38,7 @@ from torch.utils.tensorboard import SummaryWriter
 from gp import data
 from gp import wys_terrain as WT
 from gp.ladder import Ladder, LadderConfig
+from gp.pretrain import Pretrain, PretrainConfig
 from gp.tasks import recipe_config
 from gp.wys import WatchYourStep, WysConfig
 
@@ -74,18 +75,20 @@ class FloorPPO(PPO):
 
 def build(worlds: int, seed: int, device: str, out: Path | None = None, config: WysConfig | None = None,
           foot_model: str | None = None, kind: str = "wys", dataset: str = "ab01", delays: bool = True, flat: bool = False):
-    """``kind`` "wys" (gp.wys) or "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig);
-    ``flat``: every tile levelled."""
+    """``kind`` "wys" (gp.wys), "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig) or
+    "pretrain" (gp.pretrain, stage 0: imitation of the clips, always on levelled tiles); ``flat``: every tile levelled."""
+    flat = flat or kind == "pretrain"
     T = WT.build()
     if flat:
         T.heights[:] = 0.0
         T.block[:] = np.nan
     model = data.load_model(device)
     c = recipe_config()
-    if kind == "ladder":
-        cfg = config or LadderConfig()
+    if kind in ("ladder", "pretrain"):
+        cfg = config or (PretrainConfig() if kind == "pretrain" else LadderConfig())
         D = data.load("train", src=data.ROOT / "data" / dataset)
-        task: WatchYourStep = Ladder(T, D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
+        cls = Pretrain if kind == "pretrain" else Ladder
+        task: WatchYourStep = cls(T, D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
     else:
         cfg = config or WysConfig()
         task = WatchYourStep(T, cfg, seed=seed, log_dir=out, foot_model=foot_model)
@@ -104,19 +107,21 @@ def main() -> None:
     ap.add_argument("--worlds", type=int, default=8192)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--task", choices=("wys", "ladder"), default="wys")
+    ap.add_argument("--task", choices=("wys", "ladder", "pretrain"), default="wys")
     ap.add_argument("--perception", choices=("patches", "map"), default="patches", help="ladder: L1 patches, L0 map")
     ap.add_argument("--dataset", default="ab01", help="ladder: the clips (data/<dataset>)")
     ap.add_argument("--no-delays", action="store_true", help="no motor delays (default: the recipe's SCONE delays)")
     ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
     ap.add_argument("--no-policy-command", action="store_true", help="ladder L0.5: the policy does not see the command")
+    ap.add_argument("--init-from", help="ladder: start the policy, critic and guesser from this run (e.g. a pretrain run)")
     ap.add_argument("--drive-floor", type=float, default=0.05, help="lowest mean excitation per muscle (FloorPPO; 0 = off)")
     a = ap.parse_args()
     out = Path(a.out)
     resume = (out / "checkpoint.pt").exists()
     out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(a.seed)
-    config = LadderConfig(perception=a.perception, policy_command=not a.no_policy_command) if a.task == "ladder" else None
+    config = ({"ladder": LadderConfig, "pretrain": PretrainConfig}[a.task](perception=a.perception, policy_command=not a.no_policy_command)
+              if a.task in ("ladder", "pretrain") else None)
     if a.gaitamp_conditions:
         config = replace(config, **GAITAMP)
     env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset,
@@ -133,6 +138,13 @@ def main() -> None:
         if "amp" in ts:
             task.amp.load_state_dict(ts["amp"])
         print(f"resumed {out} at iteration {task.steps // task.c.steps_per_iter}, {agent.env_steps / 1e6:.0f}M steps", flush=True)
+    elif a.init_from:                       # weights only: a fresh optimiser and step count for the new reward
+        src = Path(a.init_from)
+        agent.net.load_state_dict(torch.load(src / "checkpoint.pt", map_location=task.dev, weights_only=False)["net"])
+        ts = torch.load(src / "task_state.pt", map_location=task.dev, weights_only=False)
+        task.fpm.load_state_dict(ts["fpm"])
+        task.fpm_ready = bool(ts["fpm_ready"])
+        print(f"initialised from {src}", flush=True)
     here = Path(__file__).parent
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=here, capture_output=True, text=True).stdout.strip())
@@ -167,7 +179,7 @@ def main() -> None:
             if isinstance(v, (int, float)) and k != "env_steps":
                 tb.add_scalar(k, v, s["env_steps"])
         if len(rows) % 20 == 1:
-            keys = [k for k in ("task/level", "task/r_speed", "task/r_heading", "task/r_track_lin_vel_xy", "task/r_style", "task/metabolic",
+            keys = [k for k in ("task/level", "task/imitation", "task/joint_error_deg", "task/r_speed", "task/r_heading", "task/r_track_lin_vel_xy", "task/r_style", "task/metabolic",
                                 "task/amp_accuracy", "task/effort", "task/assist", "episode_length",
                                 "terminated_frac", "steps_per_s") if k in s]
             print(f"it {s['iteration']:6d}  {s['env_steps'] / 1e6:7.1f}M  {s['seconds']:6d} s  "

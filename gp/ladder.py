@@ -148,7 +148,11 @@ class Ladder(WatchYourStep):
         T = lambda a: torch.as_tensor(np.asarray(a), dtype=torch.float32, device=dev)  # noqa: E731
         self.ex_q, self.ex_qd = T(q), T(np.concatenate([D["qvel"][r] for r in rows]))
         self.ex_gy, self.ex_lift = T(gy), T(np.concatenate([D["lift"][r] for r in rows]))
-        f, p, psi = self.pose(self.ex_q, T(xp), T(xq), self.ex_gy)
+        self.ex_xp, self.ex_xq = T(xp), T(xq)                                    # body origins / orientations per frame
+        f, p, psi = self.pose(self.ex_q, self.ex_xp, self.ex_xq, self.ex_gy)
+        self.ex_psi_f = psi                                                       # heading per frame
+        self.ex_first_f = torch.as_tensor(np.repeat(first, n), device=dev)        # each frame's clip, first and last frame
+        self.ex_last_f = torch.as_tensor(np.repeat(first + n - 1, n), device=dev)
         a = torch.as_tensor(np.concatenate([np.arange(s, s + m - 1) for s, m in zip(first, n, strict=True)]), device=dev)
         pairs = self.pair((f[a], p[a], psi[a]), (f[a + 1], p[a + 1], psi[a + 1]))
         pstart = np.r_[0, np.cumsum(n - 1)]
@@ -242,14 +246,7 @@ class Ladder(WatchYourStep):
         task = r_speed * r_heading
         pair = self.pair(self._prev, self.pose(s.qpos, s.body_pos, s.body_quat, gy)).nan_to_num(0.0, 0.0, 0.0)
         style = self.amp.reward(pair)
-        metabolic = s.metabolic_power.sum(1) / s.total_mass
-        a3 = s.activation.clamp_min(0).pow(3).sum(1)
-        ag = s.activation[:, self.bal_idx]                                              # [N, G, K]
-        k = self.bal_mask.sum(1)
-        mean = (ag * self.bal_mask).sum(2) / k
-        var = ((ag - mean[..., None]).pow(2) * self.bal_mask).sum(2) / k
-        balance = (var / (mean.pow(2) + c.balance_eps ** 2)).sum(1)
-        effort = c.w_metabolic * metabolic + c.w_activation_cubed_sum * a3 + c.w_balance * balance
+        effort, metabolic, a3, balance = self.effort(s)
         r = c.w_task * task + c.w_style * style - effort
         learn = c.training and c.amp.train_disc
         if learn:
@@ -262,6 +259,18 @@ class Ladder(WatchYourStep):
                             effort=effort, fell_low=low.float(),
                             **{k_: torch.tensor(v) for k_, v in self.amp_stats.items()})
         return r
+
+    def effort(self, s: Any) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """(weighted effort, metabolic power per kg, summed cubed activation, compartment balance)."""
+        c = self.c
+        metabolic = s.metabolic_power.sum(1) / s.total_mass
+        a3 = s.activation.clamp_min(0).pow(3).sum(1)
+        ag = s.activation[:, self.bal_idx]                                              # [N, G, K]
+        k = self.bal_mask.sum(1)
+        mean = (ag * self.bal_mask).sum(2) / k
+        var = ((ag - mean[..., None]).pow(2) * self.bal_mask).sum(2) / k
+        balance = (var / (mean.pow(2) + c.balance_eps ** 2)).sum(1)
+        return c.w_metabolic * metabolic + c.w_activation_cubed_sum * a3 + c.w_balance * balance, metabolic, a3, balance
 
     def _fpm_step(self, s: Any, b: dict[str, torch.Tensor]) -> None:
         if self.c.perception == "patches":                  # L0 has no guesser to refit
