@@ -55,6 +55,8 @@ class WysConfig:
     lin_y: tuple = (-0.5, 0.5)
     ang_z: tuple = (-1.0, 1.0)
     heading_stiffness: float = 0.5
+    #: The command's parts the policy and the guesser read: 0 forward speed, 1 sideways speed, 2 turn rate.
+    command_dims: tuple = (0, 1, 2)
     resample_s: float = 10.0
     standing_frac: float = 0.02
     turning_frac: float = 0.02
@@ -171,13 +173,14 @@ class WatchYourStep(TorchTask):
         map_perm = [ix * self.ny + (self.ny - 1 - iy) for ix in range(self.nx) for iy in range(self.ny)]
         polar, axial = ([0, 1, 2], [1.0, 1.0, -1.0]), ([0, 1, 2], [-1.0, -1.0, 1.0])
         body = [("lin_vel", 3, *polar), ("ang_vel", 3, *axial), ("gravity", 3, *polar),
-                ("command", 3, [0, 1, 2], [1.0, -1.0, -1.0]), ("joint_pos", self.nj, jperm, jsign),
+                ("command", len(c.command_dims), list(range(len(c.command_dims))),
+                 [(1.0, -1.0, -1.0)[d] for d in c.command_dims]), ("joint_pos", self.nj, jperm, jsign),
                 ("joint_vel", self.nj, jperm, jsign), ("last_action", self.nmus, mperm, [1.0] * self.nmus)]
         self.body_blocks = body
         self.scan_block = ("foothold_scan", 2 * n1, scan_perm, scan_sign)
         self.map_block = ("height_scan", self.nx * self.ny, map_perm, [1.0] * len(map_perm))
         self.mperm, self.jperm, self.jsign = mperm, jperm, jsign
-        self.state_dim = 12 + 2 * self.nj                                             # the predictor's input
+        self.state_dim = 9 + len(c.command_dims) + 2 * self.nj                       # the predictor's input
         self.blocks = self.layout()
         self._obs_dim = sum(b[1] for b in self.blocks)
         self.n_actor = sum(b[1] for b in self.blocks if not b[0].startswith("critic_"))
@@ -307,7 +310,7 @@ class WatchYourStep(TorchTask):
 
     def system_state(self, b: dict[str, torch.Tensor]) -> torch.Tensor:
         """The predictor's input: clean and unscaled (their SystemStateCfg)."""
-        return torch.cat([b["lin"], b["ang"], b["grav"], self.cmd, b["qrel"], b["qd"]], 1)
+        return torch.cat([b["lin"], b["ang"], b["grav"], self.cmd[:, list(self.c.command_dims)], b["qrel"], b["qd"]], 1)
 
     def predict(self, b: dict[str, torch.Tensor]) -> torch.Tensor:
         """``[N, 2, 2]`` predicted landing per foot (l, r): (forward, lateral right) in the root frame."""
@@ -360,10 +363,10 @@ class WatchYourStep(TorchTask):
         sp = lambda x, p, amp: x + amp * (torch.rand(x.shape, device=self.dev, generator=self.gen) < p) * (2 * torch.rand(x.shape, device=self.dev, generator=self.gen) - 1)  # noqa: E731
         noisy = [sp(b["lin"] + self._sym(b["lin"].shape, c.n_lin), c.spike_p, c.spike_lin),
                  0.2 * sp(b["ang"] + self._sym(b["ang"].shape, c.n_ang), c.spike_p, c.spike_ang),
-                 b["grav"] + self._sym(b["grav"].shape, c.n_grav), self.cmd,
+                 b["grav"] + self._sym(b["grav"].shape, c.n_grav), self.cmd[:, list(c.command_dims)],
                  b["qrel"] + self._sym(b["qrel"].shape, c.n_q), 0.05 * (b["qd"] + self._sym(b["qd"].shape, c.n_qd)),
                  self.prev_action.clamp(-10, 10)]
-        clean = [b["lin"], 0.2 * b["ang"], b["grav"], self.cmd, b["qrel"], 0.05 * b["qd"], self.prev_action.clamp(-10, 10)]
+        clean = [b["lin"], 0.2 * b["ang"], b["grav"], self.cmd[:, list(c.command_dims)], b["qrel"], 0.05 * b["qd"], self.prev_action.clamp(-10, 10)]
         return noisy, clean
 
     def before_step(self, s: Any) -> None:

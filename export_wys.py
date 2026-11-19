@@ -74,7 +74,8 @@ def main() -> None:
     env, task = build(1, 0, a.device, None, cfg, foot_model=str(models[-1]) if models else None, kind=kind,
                       dataset=args.get("dataset", "ab01"),
                       delays=not (args.get("no_delays", False) or args.get("gaitamp_conditions", False)),
-                      flat=args.get("gaitamp_conditions", False))
+                      flat=args.get("gaitamp_conditions", False),
+                      trials=tuple(t for t in args.get("trials", "").split(",") if t))
     it = rec.get("iterations")
     state = run / "task_state.pt"
     if state.exists():

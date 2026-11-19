@@ -74,9 +74,11 @@ class FloorPPO(PPO):
 
 
 def build(worlds: int, seed: int, device: str, out: Path | None = None, config: WysConfig | None = None,
-          foot_model: str | None = None, kind: str = "wys", dataset: str = "ab01", delays: bool = True, flat: bool = False):
+          foot_model: str | None = None, kind: str = "wys", dataset: str = "ab01", delays: bool = True, flat: bool = False,
+          trials: tuple = ()):
     """``kind`` "wys" (gp.wys), "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig) or
-    "pretrain" (gp.pretrain, stage 0: imitation of the clips, always on levelled tiles); ``flat``: every tile levelled."""
+    "pretrain" (gp.pretrain, stage 0: imitation of the clips, always on levelled tiles); ``flat``: every tile levelled;
+    ``trials``: only these trials' windows (e.g. "ab01_mc021"), from any split."""
     flat = flat or kind == "pretrain"
     T = WT.build()
     if flat:
@@ -86,7 +88,11 @@ def build(worlds: int, seed: int, device: str, out: Path | None = None, config: 
     c = recipe_config()
     if kind in ("ladder", "pretrain"):
         cfg = config or (PretrainConfig() if kind == "pretrain" else LadderConfig())
-        D = data.load("train", src=data.ROOT / "data" / dataset)
+        if trials:
+            D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / dataset)
+            D = data.take(D, [k for k, n in enumerate(D["name"]) if any(str(n).startswith(t + "_") for t in trials)])
+        else:
+            D = data.load("train", src=data.ROOT / "data" / dataset)
         cls = Pretrain if kind == "pretrain" else Ladder
         task: WatchYourStep = cls(T, D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
     else:
@@ -113,6 +119,7 @@ def main() -> None:
     ap.add_argument("--no-delays", action="store_true", help="no motor delays (default: the recipe's SCONE delays)")
     ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
     ap.add_argument("--no-policy-command", action="store_true", help="ladder L0.5: the policy does not see the command")
+    ap.add_argument("--trials", default="", help="ladder/pretrain: only these trials' windows, comma-separated (e.g. ab01_mc021)")
     ap.add_argument("--init-from", help="ladder: start the policy, critic and guesser from this run (e.g. a pretrain run)")
     ap.add_argument("--drive-floor", type=float, default=0.05, help="lowest mean excitation per muscle (FloorPPO; 0 = off)")
     a = ap.parse_args()
@@ -125,7 +132,8 @@ def main() -> None:
     if a.gaitamp_conditions:
         config = replace(config, **GAITAMP)
     env, task = build(a.worlds, a.seed, a.device, out, config, kind=a.task, dataset=a.dataset,
-                      delays=not (a.no_delays or a.gaitamp_conditions), flat=a.gaitamp_conditions)
+                      delays=not (a.no_delays or a.gaitamp_conditions), flat=a.gaitamp_conditions,
+                      trials=tuple(t for t in a.trials.split(",") if t))
     cfg = replace(default_ppo(), rollout_steps=task.c.steps_per_iter)
     agent = FloorPPO(env, cfg, device="cuda" if env.device.is_cuda else "cpu")
     agent.floor = a.drive_floor

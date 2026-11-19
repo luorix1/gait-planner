@@ -52,7 +52,8 @@ def test_ladder_pairs_and_step() -> None:
     task.cmd[:] = torch.tensor([1.0, 0.0, 0.3])
     task.c = replace(task.c, policy_command=False)
     obs = task.observation(env.state)
-    assert (obs[:, at("command"):at("command") + 3] == 0).all() and (obs[:, at("critic_command")] == 1.0).all()
+    assert (obs[:, at("command"):at("command") + 2] == 0).all() and (obs[:, at("critic_command")] == 1.0).all()
+    assert obs.shape[1] == sum(b[1] for b in task.blocks) and task.state_dim == 9 + 2 + 2 * task.nj   # speed, turn rate
     task.c = replace(task.c, policy_command=True)
     # the drive floor: silent while every muscle's mean is above it (a fresh policy sits at 0.05), active below
     agent = FloorPPO(env, replace(default_ppo(), rollout_steps=24, compile_actor=False), device="cpu")

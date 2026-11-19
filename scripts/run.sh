@@ -9,6 +9,7 @@
 #   --ladder   a rung of the footstep planner ladder (gp.ladder, build B1) instead: L0 whole map, L1 patches,
 #              L0.5 patches without the command in the policy's input
 #   --pretrain stage 0 of B1: L1's policy learns to walk by imitating AB01's level clips (gp.pretrain)
+#   --trials T  only these trials' windows, comma-separated (e.g. ab01_mc021), from any split
 #   --init-from RUN  with --ladder: start from that run's policy, critic and guesser (e.g. a --pretrain run)
 #   --gaitamp  with --ladder: GAIT_amp's training conditions (flat, no delays/noise/pushes, 60 deg falls, walking starts)
 #   --smoke    a pipeline check in minutes: 256 worlds, 3 minutes of training, then the export
@@ -34,8 +35,9 @@ while [[ $# -gt 0 ]]; do
     --gaitamp) extra+=(--gaitamp-conditions); shift ;;
     --pretrain) ladder=(--task pretrain --perception patches); extra+=(--drive-floor 0); shift ;;
     --init-from) extra+=(--init-from "$2"); shift 2 ;;
+    --trials) extra+=(--trials "$2"); shift 2 ;;
     --smoke) smoke=1; shift ;;
-    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option $1 (--help)" >&2; exit 1 ;;
   esac
 done

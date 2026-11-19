@@ -50,6 +50,10 @@ class LadderConfig(WysConfig):
     lin_y: tuple = (0.0, 0.0)
     assist_offset: float = 0.0            # no helper pull (episodes start mid-stride from clip frames)
     perception: str = "patches"           # "patches" (L1) | "map" (L0)
+    #: Forward speed and turn rate only: the sideways command is always 0 here (user 11-18).
+    command_dims: tuple = (0, 2)
+    #: Stage 1 walks straight: a redrawn command changes the speed and keeps the start heading (user 11-18).
+    hold_heading: bool = True
     #: False (L0.5): the actor's command block reads zeros. The guesser and the critic still get the command, so the
     #: intent reaches the policy only through where the patches go (L1 minus the command; the reward is unchanged).
     policy_command: bool = True
@@ -216,7 +220,7 @@ class Ladder(WatchYourStep):
         hmap, scan_a, scan_c = self.scans(s, b)
         noisy, clean = self.body_obs(b)
         if not c.policy_command:
-            noisy = [torch.zeros_like(x) if x is self.cmd else x for x in noisy]
+            noisy[3] = torch.zeros_like(noisy[3])          # the command block (body_obs's order)
         mus = [s.activation, s.fiber_length / s.optimal_fiber_length, s.fiber_velocity / s.optimal_fiber_length,
                s.muscle_force / s.max_isometric_force, s.received]
         if c.perception == "patches":
@@ -259,6 +263,12 @@ class Ladder(WatchYourStep):
                             effort=effort, fell_low=low.float(),
                             **{k_: torch.tensor(v) for k_, v in self.amp_stats.items()})
         return r
+
+    def _resample(self, i: torch.Tensor) -> None:
+        keep = self.heading_target[i].clone()
+        super()._resample(i)
+        if self.c.hold_heading:
+            self.heading_target[i] = keep
 
     def effort(self, s: Any) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """(weighted effort, metabolic power per kg, summed cubed activation, compartment balance)."""
