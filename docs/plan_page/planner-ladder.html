@@ -1,4 +1,4 @@
-<title>Footstep Planner Ladder</title>
+<title>Two-Stage L1 Training</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -225,257 +225,20 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <div class="wrap">
 
 <header>
-  <p class="eyebrow">gait_planner · footstep planner study · draft, 18 Nov 2026</p>
-  <h1>Footstep planner ladder</h1>
-  <p class="lede">Eight designs and one ablation (L0.5) for how the muscle model decides where its feet go. Each one changes a single thing from the one before, so every rung answers one question. The first real rung is Watch Your Step's blind guesser, so the page starts with why that works at all.</p>
+  <p class="eyebrow">gait_planner · B1 · L1 · 18 Nov 2026</p>
+  <h1>Two-stage training for L1</h1>
+  <p class="lede">Trained from scratch, L1's policy (Watch Your Step's blind foothold guesser and two terrain patches, on our 90-muscle body) never learned to bear weight. This test trains it in two stages: first it learns to walk by imitating AB01's clips, then it switches to the ladder's own reward.</p>
   <div class="chips">
-    <span class="chip next"><i></i>L1 stage 0 training now (run b1_pretrain)</span>
-    <span class="chip todo"><i></i>L2, L3 are cheap variants</span>
-    <span class="chip todo"><i></i>L4 to L6 need a following reward or a planner</span>
-    <span class="chip ill"><i></i>Scenes are illustrations, not simulation output</span>
+    <span class="chip next"><i></i>Stage 0 running: b1_pretrain, 300M steps</span>
+    <span class="chip todo"><i></i>Keep-or-kill check at about 85M steps</span>
+    <span class="chip todo"><i></i>Stage 1 starts from stage 0's walker</span>
   </div>
-  <div class="links"><a href="#s-setup">How L1 trains now (two stages)</a><a href="#s-rew2">Rewards from L3 on</a><a href="https://claude.ai/artifact/JEJTXyCWPxEBVHdF3iomaD">Plan page (plan v2)</a></div>
 </header>
 
-<section aria-labelledby="s-why">
+<section aria-labelledby="s-stages">
   <div class="sec-head">
-    <h2 id="s-why">Why a blind guesser works in Watch Your Step</h2>
-    <p>The guesser never decides where a foot lands. It only decides where the policy looks. The terrain still reaches it, through a loop that runs through the body.</p>
-  </div>
-  <div class="panel split">
-    <div class="scroll">
-      <svg class="dia loopsvg" viewBox="0 0 760 390" role="img" aria-labelledby="loop-t">
-        <title id="loop-t">The loop: body state goes to the blind guesser, which picks where two patches go; the patches give the policy terrain heights; the policy's muscles change the body, and the next guess moves.</title>
-        <defs>
-          <marker id="lw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
-          <marker id="lt" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
-        </defs>
-        <path class="w" d="M260 75 H350.25" marker-end="url(#lw)"/>
-        <path class="w" d="M485 114 V252.25" marker-end="url(#lw)"/>
-        <path class="w terr" d="M370 311 H279.75" marker-end="url(#lt)"/>
-        <path class="w terr" d="M145 272 V133.75" marker-end="url(#lt)"/>
-        <path class="w train" d="M680 150 V75 H619.75" marker-end="url(#lw)"/>
-        <text class="lab" x="315" y="62" text-anchor="middle">every 20 ms</text>
-        <text class="lab" x="497" y="188">where</text><text class="lab" x="497" y="206">to look</text>
-        <text class="lab terr" x="315" y="338" text-anchor="middle">terrain</text><text class="lab terr" x="315" y="356" text-anchor="middle">gets in here</text>
-        <text class="lab terr" x="133" y="180" text-anchor="end">and comes</text><text class="lab terr" x="133" y="198" text-anchor="end">back as</text><text class="lab terr" x="133" y="216" text-anchor="end">posture</text>
-        <text class="big" x="315" y="186">20 to 30 rounds</text>
-        <text class="lab" x="315" y="210" text-anchor="middle">in every step</text>
-        <circle class="loopdot" r="8" id="loopdot"><animateMotion dur="2.6s" repeatCount="indefinite" path="M145 75 H485 V311 H145 Z"/></circle>
-        <g class="fn"><rect x="30" y="36" width="230" height="78" rx="12"/><text class="t1" x="145" y="69">Body state</text><text class="t2" x="145" y="91">joints, speeds, command</text></g>
-        <g class="fn"><rect x="370" y="36" width="230" height="78" rx="12"/><text class="t1" x="485" y="69">Blind guesser</text><text class="t2" x="485" y="91">next landing of each foot</text></g>
-        <g class="fn key"><rect x="370" y="272" width="230" height="78" rx="12"/><text class="t1" x="485" y="305">Two patches</text><text class="t2" x="485" y="327">7 × 7 heights each</text></g>
-        <g class="fn pol"><rect x="30" y="272" width="230" height="78" rx="12"/><text class="t1" x="145" y="305">Muscle policy</text><text class="t2" x="145" y="327">shapes the step</text></g>
-        <g class="fn dash"><rect x="606" y="150" width="148" height="84" rx="12"/><text class="t1" x="680" y="186">Landings</text><text class="t2" x="680" y="208">training labels</text></g>
-      </svg>
-    </div>
-    <div class="reasons">
-      <div class="reason"><b>It is redone every 20 ms</b><p>The guess is recomputed 20 to 30 times per step from joint angles, joint speeds, base velocity and the command. When a patch shows a stair edge and the policy shortens the swing, the body changes, and the next guess moves with it.</p></div>
-      <div class="reason"><b>It learns from real landings</b><p>Its labels are where the policy's feet actually landed, terrain adjustments included. Stair posture (more knee bend, upward base speed) teaches it stair-sized steps without seeing a stair.</p></div>
-      <div class="reason"><b>Its misses fit inside the patch</b>
-        <svg class="dia" viewBox="0 0 500 150" role="img" aria-labelledby="ruler-t" style="max-width:500px">
-          <title id="ruler-t">The paper's typical misses, 7 cm for the next foothold and 12 cm for the one after, both fit inside the patch, which spans 15 cm either side of the guess.</title>
-          <rect x="110" y="34" width="240" height="14" rx="4" fill="var(--blue-2)"/>
-          <rect x="160" y="60" width="140" height="14" rx="4" fill="var(--blue)"/>
-          <text class="lab" x="358" y="46">one after, 12 cm</text>
-          <text class="lab" x="308" y="72">next, 7 cm</text>
-          <rect x="80" y="92" width="300" height="30" rx="6" class="pband"/>
-          <g class="patchdot"><circle cx="80" cy="107" r="5"/><circle cx="130" cy="107" r="5"/><circle cx="180" cy="107" r="5"/><circle cx="230" cy="107" r="5"/><circle cx="280" cy="107" r="5"/><circle cx="330" cy="107" r="5"/><circle cx="380" cy="107" r="5"/></g>
-          <line x1="230" y1="84" x2="230" y2="130" stroke="var(--ink)" stroke-width="2"/>
-          <text class="axl" x="80" y="144" text-anchor="middle">−15 cm</text>
-          <text class="axl" x="230" y="144" text-anchor="middle">guess</text>
-          <text class="axl" x="380" y="144" text-anchor="middle">+15 cm</text>
-        </svg>
-        <p>The paper's stones are 30 to 50 cm and its gaps 10 to 20 cm, so most corrections fit inside one patch.</p>
-      </div>
-    </div>
-  </div>
-  <div class="cards">
-    <div class="card"><span class="tag">Where it breaks</span><h3>A landing far from the guess</h3><p>Wide gaps, high step-ups, the first step onto a big feature. The guess assumes a normal stride, so the patch can show the pit instead of the far edge.</p><button class="btn" type="button" data-show="2,gap">Watch L1 on the wide gap</button></div>
-    <div class="card"><span class="tag">Where it breaks</span><h3>Planning past two steps</h3><p>People change step length two or three steps before stairs or an obstacle. Two patches show two footholds, so the policy reacts. It can succeed while correcting later than a person would.</p><button class="btn" type="button" data-show="2,stairs">Watch L1 on stairs</button></div>
-    <div class="card"><span class="tag">What it never tested</span><h3>Human-like placement</h3><p>The paper's claims are faster training and better transfer on a G1 robot with joint position control. Whether the feet land where a person's would is our question, not theirs.</p></div>
-  </div>
-</section>
-
-<section aria-labelledby="s-ladder">
-  <div class="sec-head">
-    <h2 id="s-ladder">The ladder</h2>
-    <p>Pick a design and a terrain. Every design uses the same muscle policy, body, style judge, task reward and training budget. The footsteps are the same in every scene, so the only thing that changes is what each design sees and where its footholds come from.</p>
-  </div>
-  <div class="panel stage">
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Design" id="armSeg"></div>
-      <div class="seg" role="group" aria-label="Terrain" id="terSeg">
-        <button type="button" data-ter="stones" aria-pressed="false">Stepping stones</button>
-        <button type="button" data-ter="stairs" aria-pressed="true">Stairs, 16 cm</button>
-        <button type="button" data-ter="gap" aria-pressed="false">Wide gap, 70 cm</button>
-      </div>
-      <button class="play" type="button" id="play" aria-pressed="true">Pause</button>
-    </div>
-    <div class="scene-wrap scroll" id="sceneWrap">
-      <svg class="dia" id="scene" viewBox="0 0 1200 440" role="img" aria-label="Side view of the walker on the chosen terrain, with what the chosen design sees drawn on the ground.">
-        <path class="terrain" id="ground"/>
-        <g id="under"></g>
-        <g id="walker">
-          <path class="limb far" id="legF"/><path class="foot far" id="footF"/><path class="limb far arm" id="armF"/>
-          <path class="limb torso" id="torso"/><circle class="headc" id="head" r="14"/>
-          <path class="limb near" id="legN"/><path class="foot near" id="footN"/><path class="limb near arm" id="armN"/>
-        </g>
-        <g id="over"></g>
-        <text class="hud" x="18" y="30" id="hud1"></text>
-        <text class="hud2" x="18" y="52" id="hud2"></text>
-        <text class="illus" x="1186" y="430">Illustration: hand-set footsteps, not a simulation</text>
-      </svg>
-    </div>
-    <div class="legend">
-      <span style="--c:var(--blue)">full map (L0)</span>
-      <span style="--c:var(--teal-soft); --b:var(--teal)">patch at a guessed foothold</span>
-      <span style="--c:var(--wire)">terrain the guesser or planner reads</span>
-      <span style="--c:transparent; --b:var(--amber)">target the policy must hit</span>
-      <span style="--c:var(--amber-soft); --b:var(--amber)">centre-of-mass band</span>
-      <span style="--c:transparent; --b:var(--blue)">how far ahead the policy sees</span>
-    </div>
-    <div class="below">
-      <div class="scroll">
-        <svg class="dia" id="flow" viewBox="0 0 1040 410" role="img" aria-label="Data flow for the chosen design." style="min-width:640px">
-          <defs>
-            <marker id="fw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
-            <marker id="ft" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-teal" d="M0 0 L10 5 L0 10 z"/></marker>
-            <marker id="fa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
-          </defs>
-          <path class="e data" data-arms="01234567h" d="M121 70 V24 H959 V138.25" marker-end="url(#fw)"/>
-          <text class="el" data-arms="01234" x="540" y="16" text-anchor="middle">body, muscle states, command</text>
-          <text class="el" data-arms="567h" x="540" y="16" text-anchor="middle">body and muscle states (no command)</text>
-          <path class="e data" data-arms="01234567h" d="M860 200 H874.25" marker-end="url(#fw)"/>
-          <path class="e train" data-arms="01234567h" d="M860 362 H959 V261.75" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M540 200 H590.25" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M226 102 C262 102 262 178 280.25 178" marker-end="url(#fw)"/>
-          <path class="e data" data-arms="1234567h" d="M226 190 C262 190 262 200 280.25 200" marker-end="url(#fw)"/>
-          <path class="e terr" data-arms="234567" d="M226 278 C262 278 262 222 280.25 222" marker-end="url(#ft)"/>
-          <path class="e terr" data-arms="01234h" d="M226 294 H735 V261.75" marker-end="url(#ft)"/>
-          <text class="el terr" data-arms="1234h" x="420" y="316" text-anchor="middle">heights read at the guessed spots</text>
-          <text class="el terr" data-arms="0" x="420" y="316" text-anchor="middle">all 693 heights</text>
-          <path class="e train" data-arms="126h" d="M930 158 V138 H480 V138.25" marker-end="url(#fw)"/>
-          <text class="el" data-arms="12h" x="705" y="130" text-anchor="middle">labels: the policy's own landings</text>
-          <text class="el" data-arms="6" x="705" y="130" text-anchor="middle">labels off the clips: the policy's own landings</text>
-          <path class="e hum" data-arms="34567" d="M420 116 V138.25" marker-end="url(#fa)"/>
-          <text class="el hum" data-arms="34567" x="430" y="140">labels</text>
-          <path class="e train" data-arms="7" d="M930 158 V84 H559.75" marker-end="url(#fw)"/>
-          <text class="el" data-arms="7" x="737" y="76" text-anchor="middle">runs that pass the checks</text>
-          <g class="fn" data-node="body"><rect x="16" y="70" width="210" height="64" rx="12"/><text class="t1" x="121" y="96">Body state</text><text class="t2" x="121" y="118">joints, speeds, muscles</text></g>
-          <g class="fn" data-node="cmd"><rect x="16" y="158" width="210" height="64" rx="12"/><text class="t1" x="121" y="184">Command</text><text class="t2" x="121" y="206">speed, turn</text></g>
-          <g class="fn key" data-node="map"><rect x="16" y="246" width="210" height="64" rx="12"/><text class="t1" x="121" y="272">Height map</text><text class="t2" x="121" y="294">1.6 × 1.0 m, 5 cm cells</text></g>
-          <g class="fn hum" data-node="human"><rect x="300" y="52" width="240" height="64" rx="12"/><text class="t1" x="420" y="78">Human footsteps</text><text class="t2" x="420" y="100">AB01, Camargo, PARC</text></g>
-          <g class="fn" data-node="mod"><rect x="300" y="158" width="240" height="84" rx="12"/><text class="t1" x="420" y="194" id="modT"></text><text class="t2" x="420" y="216" id="modS"></text></g>
-          <g class="fn key" data-node="inp"><rect x="610" y="158" width="250" height="84" rx="12"/><text class="t1" x="735" y="194" id="inpT"></text><text class="t2" x="735" y="216" id="inpS"></text></g>
-          <g class="fn pol" data-node="pol"><rect x="894" y="158" width="130" height="84" rx="12"/><text class="t1" x="959" y="183">Muscle</text><text class="t1" x="959" y="205">policy</text><text class="t2" x="959" y="227">90 muscles</text></g>
-          <a class="rewlink" href="#s-reward"><g class="fn dash" data-node="rew"><rect x="610" y="330" width="250" height="64" rx="12"/><text class="t1" x="735" y="356">Rewards</text><text class="t2" x="735" y="378" id="rewS"></text></g></a>
-        </svg>
-      </div>
-      <div class="cap" aria-live="polite">
-        <h3 id="capT"></h3>
-        <dl>
-          <div><dt>What you're watching</dt><dd id="capW"></dd></div>
-          <div><dt>Changed from the rung below</dt><dd id="capC"></dd></div>
-          <div><dt>Expected</dt><dd id="capE"></dd></div>
-          <div><dt>Cost</dt><dd id="capK"></dd></div>
-        </dl>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section aria-labelledby="s-reward">
-  <div class="sec-head">
-    <h2 id="s-reward">The reward in B1 (L0 and L1)</h2>
-    <p>One number per control step, 40 times a second: half the task (speed × heading), half the style judge's score, minus what the muscles cost. L4 shares the task half with following the guessed footholds, and from L5 the plan takes it over (next section).</p>
-  </div>
-  <div class="panel rw">
-    <div class="formula"><span>r =</span><span class="fk task">½ × task</span><span>+</span><span class="fk style">½ × style</span><span>−</span><span class="fk eff">effort</span></div>
-    <div class="scroll">
-      <svg class="dia" viewBox="0 0 900 96" role="img" aria-labelledby="bud-t" style="min-width:560px; max-width:900px">
-        <title id="bud-t">The most a walking step can earn, to scale: speed × heading 0.5, style 0.5.</title>
-        <rect x="20" y="16" width="348" height="34" rx="6" fill="var(--blue)"/>
-        <rect x="370" y="16" width="348" height="34" rx="6" fill="var(--teal)"/>
-        <text class="seg-l" x="194" y="72" text-anchor="middle">speed × heading</text><text class="seg-n" x="194" y="90" text-anchor="middle">0.5</text>
-        <text class="seg-l" x="544" y="72" text-anchor="middle">style</text><text class="seg-n" x="544" y="90" text-anchor="middle">0.5</text>
-        <text class="seg-n" x="734" y="38">= 1.0 a step</text>
-      </svg>
-    </div>
-    <p class="note">The most a step can earn, to scale; the effort comes off. A fall ends the episode with no penalty: it loses what the rest of the episode would have paid.</p>
-    <div class="rcols">
-      <div>
-        <h3>Task <small>speed × heading, GAIT_amp's form: standing still earns little, and the heading pays only while moving. Falls end the episode with no penalty</small></h3>
-        <table class="rt">
-          <tbody>
-            <tr><td>Speed</td><td>exp(−2 × (error − 0.1)²), the first 0.1 m/s free: the commanded forward speed, and no sideways speed. Half the speed still earns 0.73</td><td class="w" rowspan="2">×, up to +0.5</td></tr>
-            <tr><td>Heading</td><td>exp(−error²): turning at the rate the command asks for, 0.5 × the gap to a target heading, at most 1 rad/s</td></tr>
-            <tr><td>Fall</td><td>ends the episode, no penalty: tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank on the ground</td><td class="w">end</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <h3>Style <small>the judge, retrained every iteration</small></h3>
-        <table class="rt"><tbody><tr><td>Style</td><td>max(0, 1 − ¼ (D − 1)²), D the judge's score</td><td class="w">+0.5</td></tr></tbody></table>
-        <p class="note">The judge sees two poses 25 ms apart: pelvis height over the ground, the pelvis's up axis, the 17 joint angles and both heels relative to the pelvis, plus how far the pelvis moved and turned between them.</p>
-        <p class="note">It learns to score 75,334 pairs from 198 AB01 clips (walking, start-stop, standing; mirrored half the time) toward +1 and the policy's latest pairs toward −1, in 80 updates per iteration.</p>
-      </div>
-      <div>
-        <h3>Effort <small>fixed weights, about 4 % of what an early step earns, as in our GAIT_amp runs</small></h3>
-        <table class="rt">
-          <tbody>
-            <tr><td>Metabolic power</td><td>W per kg of body mass</td><td class="w">−0.0025</td></tr>
-            <tr><td>Cubed activation</td><td>Σ a³ over the 90 muscles</td><td class="w">−0.0025</td></tr>
-            <tr><td>Compartment balance</td><td>Σ variance / mean² within a split muscle (gluteus maximus 1–3, …)</td><td class="w">−0.0025</td></tr>
-          </tbody>
-        </table>
-        <p class="note">Without the balance term, the near-linear metabolic cost lets one compartment do its group's work.</p>
-        <p class="note">Sized on the first 2.4M steps to about 3.8 % of the task + style reward. Our GAIT_amp walking runs paid 2.4 to 5.7 % at a fixed 0.00375 per W/kg; the share drifts as the reward and the muscle use change. The imitation recipe's 0.02 each took 29 to 39 % early in the first L1 run.</p>
-        <p class="note">Learner: each muscle's mean drive is kept at 0.05 or above. In the first runs the leg extensors sank to about 0.02, where learning can barely raise them again, and the walkers collapsed within 2 s.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section aria-labelledby="s-rew2">
-  <div class="sec-head">
-    <h2 id="s-rew2">Rewards from L3 on</h2>
-    <p>The style half and the effort stay as in B1; only the task half changes. L3 keeps L1's reward exactly: only the guesser's labels change, to the next two human footfalls, taken at the foot centre by the same function on clips and simulation. L4 shares the task half with following the guessed footholds. From L5 the plan takes it over.</p>
-  </div>
-  <div class="panel rw">
-    <div class="scroll">
-      <svg class="dia" viewBox="0 0 900 270" role="img" aria-labelledby="rew2-t" style="min-width:600px; max-width:900px">
-        <title id="rew2-t">The most a step can earn, to scale, per rung group. L0 to L3: speed times heading 0.5, style 0.5. L4: speed times heading 0.25, following 0.25, style 0.5. L5 to L6: touchdowns 0.3, centre-of-mass band 0.2, style 0.5.</title>
-        <text class="seg-l" x="20" y="38">L0 to L3</text>
-        <rect x="120" y="16" width="298" height="34" rx="6" fill="var(--blue)"/>
-        <rect x="420" y="16" width="300" height="34" rx="6" fill="var(--teal)"/>
-        <text class="seg-n" x="269" y="70" text-anchor="middle">speed × heading 0.5</text><text class="seg-n" x="570" y="70" text-anchor="middle">style 0.5</text>
-        <text class="seg-l" x="20" y="125">L4</text>
-        <rect x="120" y="103" width="148" height="34" rx="6" fill="var(--blue)"/>
-        <rect x="270" y="103" width="148" height="34" rx="6" fill="var(--amber)"/>
-        <rect x="420" y="103" width="300" height="34" rx="6" fill="var(--teal)"/>
-        <text class="seg-n" x="194" y="157" text-anchor="middle">speed × heading 0.25</text><text class="seg-n" x="344" y="157" text-anchor="middle">following 0.25</text><text class="seg-n" x="570" y="157" text-anchor="middle">style 0.5</text>
-        <text class="seg-l" x="20" y="212">L5 to L6</text>
-        <rect x="120" y="190" width="178" height="34" rx="6" fill="var(--amber)"/>
-        <rect x="300" y="190" width="118" height="34" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
-        <rect x="420" y="190" width="300" height="34" rx="6" fill="var(--teal)"/>
-        <text class="seg-n" x="209" y="244" text-anchor="middle">touchdowns 0.3</text><text class="seg-n" x="359" y="244" text-anchor="middle">CoM band 0.2</text><text class="seg-n" x="570" y="244" text-anchor="middle">style 0.5</text>
-        <text class="seg-n" x="738" y="38">− effort</text><text class="seg-n" x="738" y="125">− effort</text><text class="seg-n" x="738" y="212">− effort</text>
-      </svg>
-    </div>
-    <p class="note">The most a control step can earn, to scale; the effort comes off at the fixed weights. Touchdown terms pay for time, so their scale matches the per-step terms.</p>
-  </div>
-  <div class="cards">
-    <div class="card"><span class="tag">L4</span><h3>Following the guessed footholds</h3><p>At each touchdown, hit = exp(−d²/σ²): d is the horizontal distance from the foot centre to the foothold the guesser gave for that foot when it lifted off, so a guess that keeps re-aiming at the foot can't be followed for free. σ is the L3 guesser's own error on held-out human steps. Paid for time: hit × the control steps since the last touchdown, at most 1 s, so extra short steps earn nothing more. The first touchdown after a start has no target and is skipped.</p></div>
-    <div class="card"><span class="tag">L5 on</span><h3>Touchdowns and the centre-of-mass band</h3><p>Touchdown = foothold hit × timing hit exp(−Δt²/σ_t²), both against the plan as it stood when the foot lifted off, paid for time as in L4. Every step, the centre of mass scores 1 inside the plan's band and exp(−(distance outside)²/σ_c²) outside it. σ, σ_t and σ_c are the planner's own errors on held-out human plans. No speed or heading term: the plan carries the command.</p></div>
-    <div class="card"><span class="tag">L6</span><h3>Checks for the loop</h3><p>A run enters the planner's training data only with no fall in the window, a style score at a human level, metabolic power of 2 to 5 W/kg, peak vertical ground force under 1.5 body weights and every joint within human limits. L5.5 and L6 pay the policy as L5 does; they change only what the planner learns from.</p></div>
-  </div>
-</section>
-
-<section aria-labelledby="s-setup">
-  <div class="sec-head">
-    <h2 id="s-setup">How L1 trains now: two stages</h2>
-    <p>Trained from scratch, L1's policy never learned to bear weight: from its untrained start no uniform muscle drive keeps this body up, so a reward for staying up pushes the extensors down. So L1 now trains in two stages. Stage 0 learns to walk by imitating AB01's level clips, as STC trains this same model. Stage 1 starts from that walker with the ladder's reward on the whole stage-1 setup (cards below). Every rung starts from the same stage-0 walker.</p>
+    <h2 id="s-stages">The two stages</h2>
+    <p>The policy's inputs are the same in both stages, so stage 1 picks up stage 0's weights unchanged. The clip appears only in stage 0's reward, never in the policy's input.</p>
   </div>
   <div class="panel scroll" style="margin-bottom:16px">
     <svg class="dia" viewBox="0 0 1200 270" role="img" aria-labelledby="stages-t" style="min-width:760px">
@@ -499,10 +262,68 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <text class="lab" x="830" y="236" text-anchor="middle">the setup in the cards below</text>
     </svg>
   </div>
-  <div class="cards" style="margin-bottom:16px">
-    <div class="card"><span class="tag">Stage 0</span><h3>Imitation pretraining (run b1_pretrain)</h3><p>L1's inputs, with no reference clip in them. Reward: SPRINT's imitation terms against AB01's level walking, start-stop and standing clips on flat ground (joint angles 0.30, joint speeds 0.15, pelvis height 0.05, pelvis orientation 0.10, feet 0.20, body points 0.15, torso 0.05), minus STC's effort (0.02 each). The command follows the clip's speed and heading; the clip's clock follows the walker's step timing, within 0.25 s of real time. An episode ends when the pelvis is 15 cm off the clip's height, or 60° off its orientation, for 3 steps. 300M steps.</p></div>
-    <div class="card"><span class="tag">Stage 1</span><h3>The ladder's reward</h3><p>Starts from stage 0's policy, critic and guesser, with a fresh optimiser. Speed × heading, style and effort at the fixed weights, on the terrain curriculum with delays, sensor noise and pushes: the setup in the cards below.</p></div>
-    <div class="card"><span class="tag">Why</span><h3>What stage 0 fixes</h3><p>Held at one drive, every muscle at 0.05 falls in 0.8 s and every muscle at 0.5 in 0.25 s, so more drive only falls faster until the policy is coordinated. Imitation pays for the right joint angles and pelvis height every step, so it never has to find standing by surviving longer.</p></div>
+  <div class="cards">
+    <div class="card"><span class="tag">Stage 0</span><h3>Imitation (run b1_pretrain)</h3><p>Rewarded every step for matching an AB01 clip's joint angles, pelvis and foot positions, on flat ground. The policy gets only the clip's speed and heading, as its command. 300M steps.</p></div>
+    <div class="card"><span class="tag">Stage 1</span><h3>The ladder's reward</h3><p>Starts from stage 0's policy, critic and guesser. ½ speed × heading + ½ style − effort, on the terrain curriculum with delays, sensor noise and pushes.</p></div>
+    <div class="card"><span class="tag">Fair comparison</span><h3>One walker for every rung</h3><p>Every rung of the ladder will start from the same stage-0 walker, so differences between rungs still come from the rung.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-why">
+  <div class="sec-head">
+    <h2 id="s-why">Why from scratch failed</h2>
+    <p>No fixed muscle drive keeps this body up, and more drive only falls faster. An untrained policy is therefore rewarded for lowering its drive, and its calf, knee and hip extensors sank to about 0.02, a corner where learning can barely raise them again. Every from-scratch run collapsed within 2 s, whatever the effort weight, reward shape or training conditions.</p>
+  </div>
+  <div class="panel scroll">
+      <svg class="dia" viewBox="0 0 900 300" role="img" aria-labelledby="drive-t" style="min-width:600px; max-width:900px">
+        <title id="drive-t">Median time to fall from the training starts with every muscle held at one drive: 0.01, 0.43 s; 0.05, 0.78 s; 0.10, 0.93 s; 0.20, 0.50 s; 0.30, 0.33 s; 0.50, 0.25 s.</title>
+        <line class="ax" x1="70" y1="240" x2="880" y2="240"/>
+        <rect x="90" y="154.0" width="80" height="86.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="130" y="146.0" text-anchor="middle">0.43 s</text><text class="axl" x="130" y="262" text-anchor="middle">0.01</text><rect x="220" y="84.0" width="80" height="156.0" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="2"/><text class="seg-n" x="260" y="76.0" text-anchor="middle">0.78 s</text><text class="axl" x="260" y="262" text-anchor="middle">0.05</text><rect x="350" y="54.0" width="80" height="186.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="390" y="46.0" text-anchor="middle">0.93 s</text><text class="axl" x="390" y="262" text-anchor="middle">0.10</text><rect x="480" y="140.0" width="80" height="100.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="520" y="132.0" text-anchor="middle">0.50 s</text><text class="axl" x="520" y="262" text-anchor="middle">0.20</text><rect x="610" y="174.0" width="80" height="66.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="650" y="166.0" text-anchor="middle">0.33 s</text><text class="axl" x="650" y="262" text-anchor="middle">0.30</text><rect x="740" y="190.0" width="80" height="50.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="780" y="182.0" text-anchor="middle">0.25 s</text><text class="axl" x="780" y="262" text-anchor="middle">0.50</text>
+        <text class="axl" x="475" y="288" text-anchor="middle">drive on every one of the 90 muscles</text>
+        <text class="dl rea" x="220" y="280" text-anchor="middle">(untrained policy)</text>
+      </svg>
+    <p class="note">Median time to fall from the training starts (level 0, delays on, no pushes), with every muscle held at one drive. Imitation avoids the problem: it pays for the right joint angles and pelvis height every step, so the policy never has to discover standing by surviving longer.</p>
+  </div>
+</section>
+
+<section aria-labelledby="s-stage0">
+  <div class="sec-head">
+    <h2 id="s-stage0">Stage 0 in detail</h2>
+    <p>SPRINT's recommended imitation terms and STC's effort and fall rule, adapted so the policy never sees the clip.</p>
+  </div>
+  <div class="panel scroll">
+      <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
+        <title id="track-t">Stage 0's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis height 0.05, torso 0.05, minus effort.</title>
+        <rect x="20" y="40" width="208" height="30" rx="5" fill="var(--blue)"/>
+        <rect x="230" y="40" width="103" height="30" rx="5" fill="var(--blue)" opacity=".8"/>
+        <rect x="335" y="40" width="138" height="30" rx="5" fill="var(--teal)"/>
+        <rect x="475" y="40" width="103" height="30" rx="5" fill="var(--teal)" opacity=".8"/>
+        <rect x="580" y="40" width="68" height="30" rx="5" fill="var(--blue)" opacity=".6"/>
+        <rect x="650" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".45"/>
+        <rect x="685" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".3"/>
+        <text class="seg-l" x="124" y="90" text-anchor="middle">joint angles 0.30</text>
+        <text class="seg-l" x="281" y="90" text-anchor="middle">joint speeds 0.15</text>
+        <text class="seg-l" x="404" y="90" text-anchor="middle">feet 0.20</text>
+        <text class="seg-l" x="526" y="90" text-anchor="middle">body points 0.15</text>
+        <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis height 0.05 · torso 0.05</text>
+        <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
+      </svg>
+    <p class="note">Most a step can earn: 1.0. Feet and body points are compared relative to the pelvis in its heading frame, and the pelvis by its height over the ground: with no clip in its input, the walker's position in the world drifts.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">Inputs</span><h3>What the policy sees</h3><p>L1's inputs: body state, command, five states per muscle, two terrain patches (flat here). No reference clip.</p></div>
+    <div class="card"><span class="tag">Command and clock</span><h3>Following the clip without seeing it</h3><p>The command is the clip's speed (averaged over 1 s) and heading. The clip's clock follows the walker: each step it may slip or gain 2 frames toward the walker's pose, never more than 0.25 s from real time, so a slightly different step rhythm isn't punished and the walker can't stall it.</p></div>
+    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>Starts from a random frame of AB01's 152 level windows (walking, start-stop, standing) on flat ground, with no pushes or friction spread. An episode ends when the pelvis is 15 cm off the clip's height or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
+    <div class="card"><span class="tag">Effort and learner</span><h3>As STC weighs it</h3><p>Metabolic power, summed cubed activation and compartment balance at 0.02 each. SPRINT's PPO with the STC settings, no drive floor, every muscle starting at 0.05 drive.</p></div>
+    <div class="card"><span class="tag">Not yet</span><h3>Left out of this run</h3><p>AB01's 46 ramp windows (5° and 10°, up, down and standing): they need ramp ground, two straight ramp strips. No EMG reward (data/ab01 has no EMG). No pre-filled muscle activation at the start of an episode.</p></div>
+    <div class="card"><span class="tag">Check</span><h3>A body on its clip scores 1</h3><p>A test puts the body exactly on its reference frame: all seven terms score above 0.99, so frames, heading frames and body points line up.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-stage1">
+  <div class="sec-head">
+    <h2 id="s-stage1">Stage 1 in detail</h2>
+    <p>The B1 setup the from-scratch runs used, now starting from the walker. Reward per control step: ½ × speed × heading + ½ × style − effort, with speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free, heading exp(−turn-rate error²), and effort at fixed weights of 0.0025 each.</p>
   </div>
   <div class="cards">
     <div class="card"><span class="tag">Body</span><h3>Body and physics</h3><p>Rajagopal lower body: 90 muscles, 23 joints. 40 control steps a second, 75 physics steps each. Motor delays: 10 ms for hip and trunk muscles, 20 ms knee, 40 ms ankle and foot.</p></div>
@@ -510,399 +331,20 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <div class="card"><span class="tag">Senses</span><h3>What the policy senses</h3><p>Body state with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s), the command, five states per muscle, and 98 heights in two patches where the blind guesser expects the feet to land (±5 cm drift). The critic also gets the clean state and the full map.</p></div>
     <div class="card"><span class="tag">Episodes</span><h3>Starts and commands</h3><p>A random frame of 152 level AB01 clips (walking, start-stop, standing; 28 % standing frames), with the clip's velocities. The command starts at that frame's speed and heading; every 10 s a new random speed (0–1.5 m/s) and heading. 20 s at most.</p></div>
     <div class="card"><span class="tag">Disturbances</span><h3>Pushes and falls</h3><p>Friction ×0.5–2 per world, a constant push of up to 7 N per episode, a velocity kick every 4 s. A fall (tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching) ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Muscles start at 0.05 drive. Stage 0 has no drive floor; whether stage 1 keeps the 0.05 floor is still open.</p></div>
+    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Starts from stage 0's policy, critic and guesser with a fresh optimiser. Whether stage 1 keeps the 0.05 drive floor of the from-scratch runs is still open.</p></div>
   </div>
 </section>
 
-<section aria-labelledby="s-glance">
+<section aria-labelledby="s-status">
   <div class="sec-head">
-    <h2 id="s-glance">All nine at a glance</h2>
-    <p>Read left to right. A bar runs for as long as a choice stays the same; a blue edge marks the rung where it changes. Each rung's question compares it with the rung to its left, except L0.5: an ablation of L1 that only drops the command, so compare it with L1. Click a rung to watch it above.</p>
+    <h2 id="s-status">Status and the decision</h2>
+    <p>Stage 0 runs to 300M steps (about 01:30). At about 85M steps it is checked against a rule fixed in advance.</p>
   </div>
-  <div class="panel scroll">
-    <div class="lanes" role="img" aria-label="Six design choices across the nine rungs.">
-      <div class="lh corner"></div>
-      <button type="button" class="rung" data-arm="0" style="grid-column:2"><b>L0</b><span>Full map</span><em>the reference</em></button>
-      <button type="button" class="rung" data-arm="1" style="grid-column:3"><b>L0.5</b><span>No command</span><em>ablation of L1</em></button>
-      <button type="button" class="rung" data-arm="2" style="grid-column:4"><b>L1</b><span>Blind guess</span><em>+ blind guesser</em></button>
-      <button type="button" class="rung" data-arm="3" style="grid-column:5"><b>L2</b><span>+ terrain</span><em>guesser sees terrain</em></button>
-      <button type="button" class="rung" data-arm="4" style="grid-column:6"><b>L3</b><span>Human-trained</span><em>human labels</em></button>
-      <button type="button" class="rung" data-arm="5" style="grid-column:7"><b>L4</b><span>Follow</span><em>rewarded to follow</em></button>
-      <button type="button" class="rung" data-arm="6" style="grid-column:8"><b>L5</b><span>Planner</span><em>planner, 1.5 s</em></button>
-      <button type="button" class="rung" data-arm="7" style="grid-column:9"><b>L5.5</b><span>Mixed labels</span><em>mixed labels</em></button>
-      <button type="button" class="rung" data-arm="8" style="grid-column:10"><b>L6</b><span>+ loop</span><em>+ checked loop</em></button>
-      <div class="lh" style="grid-row:2">Policy sees</div>
-      <div class="bar base" style="grid-row:2; grid-column:2 / span 1">the full map, 0.8 m ahead</div>
-      <div class="bar base new" style="grid-row:2; grid-column:3 / span 5">2 patches at the guessed footholds</div>
-      <div class="bar base new" style="grid-row:2; grid-column:8 / span 3">the plan: footholds, timing, centre-of-mass band, about 1.5 s</div>
-      <div class="lh" style="grid-row:3">Policy sees the command</div>
-      <div class="bar base" style="grid-row:3; grid-column:2 / span 1">yes</div>
-      <div class="bar none new" style="grid-row:3; grid-column:3 / span 1">no; only where the patches go</div>
-      <div class="bar base new" style="grid-row:3; grid-column:4 / span 4">yes</div>
-      <div class="bar none new" style="grid-row:3; grid-column:8 / span 3">no; the plan carries it</div>
-      <div class="lh" style="grid-row:4">Footholds picked by</div>
-      <div class="bar none" style="grid-row:4; grid-column:2 / span 1">nobody</div>
-      <div class="bar base new" style="grid-row:4; grid-column:3 / span 2">a guesser that sees only the body</div>
-      <div class="bar base new" style="grid-row:4; grid-column:5 / span 3">a guesser that also reads a terrain strip</div>
-      <div class="bar base new" style="grid-row:4; grid-column:8 / span 3">a planner</div>
-      <div class="lh" style="grid-row:5">Trained on</div>
-      <div class="bar none" style="grid-row:5; grid-column:2 / span 1">–</div>
-      <div class="bar own new" style="grid-row:5; grid-column:3 / span 3">the policy’s own landings</div>
-      <div class="bar hum new" style="grid-row:5; grid-column:6 / span 3">human footsteps</div>
-      <div class="bar mix new" style="grid-row:5; grid-column:9 / span 1">human where the clips cover the terrain, its own landings elsewhere</div>
-      <div class="bar mix new" style="grid-row:5; grid-column:10 / span 1">human + its own checked runs, in rounds</div>
-      <div class="lh" style="grid-row:6">Must step there</div>
-      <div class="bar none" style="grid-row:6; grid-column:2 / span 5">no, it only looks</div>
-      <div class="bar base new" style="grid-row:6; grid-column:7 / span 4">yes, rewarded for landing there</div>
-      <div class="lh" style="grid-row:7">Policy’s reward</div>
-      <div class="bar base" style="grid-row:7; grid-column:2 / span 5">½ speed × heading + ½ style − effort</div>
-      <div class="bar base new" style="grid-row:7; grid-column:7 / span 1">¼ speed × heading + ¼ following + ½ style − effort</div>
-      <div class="bar base new" style="grid-row:7; grid-column:8 / span 3">0.3 touchdowns + 0.2 centre-of-mass band + ½ style − effort; no speed or heading</div>
-      <div class="lh q" style="grid-row:8">Question</div>
-      <div class="qq" style="grid-row:8; grid-column:2">the reference for everything to its right</div>
-      <div class="qq" style="grid-row:8; grid-column:3">can the patches alone tell the policy where to go? (compare with L1)</div>
-      <div class="qq" style="grid-row:8; grid-column:4">does looking only where the feet go learn faster on our body? (compare with L0)</div>
-      <div class="qq" style="grid-row:8; grid-column:5">does the guesser need terrain?</div>
-      <div class="qq" style="grid-row:8; grid-column:6">does human data make placement human-like?</div>
-      <div class="qq" style="grid-row:8; grid-column:7">is looking enough, or must it step there?</div>
-      <div class="qq" style="grid-row:8; grid-column:8">does anticipation need a longer horizon?</div>
-      <div class="qq" style="grid-row:8; grid-column:9">is mixing in its own landings enough to leave the clips?</div>
-      <div class="qq" style="grid-row:8; grid-column:10">do the checks and rounds beat L5.5 past the clips, without drifting from human?</div>
-    </div>
-    <div class="lkey"><span class="k hum">human data</span><span class="k own">the policy’s own landings</span><span class="k mix">both</span><span class="k new">changes at this rung</span></div>
-  </div>
-</section>
-
-<section aria-labelledby="s-judge">
-  <div class="sec-head">
-    <h2 id="s-judge">How we'd judge them</h2>
-    <p>Human-likeness only means something on terrain we have people walking on, and against subjects held out from training.</p>
-  </div>
-  <div class="meas">
-    <div class="panel" style="display:grid; gap:12px">
-      <h3>Step length before the first stair <span class="sketch-tag">sketch</span></h3>
-      <div class="scroll">
-        <svg class="dia" viewBox="0 0 560 300" role="img" aria-labelledby="ant-t" style="min-width:420px">
-          <title id="ant-t">Sketch of the hypothesis: people shorten their steps gradually over the three steps before the first stair; a reactive design keeps a normal stride and shortens late; a planner should look like people. Not measured.</title>
-          <line class="ax" x1="60" y1="250" x2="540" y2="250"/>
-          <line class="ax" x1="60" y1="40" x2="60" y2="250"/>
-          <line x1="432" y1="40" x2="432" y2="250" stroke="var(--wire)" stroke-width="1.5" stroke-dasharray="4 5"/>
-          <text class="axl" x="438" y="54">first stair</text>
-          <text class="axl" x="66" y="34">step length</text>
-          <text class="axl" x="80" y="272" text-anchor="middle">−4</text><text class="axl" x="168" y="272" text-anchor="middle">−3</text><text class="axl" x="256" y="272" text-anchor="middle">−2</text><text class="axl" x="344" y="272" text-anchor="middle">−1</text><text class="axl" x="432" y="272" text-anchor="middle">0</text><text class="axl" x="520" y="272" text-anchor="middle">+1</text>
-          <text class="axl" x="300" y="294" text-anchor="middle">steps relative to the first foot on the stairs</text>
-          <polyline class="ln rea" points="80,79 168,79 256,79 344,88 432,159 520,225"/>
-          <polyline class="ln ppl" points="80,79 168,88 256,107 344,135 432,173 520,225"/>
-          <polyline class="ln pla" points="80,79 168,90 256,110 344,138 432,176 520,225"/>
-          <text class="dl rea" x="168" y="68">reactive (expected for L0 to L4)</text>
-          <text class="dl ppl" x="250" y="150" text-anchor="end">people (Camargo transitions)</text>
-          <text class="dl pla" x="250" y="168" text-anchor="end">planned (expected for L5 to L6)</text>
-        </svg>
-      </div>
-      <p class="note">No numbers on purpose: the human curve will come from Camargo's level-to-stair trials. This is the measure that should split the reactive designs from the planned ones.</p>
-    </div>
-    <div class="mgrid">
-      <div class="card"><h3>Foot placement</h3><p>Step length and width against speed; where the foot lands on a tread and how far it clears the nosing; take-off distance from a platform edge.</p></div>
-      <div class="card"><h3>Anticipation</h3><p>Step length over the 3 steps before a terrain change, against Camargo's transition trials (the sketch).</p></div>
-      <div class="card"><h3>Biomechanics</h3><p>Joint angles, ground forces, joint moments and EMG against Camargo, terrain by terrain.</p></div>
-      <div class="card"><h3>Task</h3><p>Falls, terrain level reached, and how fast each design learns.</p></div>
-      <div class="card"><h3>Guesser misses</h3><p>Foothold error by terrain, and how often the foot lands outside its patch. This is where L1 should fail first.</p></div>
-      <div class="card"><h3>Test terrain</h3>
-        <div class="tchips"><span>level + ramps: AB01, Camargo</span><span>stairs + transitions: Camargo</span><span>platforms: PARC captured clips</span><span>held-out subjects</span></div>
-        <p>Stones, boxes and pits have no human footstep data. Judge them on task only.</p></div>
-    </div>
-  </div>
-</section>
-
-<section aria-labelledby="s-order">
-  <div class="sec-head">
-    <h2 id="s-order">Order and cost</h2>
-    <p>The ladder follows the plan's B-then-A route, with four cheap rungs slotted in between.</p>
-  </div>
-  <ol class="road">
-    <li class="now"><span class="st">B1</span><b>L0, L1, L0.5</b><span>on AB01 clips; L0.5 drops the command</span><span class="cost">next build</span></li>
-    <li><span class="st">B2</span><b>L0 + L1</b><span>add Camargo stairs and PARC jumps</span><span class="cost">more clips</span></li>
-    <li><span class="st">L2, L3</span><b>Guesser variants</b><span>terrain strip; human labels</span><span class="cost">cheap</span></li>
-    <li><span class="st">L4</span><b>Follow the footholds</b><span>add a following reward</span><span class="cost">small</span></li>
-    <li><span class="st">A1</span><b>L5 planner</b><span>footholds, timing, centre-of-mass band</span><span class="cost">the big build</span></li>
-    <li><span class="st">A1.5</span><b>L5.5 mixed labels</b><span>human plans on the clips' terrain, own landings elsewhere</span><span class="cost">small</span></li>
-    <li><span class="st">A2</span><b>L6 PARC loop</b><span>run, check, retrain the planner</span><span class="cost">loop rounds</span></li>
-  </ol>
   <div class="cards">
-    <div class="card"><span class="tag">Caveat</span><h3>Copied isn't predicted</h3><p>From L3 up, foot placement comes from human data, so it can't be claimed as a prediction. The claims are what wasn't copied: forces, moments, EMG, and behaviour on terrain past the clips.</p></div>
-    <div class="card"><span class="tag">Data</span><h3>No SEED in footstep models</h3><p>Guessers and planners train on AB01, Camargo and the captured PARC clips only. A model that predicts human footsteps is too close to a motion generator for SEED's licence.</p></div>
-    <div class="card"><span class="tag">Coverage</span><h3>Past the clips</h3><p>Stepping stones, boxes and pits have no human footstep data, so L3 to L5 extrapolate there. L5.5 falls back on the policy's own landings there, and L6's loop has to beat that.</p></div>
+    <div class="card"><span class="tag">Keep</span><h3>Clearly beyond from scratch</h3><p>Episodes well past the from-scratch runs' length at the same step count (about 57 steps at 85M), aiming for 100+ and rising; imitation reward climbing toward 0.6 or more and joint error toward 10°; calf, knee and hip extensor drive at or above the 0.05 start.</p></div>
+    <div class="card"><span class="tag">Kill</span><h3>The same trap again</h3><p>Episodes still under about 70 steps, and extensor drive sunk below 0.04.</p></div>
+    <div class="card" id="status-now"><span class="tag">Now</span><h3>24M steps (20:21)</h3><p>Episodes 40 steps (1 s), imitation reward 0.52 and rising, joint error 13° and falling. Metabolic power is falling (3.4 to 2.75 W/kg), the direction the failed runs took: the check decides.</p></div>
   </div>
 </section>
 
 </div>
-
-<script>
-(() => {
-  const reduce = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
-  if (reduce) { const d = document.getElementById('loopdot'); if (d) d.remove(); }
-
-  // ---------- designs ----------
-  const ARMS = [
-    { k: 'L0', n: 'Full map', title: 'L0 · Full map, no footholds',
-      w: 'Blue dots are the whole local map: 33 × 21 heights, from 0.8 m behind to 0.8 m ahead of the pelvis. No guesses, no patches.',
-      c: 'Nothing. This is the reference.',
-      e: 'Works, but learns slower. In the paper the full map reached terrain level 5 at 26.1k iterations, against 7.5k with patches.',
-      k2: 'Part of the stage-1 build.',
-      mod: ['no footstep module', ''], inp: ['Full map', '693 heights'], rew: '½ task + ½ style − effort' },
-    { k: 'L0.5', n: 'No command', title: 'L0.5 · Blind guesser, no command for the policy (an ablation of L1)',
-      w: 'Same picture as L1. The change is in the policy’s input: it no longer sees the commanded speed and heading. The guesser still does, so the only hint of where to go is where the patches land.',
-      c: 'The policy’s command input reads zero. The guesser and the critic still get the command, and the reward still pays for tracking it.',
-      e: 'If the patches carry the intent, it tracks speed and heading about as well as L1. If not, tracking drops, worst at the start, when the guesser still places the patches at fixed offsets.',
-      k2: 'Tiny: one input switched off (run.sh --ladder L0.5).',
-      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights, no command'], rew: '½ task + ½ style − effort' },
-    { k: 'L1', n: 'Blind guess', title: 'L1 · Blind guesser (Watch Your Step)',
-      w: 'Teal patches sit at the guessed next landing of each foot. Patch 1 slides toward the foot during the swing: that is the guess being redone from the body. The badge says whether the foot landed inside the patch it saw at take-off. Here the guess just repeats the last step; the real one reads the whole body.',
-      c: 'A guesser that sees only the body picks two 30 × 30 cm patches. The policy sees those 98 heights instead of the map.',
-      e: 'Faster learning. Misses where a landing is far from a normal stride (try the wide gap) and near-misses at the first step onto stairs.',
-      k2: 'Part of the stage-1 build.',
-      mod: ['Blind guesser', 'body only'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
-    { k: 'L2', n: '+ terrain', title: 'L2 · Guesser that sees terrain',
-      w: 'The grey strip ahead goes into the guesser, so the patches land on the right spots before the foot commits.',
-      c: 'The guesser also reads a height strip along the heading (length still to set).',
-      e: 'Fewer misses on stairs, gaps and boxes. Placement no more human than L1: it still learns the policy’s own habits.',
-      k2: 'Cheap: one extra guesser input.',
-      mod: ['Guesser', 'body + strip ahead'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
-    { k: 'L3', n: 'Human-trained', title: 'L3 · Guesser trained on people',
-      w: 'Same picture as L2. The change is in training: the guesser’s labels are human footsteps from the clips, not the policy’s own landings.',
-      c: 'Labels come from human footsteps.',
-      e: 'Placement moves toward human step length, step width and tread position.',
-      k2: 'Cheap: footstep labels from the clips.',
-      mod: ['Guesser', 'trained on people'], inp: ['2 patches', '98 heights'], rew: '½ task + ½ style − effort' },
-    { k: 'L4', n: 'Follow', title: 'L4 · Follow the footholds',
-      w: 'The amber rings are targets. Landing inside one earns a following reward (green flash).',
-      c: 'The guessed footholds become targets the policy is rewarded for hitting.',
-      e: 'Closer biomechanics where the human plan suits this body; less robust where it doesn’t.',
-      k2: 'A following reward.',
-      mod: ['Guesser', 'trained on people'], inp: ['2 patches + targets', 'rewarded to hit them'], rew: '¼ task + ¼ follow + ½ style − effort' },
-    { k: 'L5', n: 'Planner', title: 'L5 · Planner with a longer horizon',
-      w: 'The planner lays out every foothold in the next 1.5 s, with the time to each touchdown and a band the centre of mass should stay in.',
-      c: 'A planner replaces the guesser: 3 to 4 footholds, contact timing and a centre-of-mass band.',
-      e: 'The only design that should change step length 2 to 3 steps before stairs, as people do.',
-      k2: 'Build the planner (route A, step A1).',
-      mod: ['Planner', 'about 1.5 s ahead'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
-    { k: 'L5.5', n: 'Mixed labels', title: 'L5.5 · Planner on mixed labels',
-      w: 'Same picture as L5. The change is in training: where the clips cover the terrain, the labels are human plans; everywhere else they are the policy’s own steps.',
-      c: 'The planner’s labels come from people on terrain the clips cover (level, ramps, stairs) and from the policy’s own landings elsewhere, as in L2.',
-      e: 'Human placement where people have walked, and no human-style targets pulling a foot into a gap. Off the clips the plan copies the policy’s habits, so following it there costs nothing.',
-      k2: 'Small: a per-terrain switch on the planner’s labels. No checks, no rounds.',
-      mod: ['Planner', 'mixed labels'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
-    { k: 'L6', n: '+ loop', title: 'L6 · Planner + PARC loop',
-      w: 'Green ticks mark finished steps that passed the checks. Those runs go back into the planner’s training data.',
-      c: 'Rounds of: run, check, add the good runs, retrain the planner.',
-      e: 'Covers terrain past the clips. Watch for drift away from human placement.',
-      k2: 'Loop rounds (step A2).',
-      mod: ['Planner', 'retrained each round'], inp: ['The plan', 'footholds, timing, CoM band'], rew: 'steps + CoM band + style − effort' },
-  ];
-
-  // ---------- terrains (metres; x forward, h up) ----------
-  const PIT = -0.42;
-  const inAny = (x, iv) => iv.some(([a, b]) => x >= a && x < b);
-  const stonePits = [[2.08, 2.29], [2.61, 2.82], [3.14, 3.45], [3.77, 3.97], [4.29, 4.59], [4.91, 5.17], [5.49, 5.75], [6.07, 6.26]];
-  const TER = {
-    stones: { feet: [-0.6, 0, 0.6, 1.2, 1.8, 2.42, 2.95, 3.58, 4.1, 4.72, 5.3, 5.88, 6.5, 7.1, 7.7, 8.3],
-              h: x => inAny(x, stonePits) ? PIT : 0, label: 'Stepping stones', feature: 6 },
-    stairs: { feet: [-0.27, 0.35, 0.97, 1.57, 2.15, 2.7, 3.13, 3.43, 3.73, 4.1, 4.55, 5.12, 5.72, 6.32, 6.92, 7.52, 8.12],
-              h: x => x < 3.0 ? 0 : 0.16 * Math.min(4, Math.floor((x - 3.0) / 0.3 + 1e-9) + 1), label: 'Stairs, 16 cm rise', feature: 6 },
-    gap:    { feet: [-0.27, 0.35, 0.97, 1.59, 2.2, 2.8, 3.86, 4.45, 5.05, 5.65, 6.25, 6.85, 7.45, 8.05],
-              h: x => (x >= 3.0 && x < 3.7) ? PIT : 0, label: 'Wide gap, 70 cm', feature: 6 },
-  };
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const smooth = s => s * s * (3 - 2 * s);
-  for (const T of Object.values(TER)) {
-    const f = T.feet, h = T.h; T.t0 = []; T.dur = []; T.bump = []; T.g1 = []; T.g2 = [];
-    let t = 0;
-    for (let k = 2; k < f.length; k++) {
-      const a = f[k - 2], b = f[k - 1], c = f[k], l = c - b;
-      T.t0[k] = t; T.dur[k] = 0.38 + 0.28 * Math.min(l, 1.0); t += T.dur[k];
-      const ha = h(a), hc = h(c); let bump = 0.07;
-      for (let i = 2; i <= 18; i++) {
-        const s = i / 20, e = smooth(s), x = a + (c - a) * e;
-        let ht = -9; for (let d = -0.09; d <= 0.151; d += 0.03) ht = Math.max(ht, h(x + d));
-        bump = Math.max(bump, (ht + 0.04 - (ha + (hc - ha) * e)) / Math.sin(Math.PI * s));
-      }
-      T.bump[k] = bump + (l > 0.9 ? 0.06 : 0);
-      const L = clamp(b - a, 0.25, 0.72);                  // the blind guess: repeat the last step
-      T.g1[k] = b + L; T.g2[k] = b + 2 * L;
-    }
-    T.total = t;
-    const pts = [[-0.4, -0.8]]; let prev = h(-0.4); pts.push([-0.4, prev]);
-    for (let i = -40; i <= 880; i++) { const x = i / 100, v = h(x); if (v !== prev) { pts.push([x, prev], [x, v]); prev = v; } }
-    pts.push([8.8, prev], [8.8, -0.8]);
-    T.path = 'M' + pts.map(([x, y]) => X(x) + ' ' + Y(y)).join(' L') + ' Z';
-  }
-  function X(x) { return (30 + x * 140).toFixed(1); }
-  function Y(h) { return (352 - h * 140).toFixed(1); }
-
-  function stepAt(T, t) { const f = T.feet; let k = 2; while (k < f.length - 1 && t >= T.t0[k] + T.dur[k]) k++; return [k, clamp((t - T.t0[k]) / T.dur[k], 0, 1)]; }
-  function pose(T, t) {
-    const f = T.feet, h = T.h, [k, s] = stepAt(T, t), e = smooth(s);
-    const a = f[k - 2], b = f[k - 1], c = f[k], ha = h(a), hb = h(b), hc = h(c);
-    const sw = [a + (c - a) * e, ha + (hc - ha) * e + T.bump[k] * Math.sin(Math.PI * s)];
-    const px = (a + b) / 2 + (c - a) / 2 * s, R = 0.855;
-    let py = ((ha + hb) / 2) * (1 - s) + ((hb + hc) / 2) * s + 0.86 + 0.02 * Math.sin(Math.PI * s);
-    const reach = (ax, ay) => { const d = px - ax; return Math.abs(d) < R ? ay + 0.07 + Math.sqrt(R * R - d * d) : 9; };
-    py = Math.min(py, reach(b, hb), reach(sw[0], sw[1]));
-    return { k, s, e, sw, st: [b, hb], pel: [px, py] };
-  }
-  function knee(hip, ank) {
-    const l1 = 0.43, l2 = 0.44; let dx = ank[0] - hip[0], dy = ank[1] - hip[1], d = Math.hypot(dx, dy); const dm = l1 + l2 - 1e-4;
-    if (d > dm) { dx *= dm / d; dy *= dm / d; d = dm; ank = [hip[0] + dx, hip[1] + dy]; }
-    const a = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1)), base = Math.atan2(dy, dx);
-    const k1 = [hip[0] + l1 * Math.cos(base + a), hip[1] + l1 * Math.sin(base + a)], k2 = [hip[0] + l1 * Math.cos(base - a), hip[1] + l1 * Math.sin(base - a)];
-    return [k1[0] > k2[0] ? k1 : k2, ank];
-  }
-  const P = (p) => X(p[0]) + ' ' + Y(p[1]);
-
-  // ---------- state ----------
-  let arm = 2, ter = 'stairs', tau = 0, playing = !reduce;
-  const $ = id => document.getElementById(id);
-  const el = { ground: $('ground'), under: $('under'), over: $('over'), legN: $('legN'), legF: $('legF'), footN: $('footN'), footF: $('footF'),
-               armN: $('armN'), armF: $('armF'), torso: $('torso'), head: $('head'), hud1: $('hud1'), hud2: $('hud2') };
-  if (reduce) { const T = TER[ter]; tau = T.t0[T.feature] + T.dur[T.feature] * 0.55; }
-
-  function drawLeg(hip, sole, legEl, footEl) {
-    const ank = [sole[0], sole[1] + 0.07], [kn, an] = knee(hip, ank);
-    legEl.setAttribute('d', 'M' + P(hip) + ' L' + P(kn) + ' L' + P(an));
-    footEl.setAttribute('d', 'M' + P(an) + ' L' + P([an[0] - 0.08, an[1] - 0.07]) + ' L' + P([an[0] + 0.16, an[1] - 0.07]) + ' Z');
-  }
-  function drawArm(sh, ang, armEl) {
-    const el1 = [sh[0] + 0.29 * Math.sin(ang), sh[1] - 0.29 * Math.cos(ang)], a2 = ang + 0.4;
-    armEl.setAttribute('d', 'M' + P(sh) + ' L' + P(el1) + ' L' + P([el1[0] + 0.26 * Math.sin(a2), el1[1] - 0.26 * Math.cos(a2)]));
-  }
-  function patch(T, x, n, ghost) {
-    const pts = []; for (let i = -3; i <= 3; i++) { const xx = x + 0.05 * i; pts.push([xx, T.h(xx)]); }
-    const top = Math.max(...pts.map(p => p[1])), bot = Math.min(...pts.map(p => p[1]));
-    let s = `<rect class="pband${ghost ? ' ghost' : ''}" x="${X(x - 0.18)}" y="${Y(top + 0.07)}" width="${(0.36 * 140).toFixed(1)}" height="${((top - bot + 0.1) * 140).toFixed(1)}" rx="6"/>`;
-    if (!ghost) { s += pts.map(p => `<circle class="patchdot" cx="${X(p[0])}" cy="${Y(p[1])}" r="3.6"/>`).join(''); s += `<text class="plab" x="${X(x)}" y="${(+Y(top + 0.07) - 7).toFixed(1)}">${n}</text>`; }
-    return s;
-  }
-  function badge(x, y, cls, txt) {
-    const w = txt.length * 7.4 + 20;
-    return `<g class="badge ${cls}"><rect x="${(+X(x) - w / 2).toFixed(1)}" y="${(+Y(y) - 15).toFixed(1)}" width="${w.toFixed(1)}" height="26" rx="13"/><text x="${X(x)}" y="${(+Y(y) + 3).toFixed(1)}">${txt}</text></g>`;
-  }
-  const ring = (T, x, cls) => `<ellipse class="ring ${cls || ''}" cx="${X(x + 0.03)}" cy="${Y(T.h(x))}" rx="${(0.17 * 140).toFixed(1)}" ry="8"/>`;
-
-  function frame() {
-    const T = TER[ter], f = T.feet, h = T.h, Q = pose(T, tau), k = Q.k, s = Q.s, pel = Q.pel, pelx = pel[0];
-    // walker: left foot = even foothold index = near side
-    const swingNear = k % 2 === 0;
-    drawLeg(pel, Q.sw, swingNear ? el.legN : el.legF, swingNear ? el.footN : el.footF);
-    drawLeg(pel, Q.st, swingNear ? el.legF : el.legN, swingNear ? el.footF : el.footN);
-    const sh = [pel[0] + 0.05, pel[1] + 0.5], hd = [sh[0] + 0.04, sh[1] + 0.18];
-    el.torso.setAttribute('d', 'M' + P(pel) + ' L' + P(sh));
-    el.head.setAttribute('cx', X(hd[0])); el.head.setAttribute('cy', Y(hd[1]));
-    const p = 2 * Q.e - 1;
-    drawArm(sh, swingNear ? -0.35 * p : 0.35 * p, el.armN); drawArm(sh, swingNear ? 0.35 * p : -0.35 * p, el.armF);
-
-    const D = arm <= 1 ? arm : arm - 1;               // the drawing as before L0.5 (L0.5 draws as L1)
-    let u = '', o = '', far = null, hud2 = '';
-    for (let i = 0; i < k - 1; i++) {
-      u += `<line class="print" x1="${X(f[i] - 0.08)}" x2="${X(f[i] + 0.16)}" y1="${Y(h(f[i]))}" y2="${Y(h(f[i]))}"/>`;
-      if (D === 7 && i >= 2) { const cx = +X(f[i] + 0.04), cy = +Y(h(f[i])) + 22; u += `<path class="tick" d="M${cx - 7} ${cy} l5 5 l9 -11"/>`; }
-    }
-    if (D === 0) {
-      for (let j = -16; j <= 16; j++) { const x = pelx + 0.05 * j; u += `<circle class="mapdot" cx="${X(x)}" cy="${Y(h(x))}" r="3.4"/>`; }
-      far = pelx + 0.8; hud2 = 'the map ends 0.8 m ahead of the pelvis';
-    } else if (D <= 4) {
-      if (D >= 2) for (let j = 0; j <= 30; j++) { const x = pelx + 0.05 * j; u += `<circle class="stripdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
-      const next = f[k], after = f[k + 1] !== undefined ? f[k + 1] : f[k] + 0.6;
-      let g1, g2;
-      if (D === 1) { g1 = T.g1[k] + (next - T.g1[k]) * 0.5 * s; g2 = T.g2[k] + (after - T.g2[k]) * 0.3 * s; }
-      else if (D === 2) { g1 = next + 0.03; g2 = after - 0.04; }
-      else { g1 = next; g2 = after; }
-      u += patch(T, g2, 2) + patch(T, g1, 1);
-      if (D === 4) { u += ring(T, next) + ring(T, after, 'faint'); }
-      far = Math.max(g1, g2) + 0.15;
-      // what happened at the last landing
-      const last = k - 1;
-      if (last >= 2 && s < 0.7) {
-        if (D === 1) {
-          const err = Math.abs(f[last] - T.g1[last]);
-          const [cls, txt] = err <= 0.10 ? ['ok', '✓ inside the patch'] : err <= 0.15 ? ['edge', 'near the patch edge'] : ['out', '✕ outside the patch'];
-          o += badge(f[last] + 0.04, h(f[last]) - 0.15, cls, txt);
-          if (cls === 'out') u += patch(T, T.g1[last], 1, true);
-        } else if (D === 4) { u += ring(T, f[last], 'hit'); o += badge(f[last] + 0.04, h(f[last]) - 0.15, 'ok', '+ following reward'); }
-      }
-      hud2 = D === 1 ? 'the guesser sees only the body' : D === 2 ? 'the guesser also reads the strip ahead' : D === 3 ? 'guesser trained on human footsteps' : 'land in the ring to earn the following reward';
-    } else {
-      for (let j = -3; j <= 22; j++) { const x = pelx + 0.1 * j; u += `<circle class="pdot" cx="${X(x)}" cy="${(+Y(h(x)) - 9).toFixed(1)}" r="2.4"/>`; }
-      const band = [], H = Math.min(1.5, T.total - tau);
-      for (let d = 0; d <= H + 1e-6; d += 0.05) band.push(pose(T, tau + d).pel);
-      if (band.length > 1) {
-        const up = band.map(q => P([q[0], q[1] + 0.05])), dn = band.slice().reverse().map(q => P([q[0], q[1] - 0.05]));
-        u += `<path class="comband" d="M${up.join(' L')} L${dn.join(' L')} Z"/>`;
-      }
-      for (let j = k; j < f.length; j++) {
-        const td = T.t0[j] + T.dur[j] - tau; if (td > 1.5) break;
-        u += ring(T, f[j]); o += `<text class="tlab" x="${X(f[j] + 0.03)}" y="${(+Y(h(f[j])) + 26).toFixed(1)}">${td.toFixed(1)} s</text>`;
-        far = f[j] + 0.15;
-      }
-      if (far === null) far = pelx;
-      hud2 = D === 5 ? 'plan: footholds, touchdown times, centre-of-mass band' : D === 6 ? 'trained on people where the clips cover the terrain, on its own steps elsewhere' : 'ticks: finished steps that passed the checks';
-    }
-    if (arm === 1) hud2 = 'no command: only where the patches go hints at speed and heading';
-    if (far !== null) {
-      o += `<line class="horizon" x1="${X(far)}" x2="${X(far)}" y1="70" y2="${Y(h(far))}"/>`;
-      o += `<text class="hlab" x="${(+X(far) + 6).toFixed(1)}" y="84">${(far - pelx).toFixed(1)} m ahead</text>`;
-    }
-    el.under.innerHTML = u; el.over.innerHTML = o;
-    el.hud1.textContent = ARMS[arm].k + ' · ' + ARMS[arm].n + ' · ' + T.label;
-    el.hud2.textContent = hud2;
-  }
-
-  // ---------- flow diagram + caption ----------
-  const flow = $('flow');
-  const nodeOn = {
-    body: () => true, cmd: () => true, pol: () => true, rew: () => true, inp: () => true,
-    map: () => true, mod: a => a >= 1, human: a => a >= 4,
-  };
-  function setArm(a) {
-    arm = a; const A = ARMS[a];
-    document.querySelectorAll('#armSeg button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === a)));
-    const key = a === 1 ? 'h' : String(a <= 1 ? a : a - 1);     // data-arms use the indices before L0.5; L0.5 is 'h'
-    flow.querySelectorAll('[data-arms]').forEach(n => n.classList.toggle('on', n.dataset.arms.includes(key)));
-    flow.querySelectorAll('[data-node]').forEach(n => n.classList.toggle('off', !nodeOn[n.dataset.node](a)));
-    $('modT').textContent = A.mod[0]; $('modT').setAttribute('y', A.mod[1] ? '194' : '206'); $('modS').textContent = A.mod[1];
-    $('inpT').textContent = A.inp[0]; $('inpS').textContent = A.inp[1]; $('rewS').textContent = A.rew;
-    $('capT').textContent = A.title; $('capW').textContent = A.w; $('capC').textContent = A.c; $('capE').textContent = A.e; $('capK').textContent = A.k2;
-    frame();
-  }
-  function setTer(t) {
-    ter = t; $('ground').setAttribute('d', TER[t].path);
-    document.querySelectorAll('#terSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ter === t)));
-    const T = TER[t]; tau = playing ? 0 : T.t0[T.feature] + T.dur[T.feature] * 0.55; frame();
-  }
-  const seg = $('armSeg');
-  ARMS.forEach((A, i) => { const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${A.k}</b>${A.n}`; b.addEventListener('click', () => setArm(i)); seg.appendChild(b); });
-  document.querySelectorAll('#terSeg button').forEach(b => b.addEventListener('click', () => setTer(b.dataset.ter)));
-  const playBtn = $('play');
-  function setPlay(v) { playing = v; playBtn.textContent = v ? 'Pause' : 'Play'; playBtn.setAttribute('aria-pressed', String(v)); }
-  playBtn.addEventListener('click', () => setPlay(!playing));
-  document.querySelectorAll('.rung[data-arm]').forEach(b => b.addEventListener('click', () => {
-    setArm(+b.dataset.arm); $('sceneWrap').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
-  }));
-  document.querySelectorAll('[data-show]').forEach(b => b.addEventListener('click', () => {
-    const [a, t] = b.dataset.show.split(','); setPlay(true); setTer(t); setArm(+a);
-    const T = TER[t]; tau = Math.max(0, T.t0[T.feature] - 1.4);
-    $('sceneWrap').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
-  }));
-
-  setPlay(playing); setTer(ter); setArm(arm);
-  let last = null;
-  function loop(ts) {
-    if (last !== null && playing && !document.hidden) {
-      tau += Math.min(0.05, (ts - last) / 1000) * 0.8;
-      const T = TER[ter]; if (tau > T.total + 0.6) tau = 0;
-      frame();
-    }
-    last = ts; requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-})();
-</script>
