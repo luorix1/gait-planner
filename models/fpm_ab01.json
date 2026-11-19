@@ -1,0 +1,15 @@
+{
+  "samples": 84582,
+  "windows": 276,
+  "held_out_windows": 55,
+  "held_out": {
+    "median_cm": 8.391833305358887,
+    "mean_cm": 21.851776123046875,
+    "p90_cm": 64.86836242675781
+  },
+  "fixed_offsets_baseline": {
+    "median_cm": 56.934452056884766,
+    "mean_cm": 64.7882308959961,
+    "p90_cm": 126.09663391113281
+  }
+}

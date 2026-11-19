@@ -73,6 +73,8 @@ class WysConfig:
     bootstrap_iters: int = 500
     refit_iters: int = 500
     refit_samples: int = 500_000
+    #: False: the predictor is never refitted (a fixed one, e.g. fitted to human footsteps by fit_fpm.py).
+    refit: bool = True
     # reward weights (their RewardsCfg)
     w: dict = field(default_factory=lambda: dict(
         track_lin_vel_xy=1.0, track_ang_vel_z=1.0, stand_still=2.5, lin_vel_z=-0.5, ang_vel_xy=-0.05,
@@ -535,6 +537,8 @@ class WatchYourStep(TorchTask):
     # -- the predictor's refits ---------------------------------------------------------------------------------------
     def _fpm_step(self, s: Any, b: dict[str, torch.Tensor]) -> None:
         c = self.c
+        if not c.refit:
+            return
         boot = c.bootstrap_iters * c.steps_per_iter
         if self.steps <= boot:
             return

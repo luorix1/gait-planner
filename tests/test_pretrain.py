@@ -60,3 +60,29 @@ def test_ramp_starts_line_up() -> None:
     slope = (task.ground(x + 0.5, z) - task.ground(x - 0.5, z))[:, 0]
     want = torch.tan(torch.deg2rad(torch.tensor([0.0, 5.0, 10.0])))[task.wgrade]
     assert torch.allclose(slope, want, atol=0.01), (slope, want)
+
+
+def test_clip_estimator_inputs_match_the_simulation() -> None:
+    """The estimator's input computed from a clip equals the simulation's ``system_state`` with the body on that
+    clip frame (velocities from finite differences: within a few cm/s), and clip labels are finite."""
+    from dataclasses import replace
+
+    from train_wys import build
+
+    env, task = build(1, 0, "cpu", None, replace(PretrainConfig(), nominal_jitter=0.0), kind="pretrain",
+                      trials=("ab01_mc021",))
+    env.reset()
+    s = env.state
+    a = int(torch.unique(task.ex_first_f)[0])
+    f = a + 150
+    q = task.ex_q[f].clone()
+    q[task.pel["ty"]] -= task.ex_gy[f]
+    s.qpos[0], s.qvel[0] = q, task.ex_qd[f]
+    forward_kinematics(env.model, env.data)
+    task.cmd[:] = torch.tensor([float(task.ex_speed_f[f]), 0.0, 0.0])
+    sim = task.system_state(task.body_state(s))[0]
+    clip = task.clip_inputs(a, int(task.ex_last_f[a]) + 1)[150]
+    assert torch.allclose(sim[6:], clip[6:], atol=1e-4), (sim[6:] - clip[6:]).abs().max()
+    assert torch.allclose(sim[:3], clip[:3], atol=0.05) and torch.allclose(sim[3:6], clip[3:6], atol=0.15), (sim[:6], clip[:6])
+    x, y = task.clip_estimator_data()
+    assert len(x) == len(y) > 0 and torch.isfinite(x).all() and torch.isfinite(y).all()

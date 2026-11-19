@@ -280,6 +280,47 @@ class Pretrain(Ladder):
                             **{f"i_{k}": v for k, v in tr.items()})
         return imitation - effort
 
+    def clip_inputs(self, a: int, b: int) -> torch.Tensor:
+        """The estimator's input (``system_state``) at reference frames ``a..b-1`` of one clip, from the clip itself:
+        pelvis COM velocity and angular velocity (central differences) in the pelvis frame, gravity there, the command
+        (the clip's speed, a zero turn rate: stage 0 steers toward the clip's own heading), joints from the standing
+        pose and joint speeds."""
+        c, dt, r = self.c, self.c.dt, self.root
+        qr = self.ex_xq[a:b, r].cpu()
+        v = torch.gradient(self.ex_com[a:b, r].cpu(), spacing=dt, dim=0)[0]
+        dq = _qmul(qr[2:], _qconj(qr[:-2]))
+        w = _rotvec(torch.cat([dq[:1], dq, dq[-1:]])) / (2 * dt)
+        cmd = torch.zeros(b - a, 3)
+        cmd[:, 0] = self.ex_speed_f[a:b].cpu()
+        jidx = self.jidx.cpu()
+        return torch.cat([_irot(qr, v), _irot(qr, w), _irot(qr, torch.tensor([0.0, -1.0, 0.0]).expand(b - a, 3)),
+                          cmd[:, list(c.command_dims)], self.ex_q[a:b].cpu()[:, jidx] - self.q0[self.jidx].cpu(),
+                          self.ex_qd[a:b].cpu()[:, jidx]], 1)
+
+    def clip_estimator_windows(self) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        """The foot placement estimator's training set from the clips, per clip window: :meth:`clip_inputs` and the
+        label (each foot's next strictly-future landing, (forward, lateral) in the pelvis frame, as the simulation's
+        labels), frames whose next landing lies past the window's end dropped."""
+        from . import fpm as FPM
+        D, r = self.D, self.root
+        rows = np.concatenate([np.arange(D["start"][k], D["start"][k] + D["frames"][k]) for k in self.ex_clips])
+        contact = torch.as_tensor(D["plan_contact"][rows])
+        xp, xq = self.ex_xp.cpu(), self.ex_xq.cpu()
+        first, last = self.ex_first_f.cpu(), self.ex_last_f.cpu()
+        out = []
+        for a in torch.unique(first).tolist():
+            b = int(last[a]) + 1
+            land, ok = FPM.next_landings(contact[a:b], xp[a:b][:, self.feet])
+            y = _irot(xq[a:b, r][:, None].expand(-1, 2, -1), land - xp[a:b, r][:, None])[..., [0, 2]].flatten(1)
+            keep = ok.all(1)
+            out.append((self.clip_inputs(a, b)[keep], y[keep]))
+        return out
+
+    def clip_estimator_data(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """:meth:`clip_estimator_windows`, every window together."""
+        w = self.clip_estimator_windows()
+        return torch.cat([x for x, _ in w]), torch.cat([y for _, y in w])
+
     def done(self, s: Any) -> tuple[torch.Tensor, torch.Tensor]:
         fell, out = super().done(s)
         return fell, out | (self._ended & ~fell)

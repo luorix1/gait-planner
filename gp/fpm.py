@@ -86,6 +86,30 @@ def future_contacts(contact: torch.Tensor, root_pos: torch.Tensor, root_quat: to
     return _quat_inv_rotate(root_quat[:, :, None], out - root_pos[:, :, None])
 
 
+def next_landings(contact: torch.Tensor, foot_pos: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """One continuous recording (a clip): ``contact`` ``[T, F]``, ``foot_pos`` ``[T, F, 3]`` world -> each step's next
+    strictly-future landing per foot ``[T, F, 3]`` (the same definition as :func:`future_contacts`: in contact, the
+    landing after the coming lift-off; in the air, the landing it is about to make) and ``valid`` ``[T, F]``: False
+    where that landing lies past the end of the recording (``future_contacts`` labels those with the last position)."""
+    T, F = contact.shape
+    out = torch.zeros(T, F, 3, dtype=foot_pos.dtype)
+    valid = torch.zeros(T, F, dtype=torch.bool)
+    for i in range(F):
+        nxt = fut = None
+        in_air_after = False
+        for t in range(T - 1, -1, -1):
+            down = bool(contact[t, i])
+            if down and in_air_after:               # the last stance step before a lift-off
+                fut = nxt
+            if down:
+                nxt = foot_pos[t, i]
+            lab = fut if down else nxt
+            if lab is not None:
+                out[t, i], valid[t, i] = lab, True
+            in_air_after = not down
+    return out, valid
+
+
 def detect_resets(root_pos: torch.Tensor, jump: float = 0.5) -> torch.Tensor:
     """``[E, T]``: 1 where the root's horizontal position jumps more than ``jump`` m to the next step."""
     xz = root_pos[..., [0, 2]]
