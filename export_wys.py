@@ -64,6 +64,8 @@ def main() -> None:
     base = ({"ladder": LadderConfig, "pretrain": PretrainConfig}[kind](perception=args.get("perception", "patches"),
                                                                         policy_command=not args.get("no_policy_command", False))
             if kind in ("ladder", "pretrain") else WysConfig())
+    if args.get("teacher"):
+        base = replace(base, teacher=True, warp=0)
     types = WT.column_types()
     kinds = [t for t in dict.fromkeys(types) if kind not in ("ladder", "pretrain") or t in base.types]
     tiles = tuple((a.level, types.index(t)) for t in kinds) * a.per_tile            # first column of each type

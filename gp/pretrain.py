@@ -97,6 +97,11 @@ class PretrainConfig(LadderConfig):
     ramp_match: float = 1.5
     #: Share of the worlds on ramps (split evenly over the grades that have clips; none without ramp clips).
     ramp_share: float = 0.3
+    #: The imitation teacher (to distil into the L1 student): the policy also sees the clip, per tap (control steps
+    #: ahead) its joint angles, pelvis height, pelvis orientation, feet relative to the pelvis, pelvis velocity and
+    #: pelvis position, each as the error from the body now. Teacher runs set ``warp`` 0: the clip plays at its rate.
+    teacher: bool = False
+    taps: tuple = (1, 2, 3, 5, 8, 14, 24, 40)
 
     def ramp_columns(self) -> dict[int, float]:
         """Column -> grade for the ramp strips."""
@@ -111,9 +116,23 @@ class PretrainConfig(LadderConfig):
 class Pretrain(Ladder):
     name = "pretrain"
 
+    def layout(self) -> list[tuple]:
+        base = super().layout()
+        if not self.c.teacher:
+            return base
+        k = next(i for i, b in enumerate(base) if b[0].startswith("critic_"))
+        nj, polar, axial = self.nj, [1.0, 1.0, -1.0], [-1.0, -1.0, 1.0]
+        ref = []
+        for t in self.c.taps:
+            ref += [(f"ref_joint[{t}]", nj, list(self.jperm), list(self.jsign)), (f"ref_height[{t}]", 1, [0], [1.0]),
+                    (f"ref_orientation[{t}]", 3, [0, 1, 2], axial), (f"ref_feet[{t}]", 6, [3, 4, 5, 0, 1, 2], polar * 2),
+                    (f"ref_velocity[{t}]", 3, [0, 1, 2], polar), (f"ref_position[{t}]", 3, [0, 1, 2], polar)]
+        return base[:k] + ref + base[k:] + [("critic_" + b[0], *b[1:]) for b in ref]
+
     def setup(self, env: Any) -> None:
         super().setup(env)
         c, dev = self.c, self.dev
+        self.pos_off = torch.zeros(self.n, 3, device=dev)
         bn = list(env.model.body_names)
         self.torso = bn.index("torso")
         self.lm = [bn.index(b) for b in c.landmarks]
@@ -203,7 +222,43 @@ class Pretrain(Ladder):
             return
         f = self.ex_frame[self.start_pair[i]]
         self.ref_f[i], self.ref_start[i], self.t[i] = f, f, 0
+        tr = [self.pel["tx"], self.pel["ty"], self.pel["tz"]]
+        self.pos_off[i] = s.qpos[i][:, tr] - self.ex_q[f][:, tr]          # the reset's placement
         self.far[i], self.tilted[i], self._ended[i] = 0, 0, False
+
+    def observation(self, s: Any) -> torch.Tensor:
+        obs = super().observation(s)
+        if not self.c.teacher:
+            return obs
+        n = sum(b[1] for b in super().layout() if not b[0].startswith("critic_"))
+        ref = self._ref_features(s).nan_to_num(0.0, 0.0, 0.0)
+        return torch.cat([obs[:, :n], ref, obs[:, n:], ref], 1)
+
+    def _ref_features(self, s: Any) -> torch.Tensor:
+        """Per tap, the clip ``t`` control steps ahead as errors from the body now (the teacher's view of the clip)."""
+        r, p = self.root, self.pel
+        tr = [p["tx"], p["ty"], p["tz"]]
+        q = s.body_quat[:, r]
+        ys = _yaw(_heading(q))
+        com = s.body_com_pos()
+
+        def rel(x: torch.Tensor, root: torch.Tensor, yaw: torch.Tensor) -> torch.Tensor:
+            return _irot(yaw[:, None].expand(-1, x.shape[1], -1), x - root[:, None])
+
+        h_s = s.body_pos[:, r, 1] - self._pelvis_ground(s)
+        feet_s = rel(com[:, self.feet], s.body_pos[:, r], ys).flatten(1)
+        v_s = _irot(ys, s.qvel[:, tr])
+        out = []
+        for t in self.c.taps:
+            f = torch.minimum(self.ref_f + t, self.ex_last_f[self.ref_f])
+            yr = _yaw(self.ex_psi_f[f])
+            out += [self.ex_q[f][:, self.jidx] - s.qpos[:, self.jidx],
+                    ((self.ex_xp[f, r, 1] - self.ex_gy[f]) - h_s)[:, None],
+                    _rotvec(_qmul(_qconj(q), self.ex_xq[f, r])),
+                    rel(self.ex_com[f][:, self.feet], self.ex_xp[f, r], yr).flatten(1) - feet_s,
+                    _irot(yr, self.ex_qd[f][:, tr]) - v_s,
+                    _irot(ys, self.ex_q[f][:, tr] + self.pos_off - s.qpos[:, tr])]
+        return torch.cat(out, 1)
 
     def before_step(self, s: Any) -> None:
         f = self.ref_f

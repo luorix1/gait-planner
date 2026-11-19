@@ -122,6 +122,7 @@ def main() -> None:
     ap.add_argument("--gaitamp-conditions", action="store_true", help="ladder diagnostic: GAIT_amp's training conditions (GAITAMP)")
     ap.add_argument("--no-policy-command", action="store_true", help="ladder L0.5: the policy does not see the command")
     ap.add_argument("--trials", default="", help="ladder/pretrain: only these trials' windows, comma-separated (e.g. ab01_mc021)")
+    ap.add_argument("--teacher", action="store_true", help="pretrain: the imitation teacher (the clip in its input, no clock warp)")
     ap.add_argument("--foot-model", help="a fixed foot placement estimator (fit_fpm.py): no bootstrap, no refits")
     ap.add_argument("--init-from", help="ladder: start the policy, critic and guesser from this run (e.g. a pretrain run)")
     ap.add_argument("--drive-floor", type=float, default=0.05, help="lowest mean excitation per muscle (FloorPPO; 0 = off)")
@@ -134,6 +135,8 @@ def main() -> None:
               if a.task in ("ladder", "pretrain") else None)
     if a.gaitamp_conditions:
         config = replace(config, **GAITAMP)
+    if a.teacher:
+        config = replace(config, teacher=True, warp=0)
     if a.foot_model:
         config = replace(config or WysConfig(), bootstrap_iters=0, refit=False)
         shutil.copy2(a.foot_model, out / "foot_model_0.pt")          # where export_wys.py looks

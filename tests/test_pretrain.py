@@ -86,3 +86,25 @@ def test_clip_estimator_inputs_match_the_simulation() -> None:
     assert torch.allclose(sim[:3], clip[:3], atol=0.05) and torch.allclose(sim[3:6], clip[3:6], atol=0.15), (sim[:6], clip[:6])
     x, y = task.clip_estimator_data()
     assert len(x) == len(y) > 0 and torch.isfinite(x).all() and torch.isfinite(y).all()
+
+
+def test_teacher_sees_the_clip() -> None:
+    """The teacher's extra inputs: right after a reset (body on the clip) the joint-angle error at tap t is the clip's
+    own change over t frames, the layout matches the observation, and the mirror map is an involution."""
+    from dataclasses import replace
+
+    from train_wys import build
+
+    env, task = build(2, 0, "cpu", None, replace(PretrainConfig(), teacher=True, warp=0), kind="pretrain",
+                      trials=("ab01_mc021",))
+    env.reset()
+    obs = env.torch(env.obs)
+    assert obs.shape[1] == sum(b[1] for b in task.blocks) and torch.isfinite(obs).all()
+    names = [b[0] for b in task.blocks]
+    at = sum(b[1] for b in task.blocks[:names.index("ref_joint[5]")])
+    f = task.ref_f
+    want = task.ex_q[torch.minimum(f + 5, task.ex_last_f[f])][:, task.jidx] - task.ex_q[f][:, task.jidx]
+    assert torch.allclose(obs[:, at:at + task.nj], want, atol=1e-4)
+    P, S, _ = task.mirror_maps()
+    assert (P[P] == np.arange(len(P))).all() and np.allclose(S * S[P], 1.0)
+    assert task.n_actor > 687                              # L1's inputs plus the clip's
