@@ -1,4 +1,4 @@
-<title>L1 Teacher Distillation</title>
+<title>L1 Two-Phase Training</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -231,8 +231,8 @@ table.kv td:first-child { width:150px }
 
 <header>
   <p class="eyebrow">gait_planner · B1 · L1 · 19 Nov 2026</p>
-  <h1>Distilling L1 from an imitation teacher</h1>
-  <p class="lede">L1's policy (a blind foot placement estimator, two terrain patches and a 90-muscle policy) never learned to walk from scratch. The new route: train an ordinary imitation teacher that sees the clip, then distil it into L1's two networks, which never see the clip. On one clip (mc021) the student now copies the teacher nearly exactly; the teacher is training on all of AB01.</p>
+  <h1>Teaching L1 to walk through an imitation teacher</h1>
+  <p class="lede">The goal: a 90-muscle walker that follows speed and heading commands over uneven ground and moves like a person, from what it can sense alone. Trained from scratch it never stood up, so it is now trained in two phases: an imitation teacher that sees human clips, then DAgger to copy the teacher into the controller, which never sees them. Both phases pass on one clip; the teacher is training on all of AB01.</p>
   <div class="chips">
     <span class="chip"><i style="background:var(--good)"></i>mc021: teacher and student passed</span>
     <span class="chip next"><i></i>Teacher training on all of AB01 (276 windows)</span>
@@ -240,36 +240,45 @@ table.kv td:first-child { width:150px }
   </div>
 </header>
 
-<section aria-labelledby="s-plan">
+<section aria-labelledby="s-goal">
   <div class="sec-head">
-    <h2 id="s-plan">The plan</h2>
-    <p>The teacher and the student run in the same simulation, so every state the student visits can be labelled with the teacher's action. The student's inputs are a subset of the teacher's: everything except the clip.</p>
+    <h2 id="s-goal">The goal</h2>
+    <p>A muscle-driven walker that goes where it is told, over ground it has not walked on, and moves like a person, using only what a person has while walking: the command, its own body's senses and the ground near its feet. Human recordings are used in training only.</p>
   </div>
   <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 260" role="img" aria-labelledby="plan-t" style="min-width:780px">
-      <title id="plan-t">AB01 clips give the teacher its reference, in its input and its reward. The student, the foot placement estimator and muscle policy, copies the teacher's actions by DAgger in the same simulation. Stage 1 starts from the student, and every rung starts from it.</title>
-      <defs><marker id="pw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
-      <path class="w" d="M190 152 H252.5" marker-end="url(#pw)"/>
-      <path class="w" d="M500 152 H572.5" marker-end="url(#pw)"/>
-      <path class="w" d="M830 152 H902.5" marker-end="url(#pw)"/>
-      <text class="lab" x="226" y="144" text-anchor="middle">the clip</text>
-      <text class="lab" x="536" y="128" text-anchor="middle">copy its</text><text class="lab" x="536" y="144" text-anchor="middle">actions</text>
-      <text class="lab" x="866" y="144" text-anchor="middle">start</text>
-      <g class="fn dash"><rect x="270" y="14" width="560" height="50" rx="12"/><text class="t1" x="550" y="36">One simulation</text><text class="t2" x="550" y="55">the student's inputs are the teacher's minus the clip</text></g>
-      <path class="w train" d="M385 64 V82.5" marker-end="url(#pw)"/><path class="w train" d="M710 64 V82.5" marker-end="url(#pw)"/>
-      <g class="fn hum"><rect x="20" y="110" width="170" height="84" rx="12"/><text class="t1" x="105" y="142">AB01 clip</text><text class="t2" x="105" y="164">mc021 first,</text><text class="t2" x="105" y="182">then all 276</text></g>
-      <g class="fn pol"><rect x="270" y="100" width="230" height="104" rx="12"/><text class="t1" x="385" y="132">Teacher</text><text class="t2" x="385" y="156">imitation, sees the clip</text><text class="t2" x="385" y="176">PPO, tracking reward</text></g>
-      <g class="fn pol"><rect x="590" y="100" width="240" height="104" rx="12"/><text class="t1" x="710" y="132">Student</text><text class="t2" x="710" y="156">estimator + muscle policy</text><text class="t2" x="710" y="176">L1's inputs, no clip</text></g>
-      <g class="fn"><rect x="920" y="100" width="260" height="104" rx="12"/><text class="t1" x="1050" y="132">Stage 1 · ladder reward</text><text class="t2" x="1050" y="156">speed × heading + style − effort</text><text class="t2" x="1050" y="176">every rung starts here</text></g>
-      <text class="lab" x="385" y="234" text-anchor="middle">RL, with the clip's next 1 s in its input</text>
-      <text class="lab" x="710" y="234" text-anchor="middle">DAgger: supervised, on states it visits</text>
+    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="goal-t" style="min-width:820px">
+      <title id="goal-t">At run time the controller, a foot placement estimator plus a muscle policy, gets only the command, the body's senses and the terrain near the next footholds, and drives the 90 muscles of the body. AB01's human recordings are used in training only. The goal: walk where told, on stones, slopes and rough ground, rarely fall, and move like a human in joints, muscles and forces.</title>
+      <defs>
+        <marker id="gw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="ga" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <path d="M250 75 H490 V112.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga)"/>
+      <text class="lab" x="370" y="65" text-anchor="middle" fill="var(--amber)">training only</text>
+      <path class="w" d="M250 190 H300"/><path class="w" d="M250 240 H300"/><path class="w" d="M250 290 H300"/>
+      <path class="w" d="M300 190 V290"/><path class="w" d="M300 230 H352.5" marker-end="url(#gw)"/>
+      <text class="lab" x="135" y="160" text-anchor="middle">at run time (no clip)</text>
+      <path class="w" d="M620 190 H712.5" marker-end="url(#gw)"/>
+      <text class="lab" x="666" y="162" text-anchor="middle">90</text><text class="lab" x="666" y="180" text-anchor="middle">excitations</text>
+      <path class="w" d="M900 190 H972.5" marker-end="url(#gw)"/>
+      <text class="lab" x="936" y="180" text-anchor="middle">walks</text>
+      <g class="fn hum"><rect x="20" y="30" width="230" height="90" rx="12"/><text class="t1" x="135" y="58">Human recordings</text><text class="t2" x="135" y="82">AB01: walking, start-stop,</text><text class="t2" x="135" y="102">standing, ramps</text></g>
+      <g class="fn"><rect x="20" y="172" width="230" height="38" rx="10"/><text class="t2" x="135" y="196" style="fill:var(--ink)">command: speed, turn</text></g>
+      <g class="fn"><rect x="20" y="222" width="230" height="38" rx="10"/><text class="t2" x="135" y="246" style="fill:var(--ink)">body senses</text></g>
+      <g class="fn key"><rect x="20" y="272" width="230" height="38" rx="10"/><text class="t2" x="135" y="296" style="fill:var(--ink)">terrain near the next steps</text></g>
+      <g class="fn pol"><rect x="360" y="120" width="260" height="140" rx="12"/><text class="t1" x="490" y="156">Controller</text><text class="t2" x="490" y="182">foot placement estimator</text><text class="t2" x="490" y="202">+ muscle policy</text><text class="t2" x="490" y="226">40 times a second</text></g>
+      <g class="fn"><rect x="720" y="140" width="180" height="100" rx="12"/><text class="t1" x="810" y="176">Body</text><text class="t2" x="810" y="200">Rajagopal,</text><text class="t2" x="810" y="220">90 muscles</text></g>
+      <g class="fn key"><rect x="980" y="50" width="200" height="270" rx="12"/><text class="t1" x="1080" y="84">The goal</text>
+        <text class="t2" x="1080" y="118" style="fill:var(--ink)">walks where told</text><text class="t2" x="1080" y="140">speed and heading</text>
+        <text class="t2" x="1080" y="174" style="fill:var(--ink)">on any ground</text><text class="t2" x="1080" y="196">stones, slopes, rough</text>
+        <text class="t2" x="1080" y="230" style="fill:var(--ink)">rarely falls</text>
+        <text class="t2" x="1080" y="264" style="fill:var(--ink)">moves like a person</text><text class="t2" x="1080" y="286">joints, muscles, forces</text></g>
     </svg>
   </div>
 </section>
 
 <section aria-labelledby="s-nets">
   <div class="sec-head">
-    <h2 id="s-nets">The student: foot placement estimator and muscle policy</h2>
+    <h2 id="s-nets">The controller: foot placement estimator and muscle policy</h2>
     <p>L1's two networks, both at the clip's 40 Hz. The estimator guesses where each foot will land next; the terrain is read only at those two spots; the muscle policy turns everything into 90 muscle excitations. This is what the teacher is distilled into, and what stage 1 trains.</p>
   </div>
   <div class="panel scroll">
@@ -311,31 +320,63 @@ table.kv td:first-child { width:150px }
   </div>
 </section>
 
-<section aria-labelledby="s-teacher">
+<section aria-labelledby="s-phases">
   <div class="sec-head">
-    <h2 id="s-teacher">The teacher</h2>
-    <p>STC's imitation recipe, unchanged except for the EMG term (AB01 has no EMG): SPRINT's recommended reward, inputs, physics and PPO with its left-right symmetry loss, 4,096 worlds, motor delays of 10, 20 and 40 ms. It sees where the clip is going and is paid for following it.</p>
+    <h2 id="s-phases">Two-phase training</h2>
+    <p>Trained from scratch on the goal's reward, this body never learned to stand: no fixed muscle drive keeps it up, so an untrained policy is paid for doing less, and its leg muscles switch off. Imitation pays for the right pose at every step instead, so we first train a teacher that sees the clip, then copy it into the controller, which does not.</p>
   </div>
   <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 190" role="img" aria-labelledby="taps-t" style="min-width:760px">
-      <title id="taps-t">The teacher reads the clip at 8 future frames, 1, 2, 3, 5, 8, 14, 24 and 40 control steps ahead (25 ms to 1 s), each as the error from the body now; one clip frame passes per 40 Hz control step.</title>
-      <defs><marker id="tw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
-      <line class="w" x1="80" y1="100" x2="1132" y2="100" marker-end="url(#tw)"/>
-      <circle cx="80" cy="100" r="9" fill="var(--ink)"/>
-      <text class="t1" x="80" y="70" text-anchor="middle">now: the body</text>
-      <!-- x = 80 + 26 * steps -->
-      <g fill="var(--blue)">
-        <circle cx="106" cy="100" r="7"/><circle cx="132" cy="100" r="7"/><circle cx="158" cy="100" r="7"/><circle cx="210" cy="100" r="7"/>
-        <circle cx="288" cy="100" r="7"/><circle cx="444" cy="100" r="7"/><circle cx="704" cy="100" r="7"/><circle cx="1120" cy="100" r="7"/>
-      </g>
-      <g class="axl" text-anchor="middle">
-        <text x="132" y="138">1 · 2 · 3</text><text x="210" y="138">5</text><text x="288" y="138">8</text><text x="444" y="138">14</text><text x="704" y="138">24</text><text x="1120" y="138">40 steps</text>
-        <text x="444" y="160">350 ms</text><text x="704" y="160">600 ms</text><text x="1120" y="160">1 s</text>
-      </g>
-      <text class="lab" x="600" y="40" text-anchor="middle">at each tap: joint angles, pelvis height, orientation, velocity and position, both feet — as errors from the body now</text>
+    <svg class="dia" viewBox="0 0 1200 290" role="img" aria-labelledby="ph-t" style="min-width:860px">
+      <title id="ph-t">Phase 1: a teacher learns by reinforcement to follow AB01 clips, seeing the clip ahead. Phase 2: the controller, the student, learns to copy the teacher's actions by DAgger, without the clip. Then stage 1 trains the controller on the goal's reward: command, style and effort on curriculum ground.</title>
+      <defs><marker id="pa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <text class="eyebrow" x="200" y="28" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--blue)">PHASE 1</text>
+      <text class="eyebrow" x="600" y="28" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--blue)">PHASE 2</text>
+      <text class="eyebrow" x="1000" y="28" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--muted)">THEN</text>
+      <path class="w" d="M340 120 H452.5" marker-end="url(#pa)"/><text class="lab" x="400" y="110" text-anchor="middle">its actions</text>
+      <path class="w" d="M740 120 H852.5" marker-end="url(#pa)"/><text class="lab" x="800" y="110" text-anchor="middle">starts from</text>
+      <g class="fn pol"><rect x="60" y="50" width="280" height="140" rx="12"/><text class="t1" x="200" y="86">Teacher</text><text class="t2" x="200" y="112">follows AB01 clips</text><text class="t2" x="200" y="132">sees the clip 1 s ahead</text><text class="t2" x="200" y="160">reinforcement learning</text></g>
+      <g class="fn pol"><rect x="460" y="50" width="280" height="140" rx="12"/><text class="t1" x="600" y="86">Student = the controller</text><text class="t2" x="600" y="112">copies the teacher (DAgger)</text><text class="t2" x="600" y="132">L1's inputs, never the clip</text><text class="t2" x="600" y="160">supervised learning</text></g>
+      <g class="fn dash"><rect x="860" y="50" width="280" height="140" rx="12"/><text class="t1" x="1000" y="86">Stage 1</text><text class="t2" x="1000" y="112">the goal's reward: command,</text><text class="t2" x="1000" y="132">style, effort; harder ground</text><text class="t2" x="1000" y="160">reinforcement learning</text></g>
+      <text class="lab" x="200" y="226" text-anchor="middle">signal: match the clip</text>
+      <text class="lab" x="600" y="226" text-anchor="middle">signal: the teacher's action</text>
+      <text class="lab" x="1000" y="226" text-anchor="middle">signal: speed × heading, style</text>
+      <text class="axl" x="200" y="254" text-anchor="middle">mc021 passed · all AB01 running</text>
+      <text class="axl" x="600" y="254" text-anchor="middle">mc021 passed</text>
+      <text class="axl" x="1000" y="254" text-anchor="middle">not started</text>
     </svg>
   </div>
+</section>
+
+<section aria-labelledby="s-teacher">
+  <div class="sec-head">
+    <h2 id="s-teacher">Phase 1 · training the teacher</h2>
+    <p>SPRINT's port of STC's imitation reward and physics, trained with PPO and without the EMG term (AB01 has no EMG). STC itself trains this body with FlashSAC and adds error-weighted episode starts and reset priming; whether we need those is open (see Next).</p>
+  </div>
   <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="tl-t" style="min-width:860px">
+      <title id="tl-t">Teacher training loop. The teacher reads the body's state plus the clip's next second and sends 90 excitations to the simulated body. The reward compares the body with the clip now, minus effort, and PPO updates the teacher from it.</title>
+      <defs>
+        <marker id="tw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="ta" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <path d="M240 90 H322.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ta)"/>
+      <text class="lab" x="281" y="80" text-anchor="middle" fill="var(--amber)">next 1 s</text>
+      <path d="M130 135 V270 H572.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ta)"/>
+      <text class="lab" x="350" y="260" text-anchor="middle" fill="var(--amber)">the clip now</text>
+      <path class="w" d="M570 90 H652.5" marker-end="url(#tw)"/>
+      <path class="w" d="M860 90 H952.5" marker-end="url(#tw)"/><text class="lab" x="910" y="62" text-anchor="middle">90</text><text class="lab" x="910" y="80" text-anchor="middle">excitations</text>
+      <path class="w" d="M1070 45 V18 H450 V37.5" marker-end="url(#tw)"/><text class="lab" x="760" y="12" text-anchor="middle">body and muscle state</text>
+      <path class="w" d="M1070 135 V270 H887.5" marker-end="url(#tw)"/><text class="lab" x="980" y="260" text-anchor="middle">state</text>
+      <path class="w train" d="M760 225 V142.5" marker-end="url(#tw)"/><text class="lab" x="772" y="186">PPO update</text>
+      <g class="fn hum"><rect x="20" y="45" width="220" height="90" rx="12"/><text class="t1" x="130" y="78">AB01 clip</text><text class="t2" x="130" y="102">the reference</text></g>
+      <g class="fn"><rect x="330" y="45" width="240" height="90" rx="12"/><text class="t1" x="450" y="74">Teacher's inputs</text><text class="t2" x="450" y="98">its state + the clip ahead,</text><text class="t2" x="450" y="118">as errors from now</text></g>
+      <g class="fn pol"><rect x="660" y="45" width="200" height="90" rx="12"/><text class="t1" x="760" y="84">Teacher</text><text class="t2" x="760" y="108">policy network</text></g>
+      <g class="fn"><rect x="960" y="45" width="220" height="90" rx="12"/><text class="t1" x="1070" y="74">Simulated body</text><text class="t2" x="1070" y="98">muscle delays</text><text class="t2" x="1070" y="118">10 / 20 / 40 ms</text></g>
+      <g class="fn key"><rect x="580" y="225" width="300" height="90" rx="12"/><text class="t1" x="730" y="254">Reward</text><text class="t2" x="730" y="278">match the clip now:</text><text class="t2" x="730" y="298">pose, feet, body points − effort</text></g>
+    </svg>
+    <p class="note">One clip frame passes per 40 Hz control step. The clip ahead is read at 1, 2, 3, 5, 8, 14, 24 and 40 steps (25 ms to 1 s). Episodes start at a random clip frame and end when the pelvis is 30 cm from the clip or 60° off for 3 steps, when the clip ends, or after 10 s.</p>
+  </div>
+<div class="panel scroll">
     <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
       <title id="track-t">The teacher's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis position 0.05, torso 0.05, minus effort.</title>
       <rect x="20" y="40" width="208" height="30" rx="5" fill="var(--blue)"/>
@@ -352,13 +393,14 @@ table.kv td:first-child { width:150px }
       <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis position 0.05 · torso 0.05</text>
       <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
     </svg>
-    <p class="note">The reward. Episodes start at a random frame with small noise and end when the pelvis is 30 cm from the clip or 60° off for 3 steps, when the clip ends, or after 10 s. Effort: metabolic power, cubed activation and compartment balance, 0.02 each.</p>
+    <p class="note">The reward's terms to scale. Effort: metabolic power, cubed activation and compartment balance, 0.02 each.</p>
   </div>
 </section>
 
+
 <section aria-labelledby="s-distill">
   <div class="sec-head">
-    <h2 id="s-distill">Distillation into the student (DAgger)</h2>
+    <h2 id="s-distill">Phase 2 · distilling into the student (DAgger)</h2>
     <p>Supervised, not reinforcement learning. One simulated body, two views of it: the teacher's inputs and L1's. Every state is labelled with the teacher's action, whoever is driving, and the student is fitted to every label so far. Because the student increasingly drives, it collects labels in the states its own mistakes lead to, which copying only the teacher's states would never show it.</p>
   </div>
   <div class="panel scroll">
@@ -400,8 +442,316 @@ table.kv td:first-child { width:150px }
     </svg>
     <p class="note">β is 1 for the first 5 iterations (they also set the student's input normaliser), then falls linearly to 0 by iteration 85. Each iteration: 24 steps of all 4,096 worlds, then 64 gradient steps of 8,192 labels on the teacher's pre-squash mean. The estimator stays fixed, fitted to AB01's footsteps; on mc021's flat ground the patches read flat anyway. Script distill.py.</p>
   </div>
+</section>
+
+<section aria-labelledby="s-results">
+  <div class="sec-head">
+    <h2 id="s-results">Testbed: one clip (mc021)</h2>
+    <p>Both phases on a single 1.2 m/s treadmill walk turned overground (mc021, three 10 s windows), each against a pass mark set before it ran. Results for the multi-clip training will be added here.</p>
+  </div>
 <div class="charts">
-  <figure class="panel"><figcaption><b>Joint error while the student drives</b></figcaption>
+  <figure class="panel"><figcaption><b>Phase 1 · teacher joint error</b></figcaption>
+<svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="t1-t">
+<title id="t1-t">Teacher joint error on mc021 by training steps: 20 degrees at the start, 7.6 by 25M, 6.2 at 50M, 4.6 at 84M.</title>
+<line class="ax" x1="52" x2="544" y1="222.0" y2="222.0" opacity=".6"/><text class="axl" x="44" y="226.0" text-anchor="end">4°</text>
+<line class="ax" x1="52" x2="544" y1="184.4" y2="184.4" opacity=".6"/><text class="axl" x="44" y="188.4" text-anchor="end">8°</text>
+<line class="ax" x1="52" x2="544" y1="146.8" y2="146.8" opacity=".6"/><text class="axl" x="44" y="150.8" text-anchor="end">12°</text>
+<line class="ax" x1="52" x2="544" y1="109.2" y2="109.2" opacity=".6"/><text class="axl" x="44" y="113.2" text-anchor="end">16°</text>
+<line class="ax" x1="52" x2="544" y1="71.6" y2="71.6" opacity=".6"/><text class="axl" x="44" y="75.6" text-anchor="end">20°</text>
+<line class="ax" x1="52" x2="544" y1="34.0" y2="34.0" opacity=".6"/><text class="axl" x="44" y="38.0" text-anchor="end">24°</text>
+<text class="axl" x="52.0" y="242" text-anchor="middle">0M</text>
+<text class="axl" x="167.8" y="242" text-anchor="middle">20M</text>
+<text class="axl" x="283.5" y="242" text-anchor="middle">40M</text>
+<text class="axl" x="399.3" y="242" text-anchor="middle">60M</text>
+<text class="axl" x="515.1" y="242" text-anchor="middle">80M</text>
+<text class="axl" x="298" y="258" text-anchor="middle">environment steps</text>
+<line x1="341.4" x2="341.4" y1="34" y2="222" stroke="var(--amber)" stroke-width="2" stroke-dasharray="5 5"/><text class="dl" x="347.4" y="24" fill="var(--amber)">check at 50M: ≤ ~6°</text>
+<path d="M54.1 55.5 L57.9 54.0 L61.7 60.7 L65.5 69.1 L69.3 78.3 L73.1 88.2 L76.9 99.0 L80.7 110.6 L84.5 117.8 L88.3 121.6 L92.1 126.7 L95.9 132.1 L99.7 136.6 L103.4 141.2 L107.2 146.1 L111.0 150.1 L114.8 155.7 L118.6 158.8 L122.4 162.4 L126.2 164.8 L130.0 167.7 L133.8 170.5 L137.6 173.6 L141.4 176.0 L145.2 178.2 L149.0 180.2 L152.8 181.7 L156.6 182.4 L160.3 183.6 L164.1 184.4 L167.9 184.5 L171.7 185.4 L175.5 186.0 L179.3 185.9 L183.1 186.1 L186.9 186.7 L190.7 187.5 L194.5 187.0 L198.3 187.9 L202.1 187.8 L205.9 188.1 L209.7 187.7 L213.5 187.6 L217.2 187.8 L221.0 187.0 L224.8 187.7 L228.6 187.9 L232.4 187.7 L236.2 187.5 L240.0 187.7 L243.8 186.8 L247.6 187.4 L251.4 186.9 L255.2 186.6 L259.0 188.7 L262.8 188.9 L266.6 189.7 L270.4 189.7 L274.1 189.7 L277.9 188.9 L281.7 191.4 L285.5 192.8 L289.3 192.3 L293.1 192.4 L296.9 193.4 L300.7 193.4 L304.5 194.0 L308.3 194.8 L312.1 196.5 L315.9 195.6 L319.7 195.1 L323.5 196.6 L327.3 197.9 L331.1 199.1 L334.8 199.9 L338.6 200.0 L342.4 201.3 L346.2 202.2 L350.0 202.6 L353.8 203.4 L357.6 203.6 L361.4 203.6 L365.2 204.7 L369.0 205.1 L372.8 205.7 L376.6 206.0 L380.4 206.5 L384.2 206.5 L388.0 207.1 L391.7 208.2 L395.5 208.1 L399.3 207.9 L403.1 207.9 L406.9 208.1 L410.7 209.4 L414.5 210.1 L418.3 210.3 L422.1 209.6 L425.9 210.1 L429.7 210.8 L433.5 210.7 L437.3 211.9 L441.1 211.5 L444.9 211.5 L448.6 211.7 L452.4 212.3 L456.2 211.8 L460.0 212.2 L463.8 213.1 L467.6 213.6 L471.4 213.8 L475.2 213.3 L479.0 213.7 L482.8 213.6 L486.6 213.6 L490.4 214.0 L494.2 214.4 L498.0 215.0 L501.8 215.8 L505.5 215.5 L509.3 215.4 L513.1 215.5 L516.9 215.6 L520.7 215.3 L524.5 215.3 L528.3 215.5 L532.1 216.0 L535.9 216.5 L539.7 216.6 L542.3 216.5" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="54.1" cy="55.5" r="7" fill="transparent"><title>0M steps: 21.7°</title></circle>
+<circle cx="57.9" cy="54.0" r="7" fill="transparent"><title>1M steps: 21.9°</title></circle>
+<circle cx="61.7" cy="60.7" r="7" fill="transparent"><title>2M steps: 21.2°</title></circle>
+<circle cx="65.5" cy="69.1" r="7" fill="transparent"><title>2M steps: 20.3°</title></circle>
+<circle cx="69.3" cy="78.3" r="7" fill="transparent"><title>3M steps: 19.3°</title></circle>
+<circle cx="73.1" cy="88.2" r="7" fill="transparent"><title>4M steps: 18.2°</title></circle>
+<circle cx="76.9" cy="99.0" r="7" fill="transparent"><title>4M steps: 17.1°</title></circle>
+<circle cx="80.7" cy="110.6" r="7" fill="transparent"><title>5M steps: 15.8°</title></circle>
+<circle cx="84.5" cy="117.8" r="7" fill="transparent"><title>6M steps: 15.1°</title></circle>
+<circle cx="88.3" cy="121.6" r="7" fill="transparent"><title>6M steps: 14.7°</title></circle>
+<circle cx="92.1" cy="126.7" r="7" fill="transparent"><title>7M steps: 14.1°</title></circle>
+<circle cx="95.9" cy="132.1" r="7" fill="transparent"><title>8M steps: 13.6°</title></circle>
+<circle cx="99.7" cy="136.6" r="7" fill="transparent"><title>8M steps: 13.1°</title></circle>
+<circle cx="103.4" cy="141.2" r="7" fill="transparent"><title>9M steps: 12.6°</title></circle>
+<circle cx="107.2" cy="146.1" r="7" fill="transparent"><title>10M steps: 12.1°</title></circle>
+<circle cx="111.0" cy="150.1" r="7" fill="transparent"><title>10M steps: 11.6°</title></circle>
+<circle cx="114.8" cy="155.7" r="7" fill="transparent"><title>11M steps: 11.1°</title></circle>
+<circle cx="118.6" cy="158.8" r="7" fill="transparent"><title>12M steps: 10.7°</title></circle>
+<circle cx="122.4" cy="162.4" r="7" fill="transparent"><title>12M steps: 10.3°</title></circle>
+<circle cx="126.2" cy="164.8" r="7" fill="transparent"><title>13M steps: 10.1°</title></circle>
+<circle cx="130.0" cy="167.7" r="7" fill="transparent"><title>13M steps: 9.8°</title></circle>
+<circle cx="133.8" cy="170.5" r="7" fill="transparent"><title>14M steps: 9.5°</title></circle>
+<circle cx="137.6" cy="173.6" r="7" fill="transparent"><title>15M steps: 9.1°</title></circle>
+<circle cx="141.4" cy="176.0" r="7" fill="transparent"><title>15M steps: 8.9°</title></circle>
+<circle cx="145.2" cy="178.2" r="7" fill="transparent"><title>16M steps: 8.7°</title></circle>
+<circle cx="149.0" cy="180.2" r="7" fill="transparent"><title>17M steps: 8.5°</title></circle>
+<circle cx="152.8" cy="181.7" r="7" fill="transparent"><title>17M steps: 8.3°</title></circle>
+<circle cx="156.6" cy="182.4" r="7" fill="transparent"><title>18M steps: 8.2°</title></circle>
+<circle cx="160.3" cy="183.6" r="7" fill="transparent"><title>19M steps: 8.1°</title></circle>
+<circle cx="164.1" cy="184.4" r="7" fill="transparent"><title>19M steps: 8.0°</title></circle>
+<circle cx="167.9" cy="184.5" r="7" fill="transparent"><title>20M steps: 8.0°</title></circle>
+<circle cx="171.7" cy="185.4" r="7" fill="transparent"><title>21M steps: 7.9°</title></circle>
+<circle cx="175.5" cy="186.0" r="7" fill="transparent"><title>21M steps: 7.8°</title></circle>
+<circle cx="179.3" cy="185.9" r="7" fill="transparent"><title>22M steps: 7.8°</title></circle>
+<circle cx="183.1" cy="186.1" r="7" fill="transparent"><title>23M steps: 7.8°</title></circle>
+<circle cx="186.9" cy="186.7" r="7" fill="transparent"><title>23M steps: 7.8°</title></circle>
+<circle cx="190.7" cy="187.5" r="7" fill="transparent"><title>24M steps: 7.7°</title></circle>
+<circle cx="194.5" cy="187.0" r="7" fill="transparent"><title>25M steps: 7.7°</title></circle>
+<circle cx="198.3" cy="187.9" r="7" fill="transparent"><title>25M steps: 7.6°</title></circle>
+<circle cx="202.1" cy="187.8" r="7" fill="transparent"><title>26M steps: 7.6°</title></circle>
+<circle cx="205.9" cy="188.1" r="7" fill="transparent"><title>27M steps: 7.6°</title></circle>
+<circle cx="209.7" cy="187.7" r="7" fill="transparent"><title>27M steps: 7.6°</title></circle>
+<circle cx="213.5" cy="187.6" r="7" fill="transparent"><title>28M steps: 7.7°</title></circle>
+<circle cx="217.2" cy="187.8" r="7" fill="transparent"><title>29M steps: 7.6°</title></circle>
+<circle cx="221.0" cy="187.0" r="7" fill="transparent"><title>29M steps: 7.7°</title></circle>
+<circle cx="224.8" cy="187.7" r="7" fill="transparent"><title>30M steps: 7.6°</title></circle>
+<circle cx="228.6" cy="187.9" r="7" fill="transparent"><title>31M steps: 7.6°</title></circle>
+<circle cx="232.4" cy="187.7" r="7" fill="transparent"><title>31M steps: 7.6°</title></circle>
+<circle cx="236.2" cy="187.5" r="7" fill="transparent"><title>32M steps: 7.7°</title></circle>
+<circle cx="240.0" cy="187.7" r="7" fill="transparent"><title>32M steps: 7.6°</title></circle>
+<circle cx="243.8" cy="186.8" r="7" fill="transparent"><title>33M steps: 7.7°</title></circle>
+<circle cx="247.6" cy="187.4" r="7" fill="transparent"><title>34M steps: 7.7°</title></circle>
+<circle cx="251.4" cy="186.9" r="7" fill="transparent"><title>34M steps: 7.7°</title></circle>
+<circle cx="255.2" cy="186.6" r="7" fill="transparent"><title>35M steps: 7.8°</title></circle>
+<circle cx="259.0" cy="188.7" r="7" fill="transparent"><title>36M steps: 7.5°</title></circle>
+<circle cx="262.8" cy="188.9" r="7" fill="transparent"><title>36M steps: 7.5°</title></circle>
+<circle cx="266.6" cy="189.7" r="7" fill="transparent"><title>37M steps: 7.4°</title></circle>
+<circle cx="270.4" cy="189.7" r="7" fill="transparent"><title>38M steps: 7.4°</title></circle>
+<circle cx="274.1" cy="189.7" r="7" fill="transparent"><title>38M steps: 7.4°</title></circle>
+<circle cx="277.9" cy="188.9" r="7" fill="transparent"><title>39M steps: 7.5°</title></circle>
+<circle cx="281.7" cy="191.4" r="7" fill="transparent"><title>40M steps: 7.3°</title></circle>
+<circle cx="285.5" cy="192.8" r="7" fill="transparent"><title>40M steps: 7.1°</title></circle>
+<circle cx="289.3" cy="192.3" r="7" fill="transparent"><title>41M steps: 7.2°</title></circle>
+<circle cx="293.1" cy="192.4" r="7" fill="transparent"><title>42M steps: 7.1°</title></circle>
+<circle cx="296.9" cy="193.4" r="7" fill="transparent"><title>42M steps: 7.0°</title></circle>
+<circle cx="300.7" cy="193.4" r="7" fill="transparent"><title>43M steps: 7.0°</title></circle>
+<circle cx="304.5" cy="194.0" r="7" fill="transparent"><title>44M steps: 7.0°</title></circle>
+<circle cx="308.3" cy="194.8" r="7" fill="transparent"><title>44M steps: 6.9°</title></circle>
+<circle cx="312.1" cy="196.5" r="7" fill="transparent"><title>45M steps: 6.7°</title></circle>
+<circle cx="315.9" cy="195.6" r="7" fill="transparent"><title>46M steps: 6.8°</title></circle>
+<circle cx="319.7" cy="195.1" r="7" fill="transparent"><title>46M steps: 6.9°</title></circle>
+<circle cx="323.5" cy="196.6" r="7" fill="transparent"><title>47M steps: 6.7°</title></circle>
+<circle cx="327.3" cy="197.9" r="7" fill="transparent"><title>48M steps: 6.6°</title></circle>
+<circle cx="331.1" cy="199.1" r="7" fill="transparent"><title>48M steps: 6.4°</title></circle>
+<circle cx="334.8" cy="199.9" r="7" fill="transparent"><title>49M steps: 6.3°</title></circle>
+<circle cx="338.6" cy="200.0" r="7" fill="transparent"><title>50M steps: 6.3°</title></circle>
+<circle cx="342.4" cy="201.3" r="7" fill="transparent"><title>50M steps: 6.2°</title></circle>
+<circle cx="346.2" cy="202.2" r="7" fill="transparent"><title>51M steps: 6.1°</title></circle>
+<circle cx="350.0" cy="202.6" r="7" fill="transparent"><title>51M steps: 6.1°</title></circle>
+<circle cx="353.8" cy="203.4" r="7" fill="transparent"><title>52M steps: 6.0°</title></circle>
+<circle cx="357.6" cy="203.6" r="7" fill="transparent"><title>53M steps: 6.0°</title></circle>
+<circle cx="361.4" cy="203.6" r="7" fill="transparent"><title>53M steps: 6.0°</title></circle>
+<circle cx="365.2" cy="204.7" r="7" fill="transparent"><title>54M steps: 5.8°</title></circle>
+<circle cx="369.0" cy="205.1" r="7" fill="transparent"><title>55M steps: 5.8°</title></circle>
+<circle cx="372.8" cy="205.7" r="7" fill="transparent"><title>55M steps: 5.7°</title></circle>
+<circle cx="376.6" cy="206.0" r="7" fill="transparent"><title>56M steps: 5.7°</title></circle>
+<circle cx="380.4" cy="206.5" r="7" fill="transparent"><title>57M steps: 5.6°</title></circle>
+<circle cx="384.2" cy="206.5" r="7" fill="transparent"><title>57M steps: 5.6°</title></circle>
+<circle cx="388.0" cy="207.1" r="7" fill="transparent"><title>58M steps: 5.6°</title></circle>
+<circle cx="391.7" cy="208.2" r="7" fill="transparent"><title>59M steps: 5.5°</title></circle>
+<circle cx="395.5" cy="208.1" r="7" fill="transparent"><title>59M steps: 5.5°</title></circle>
+<circle cx="399.3" cy="207.9" r="7" fill="transparent"><title>60M steps: 5.5°</title></circle>
+<circle cx="403.1" cy="207.9" r="7" fill="transparent"><title>61M steps: 5.5°</title></circle>
+<circle cx="406.9" cy="208.1" r="7" fill="transparent"><title>61M steps: 5.5°</title></circle>
+<circle cx="410.7" cy="209.4" r="7" fill="transparent"><title>62M steps: 5.3°</title></circle>
+<circle cx="414.5" cy="210.1" r="7" fill="transparent"><title>63M steps: 5.3°</title></circle>
+<circle cx="418.3" cy="210.3" r="7" fill="transparent"><title>63M steps: 5.2°</title></circle>
+<circle cx="422.1" cy="209.6" r="7" fill="transparent"><title>64M steps: 5.3°</title></circle>
+<circle cx="425.9" cy="210.1" r="7" fill="transparent"><title>65M steps: 5.3°</title></circle>
+<circle cx="429.7" cy="210.8" r="7" fill="transparent"><title>65M steps: 5.2°</title></circle>
+<circle cx="433.5" cy="210.7" r="7" fill="transparent"><title>66M steps: 5.2°</title></circle>
+<circle cx="437.3" cy="211.9" r="7" fill="transparent"><title>67M steps: 5.1°</title></circle>
+<circle cx="441.1" cy="211.5" r="7" fill="transparent"><title>67M steps: 5.1°</title></circle>
+<circle cx="444.9" cy="211.5" r="7" fill="transparent"><title>68M steps: 5.1°</title></circle>
+<circle cx="448.6" cy="211.7" r="7" fill="transparent"><title>69M steps: 5.1°</title></circle>
+<circle cx="452.4" cy="212.3" r="7" fill="transparent"><title>69M steps: 5.0°</title></circle>
+<circle cx="456.2" cy="211.8" r="7" fill="transparent"><title>70M steps: 5.1°</title></circle>
+<circle cx="460.0" cy="212.2" r="7" fill="transparent"><title>70M steps: 5.0°</title></circle>
+<circle cx="463.8" cy="213.1" r="7" fill="transparent"><title>71M steps: 5.0°</title></circle>
+<circle cx="467.6" cy="213.6" r="7" fill="transparent"><title>72M steps: 4.9°</title></circle>
+<circle cx="471.4" cy="213.8" r="7" fill="transparent"><title>72M steps: 4.9°</title></circle>
+<circle cx="475.2" cy="213.3" r="7" fill="transparent"><title>73M steps: 4.9°</title></circle>
+<circle cx="479.0" cy="213.7" r="7" fill="transparent"><title>74M steps: 4.9°</title></circle>
+<circle cx="482.8" cy="213.6" r="7" fill="transparent"><title>74M steps: 4.9°</title></circle>
+<circle cx="486.6" cy="213.6" r="7" fill="transparent"><title>75M steps: 4.9°</title></circle>
+<circle cx="490.4" cy="214.0" r="7" fill="transparent"><title>76M steps: 4.9°</title></circle>
+<circle cx="494.2" cy="214.4" r="7" fill="transparent"><title>76M steps: 4.8°</title></circle>
+<circle cx="498.0" cy="215.0" r="7" fill="transparent"><title>77M steps: 4.7°</title></circle>
+<circle cx="501.8" cy="215.8" r="7" fill="transparent"><title>78M steps: 4.7°</title></circle>
+<circle cx="505.5" cy="215.5" r="7" fill="transparent"><title>78M steps: 4.7°</title></circle>
+<circle cx="509.3" cy="215.4" r="7" fill="transparent"><title>79M steps: 4.7°</title></circle>
+<circle cx="513.1" cy="215.5" r="7" fill="transparent"><title>80M steps: 4.7°</title></circle>
+<circle cx="516.9" cy="215.6" r="7" fill="transparent"><title>80M steps: 4.7°</title></circle>
+<circle cx="520.7" cy="215.3" r="7" fill="transparent"><title>81M steps: 4.7°</title></circle>
+<circle cx="524.5" cy="215.3" r="7" fill="transparent"><title>82M steps: 4.7°</title></circle>
+<circle cx="528.3" cy="215.5" r="7" fill="transparent"><title>82M steps: 4.7°</title></circle>
+<circle cx="532.1" cy="216.0" r="7" fill="transparent"><title>83M steps: 4.6°</title></circle>
+<circle cx="535.9" cy="216.5" r="7" fill="transparent"><title>84M steps: 4.6°</title></circle>
+<circle cx="539.7" cy="216.6" r="7" fill="transparent"><title>84M steps: 4.6°</title></circle>
+<circle cx="542.3" cy="216.5" r="7" fill="transparent"><title>85M steps: 4.6°</title></circle>
+<text class="dl" x="73.5" y="59.1" fill="var(--blue)">teacher</text>
+</svg>
+  </figure>
+  <figure class="panel"><figcaption><b>Phase 1 · teacher episodes ending in a fall</b></figcaption>
+<svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="t2-t">
+<title id="t2-t">Share of the teacher's ended episodes that were falls: about 90 percent until 30M, then down to 2 percent by 50M as episodes start reaching the clip's end.</title>
+<line class="ax" x1="52" x2="544" y1="222.0" y2="222.0" opacity=".6"/><text class="axl" x="44" y="226.0" text-anchor="end">0%</text>
+<line class="ax" x1="52" x2="544" y1="175.0" y2="175.0" opacity=".6"/><text class="axl" x="44" y="179.0" text-anchor="end">25%</text>
+<line class="ax" x1="52" x2="544" y1="128.0" y2="128.0" opacity=".6"/><text class="axl" x="44" y="132.0" text-anchor="end">50%</text>
+<line class="ax" x1="52" x2="544" y1="81.0" y2="81.0" opacity=".6"/><text class="axl" x="44" y="85.0" text-anchor="end">75%</text>
+<line class="ax" x1="52" x2="544" y1="34.0" y2="34.0" opacity=".6"/><text class="axl" x="44" y="38.0" text-anchor="end">100%</text>
+<text class="axl" x="52.0" y="242" text-anchor="middle">0M</text>
+<text class="axl" x="167.8" y="242" text-anchor="middle">20M</text>
+<text class="axl" x="283.5" y="242" text-anchor="middle">40M</text>
+<text class="axl" x="399.3" y="242" text-anchor="middle">60M</text>
+<text class="axl" x="515.1" y="242" text-anchor="middle">80M</text>
+<text class="axl" x="298" y="258" text-anchor="middle">environment steps</text>
+<line x1="341.4" x2="341.4" y1="34" y2="222" stroke="var(--amber)" stroke-width="2" stroke-dasharray="5 5"/><text class="dl" x="347.4" y="24" fill="var(--amber)">check at 50M: most finish</text>
+<path d="M54.1 47.6 L57.9 45.7 L61.7 45.5 L65.5 45.4 L69.3 45.2 L73.1 46.1 L76.9 46.2 L80.7 47.2 L84.5 48.4 L88.3 49.2 L92.1 49.8 L95.9 50.2 L99.7 51.0 L103.4 51.1 L107.2 51.5 L111.0 51.7 L114.8 52.8 L118.6 52.8 L122.4 52.9 L126.2 53.9 L130.0 53.8 L133.8 54.3 L137.6 55.0 L141.4 55.0 L145.2 56.2 L149.0 55.2 L152.8 56.7 L156.6 57.1 L160.3 58.9 L164.1 58.8 L167.9 59.7 L171.7 61.3 L175.5 61.4 L179.3 61.8 L183.1 62.8 L186.9 63.9 L190.7 64.4 L194.5 64.7 L198.3 65.1 L202.1 65.4 L205.9 65.5 L209.7 67.3 L213.5 66.9 L217.2 67.8 L221.0 69.5 L224.8 69.5 L228.6 72.3 L232.4 72.1 L236.2 73.1 L240.0 75.1 L243.8 74.0 L247.6 77.2 L251.4 79.5 L255.2 82.9 L259.0 80.9 L262.8 85.6 L266.6 86.8 L270.4 92.6 L274.1 92.4 L277.9 100.4 L281.7 104.5 L285.5 109.4 L289.3 115.9 L293.1 131.4 L296.9 142.7 L300.7 149.0 L304.5 165.5 L308.3 179.3 L312.1 189.2 L315.9 201.0 L319.7 205.6 L323.5 210.3 L327.3 212.5 L331.1 214.7 L334.8 216.5 L338.6 217.7 L342.4 218.2 L346.2 218.7 L350.0 218.8 L353.8 218.5 L357.6 218.2 L361.4 218.2 L365.2 219.9 L369.0 220.3 L372.8 220.6 L376.6 220.3 L380.4 220.8 L384.2 220.6 L388.0 220.6 L391.7 221.0 L395.5 220.7 L399.3 220.8 L403.1 220.7 L406.9 221.1 L410.7 221.0 L414.5 221.4 L418.3 220.9 L422.1 220.7 L425.9 220.7 L429.7 221.1 L433.5 221.1 L437.3 220.7 L441.1 221.0 L444.9 220.8 L448.6 221.4 L452.4 221.5 L456.2 220.7 L460.0 220.0 L463.8 220.6 L467.6 220.6 L471.4 221.2 L475.2 220.5 L479.0 221.4 L482.8 221.5 L486.6 221.3 L490.4 221.7 L494.2 221.7 L498.0 221.3 L501.8 221.4 L505.5 221.4 L509.3 221.5 L513.1 221.7 L516.9 221.5 L520.7 221.4 L524.5 221.2 L528.3 221.7 L532.1 221.7 L535.9 221.8 L539.7 221.8 L542.3 221.4" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="54.1" cy="47.6" r="7" fill="transparent"><title>0M steps: 92.8%</title></circle>
+<circle cx="57.9" cy="45.7" r="7" fill="transparent"><title>1M steps: 93.8%</title></circle>
+<circle cx="61.7" cy="45.5" r="7" fill="transparent"><title>2M steps: 93.9%</title></circle>
+<circle cx="65.5" cy="45.4" r="7" fill="transparent"><title>2M steps: 93.9%</title></circle>
+<circle cx="69.3" cy="45.2" r="7" fill="transparent"><title>3M steps: 94.0%</title></circle>
+<circle cx="73.1" cy="46.1" r="7" fill="transparent"><title>4M steps: 93.5%</title></circle>
+<circle cx="76.9" cy="46.2" r="7" fill="transparent"><title>4M steps: 93.5%</title></circle>
+<circle cx="80.7" cy="47.2" r="7" fill="transparent"><title>5M steps: 93.0%</title></circle>
+<circle cx="84.5" cy="48.4" r="7" fill="transparent"><title>6M steps: 92.3%</title></circle>
+<circle cx="88.3" cy="49.2" r="7" fill="transparent"><title>6M steps: 91.9%</title></circle>
+<circle cx="92.1" cy="49.8" r="7" fill="transparent"><title>7M steps: 91.6%</title></circle>
+<circle cx="95.9" cy="50.2" r="7" fill="transparent"><title>8M steps: 91.4%</title></circle>
+<circle cx="99.7" cy="51.0" r="7" fill="transparent"><title>8M steps: 90.9%</title></circle>
+<circle cx="103.4" cy="51.1" r="7" fill="transparent"><title>9M steps: 90.9%</title></circle>
+<circle cx="107.2" cy="51.5" r="7" fill="transparent"><title>10M steps: 90.7%</title></circle>
+<circle cx="111.0" cy="51.7" r="7" fill="transparent"><title>10M steps: 90.6%</title></circle>
+<circle cx="114.8" cy="52.8" r="7" fill="transparent"><title>11M steps: 90.0%</title></circle>
+<circle cx="118.6" cy="52.8" r="7" fill="transparent"><title>12M steps: 90.0%</title></circle>
+<circle cx="122.4" cy="52.9" r="7" fill="transparent"><title>12M steps: 89.9%</title></circle>
+<circle cx="126.2" cy="53.9" r="7" fill="transparent"><title>13M steps: 89.4%</title></circle>
+<circle cx="130.0" cy="53.8" r="7" fill="transparent"><title>13M steps: 89.5%</title></circle>
+<circle cx="133.8" cy="54.3" r="7" fill="transparent"><title>14M steps: 89.2%</title></circle>
+<circle cx="137.6" cy="55.0" r="7" fill="transparent"><title>15M steps: 88.8%</title></circle>
+<circle cx="141.4" cy="55.0" r="7" fill="transparent"><title>15M steps: 88.9%</title></circle>
+<circle cx="145.2" cy="56.2" r="7" fill="transparent"><title>16M steps: 88.2%</title></circle>
+<circle cx="149.0" cy="55.2" r="7" fill="transparent"><title>17M steps: 88.7%</title></circle>
+<circle cx="152.8" cy="56.7" r="7" fill="transparent"><title>17M steps: 87.9%</title></circle>
+<circle cx="156.6" cy="57.1" r="7" fill="transparent"><title>18M steps: 87.7%</title></circle>
+<circle cx="160.3" cy="58.9" r="7" fill="transparent"><title>19M steps: 86.7%</title></circle>
+<circle cx="164.1" cy="58.8" r="7" fill="transparent"><title>19M steps: 86.8%</title></circle>
+<circle cx="167.9" cy="59.7" r="7" fill="transparent"><title>20M steps: 86.3%</title></circle>
+<circle cx="171.7" cy="61.3" r="7" fill="transparent"><title>21M steps: 85.5%</title></circle>
+<circle cx="175.5" cy="61.4" r="7" fill="transparent"><title>21M steps: 85.4%</title></circle>
+<circle cx="179.3" cy="61.8" r="7" fill="transparent"><title>22M steps: 85.2%</title></circle>
+<circle cx="183.1" cy="62.8" r="7" fill="transparent"><title>23M steps: 84.7%</title></circle>
+<circle cx="186.9" cy="63.9" r="7" fill="transparent"><title>23M steps: 84.1%</title></circle>
+<circle cx="190.7" cy="64.4" r="7" fill="transparent"><title>24M steps: 83.8%</title></circle>
+<circle cx="194.5" cy="64.7" r="7" fill="transparent"><title>25M steps: 83.7%</title></circle>
+<circle cx="198.3" cy="65.1" r="7" fill="transparent"><title>25M steps: 83.5%</title></circle>
+<circle cx="202.1" cy="65.4" r="7" fill="transparent"><title>26M steps: 83.3%</title></circle>
+<circle cx="205.9" cy="65.5" r="7" fill="transparent"><title>27M steps: 83.2%</title></circle>
+<circle cx="209.7" cy="67.3" r="7" fill="transparent"><title>27M steps: 82.3%</title></circle>
+<circle cx="213.5" cy="66.9" r="7" fill="transparent"><title>28M steps: 82.5%</title></circle>
+<circle cx="217.2" cy="67.8" r="7" fill="transparent"><title>29M steps: 82.0%</title></circle>
+<circle cx="221.0" cy="69.5" r="7" fill="transparent"><title>29M steps: 81.1%</title></circle>
+<circle cx="224.8" cy="69.5" r="7" fill="transparent"><title>30M steps: 81.1%</title></circle>
+<circle cx="228.6" cy="72.3" r="7" fill="transparent"><title>31M steps: 79.6%</title></circle>
+<circle cx="232.4" cy="72.1" r="7" fill="transparent"><title>31M steps: 79.8%</title></circle>
+<circle cx="236.2" cy="73.1" r="7" fill="transparent"><title>32M steps: 79.2%</title></circle>
+<circle cx="240.0" cy="75.1" r="7" fill="transparent"><title>32M steps: 78.1%</title></circle>
+<circle cx="243.8" cy="74.0" r="7" fill="transparent"><title>33M steps: 78.7%</title></circle>
+<circle cx="247.6" cy="77.2" r="7" fill="transparent"><title>34M steps: 77.0%</title></circle>
+<circle cx="251.4" cy="79.5" r="7" fill="transparent"><title>34M steps: 75.8%</title></circle>
+<circle cx="255.2" cy="82.9" r="7" fill="transparent"><title>35M steps: 74.0%</title></circle>
+<circle cx="259.0" cy="80.9" r="7" fill="transparent"><title>36M steps: 75.1%</title></circle>
+<circle cx="262.8" cy="85.6" r="7" fill="transparent"><title>36M steps: 72.6%</title></circle>
+<circle cx="266.6" cy="86.8" r="7" fill="transparent"><title>37M steps: 71.9%</title></circle>
+<circle cx="270.4" cy="92.6" r="7" fill="transparent"><title>38M steps: 68.8%</title></circle>
+<circle cx="274.1" cy="92.4" r="7" fill="transparent"><title>38M steps: 68.9%</title></circle>
+<circle cx="277.9" cy="100.4" r="7" fill="transparent"><title>39M steps: 64.7%</title></circle>
+<circle cx="281.7" cy="104.5" r="7" fill="transparent"><title>40M steps: 62.5%</title></circle>
+<circle cx="285.5" cy="109.4" r="7" fill="transparent"><title>40M steps: 59.9%</title></circle>
+<circle cx="289.3" cy="115.9" r="7" fill="transparent"><title>41M steps: 56.4%</title></circle>
+<circle cx="293.1" cy="131.4" r="7" fill="transparent"><title>42M steps: 48.2%</title></circle>
+<circle cx="296.9" cy="142.7" r="7" fill="transparent"><title>42M steps: 42.2%</title></circle>
+<circle cx="300.7" cy="149.0" r="7" fill="transparent"><title>43M steps: 38.8%</title></circle>
+<circle cx="304.5" cy="165.5" r="7" fill="transparent"><title>44M steps: 30.0%</title></circle>
+<circle cx="308.3" cy="179.3" r="7" fill="transparent"><title>44M steps: 22.7%</title></circle>
+<circle cx="312.1" cy="189.2" r="7" fill="transparent"><title>45M steps: 17.4%</title></circle>
+<circle cx="315.9" cy="201.0" r="7" fill="transparent"><title>46M steps: 11.2%</title></circle>
+<circle cx="319.7" cy="205.6" r="7" fill="transparent"><title>46M steps: 8.7%</title></circle>
+<circle cx="323.5" cy="210.3" r="7" fill="transparent"><title>47M steps: 6.2%</title></circle>
+<circle cx="327.3" cy="212.5" r="7" fill="transparent"><title>48M steps: 5.0%</title></circle>
+<circle cx="331.1" cy="214.7" r="7" fill="transparent"><title>48M steps: 3.9%</title></circle>
+<circle cx="334.8" cy="216.5" r="7" fill="transparent"><title>49M steps: 2.9%</title></circle>
+<circle cx="338.6" cy="217.7" r="7" fill="transparent"><title>50M steps: 2.3%</title></circle>
+<circle cx="342.4" cy="218.2" r="7" fill="transparent"><title>50M steps: 2.0%</title></circle>
+<circle cx="346.2" cy="218.7" r="7" fill="transparent"><title>51M steps: 1.8%</title></circle>
+<circle cx="350.0" cy="218.8" r="7" fill="transparent"><title>51M steps: 1.7%</title></circle>
+<circle cx="353.8" cy="218.5" r="7" fill="transparent"><title>52M steps: 1.9%</title></circle>
+<circle cx="357.6" cy="218.2" r="7" fill="transparent"><title>53M steps: 2.0%</title></circle>
+<circle cx="361.4" cy="218.2" r="7" fill="transparent"><title>53M steps: 2.0%</title></circle>
+<circle cx="365.2" cy="219.9" r="7" fill="transparent"><title>54M steps: 1.1%</title></circle>
+<circle cx="369.0" cy="220.3" r="7" fill="transparent"><title>55M steps: 0.9%</title></circle>
+<circle cx="372.8" cy="220.6" r="7" fill="transparent"><title>55M steps: 0.7%</title></circle>
+<circle cx="376.6" cy="220.3" r="7" fill="transparent"><title>56M steps: 0.9%</title></circle>
+<circle cx="380.4" cy="220.8" r="7" fill="transparent"><title>57M steps: 0.7%</title></circle>
+<circle cx="384.2" cy="220.6" r="7" fill="transparent"><title>57M steps: 0.8%</title></circle>
+<circle cx="388.0" cy="220.6" r="7" fill="transparent"><title>58M steps: 0.7%</title></circle>
+<circle cx="391.7" cy="221.0" r="7" fill="transparent"><title>59M steps: 0.5%</title></circle>
+<circle cx="395.5" cy="220.7" r="7" fill="transparent"><title>59M steps: 0.7%</title></circle>
+<circle cx="399.3" cy="220.8" r="7" fill="transparent"><title>60M steps: 0.6%</title></circle>
+<circle cx="403.1" cy="220.7" r="7" fill="transparent"><title>61M steps: 0.7%</title></circle>
+<circle cx="406.9" cy="221.1" r="7" fill="transparent"><title>61M steps: 0.5%</title></circle>
+<circle cx="410.7" cy="221.0" r="7" fill="transparent"><title>62M steps: 0.5%</title></circle>
+<circle cx="414.5" cy="221.4" r="7" fill="transparent"><title>63M steps: 0.3%</title></circle>
+<circle cx="418.3" cy="220.9" r="7" fill="transparent"><title>63M steps: 0.6%</title></circle>
+<circle cx="422.1" cy="220.7" r="7" fill="transparent"><title>64M steps: 0.7%</title></circle>
+<circle cx="425.9" cy="220.7" r="7" fill="transparent"><title>65M steps: 0.7%</title></circle>
+<circle cx="429.7" cy="221.1" r="7" fill="transparent"><title>65M steps: 0.5%</title></circle>
+<circle cx="433.5" cy="221.1" r="7" fill="transparent"><title>66M steps: 0.5%</title></circle>
+<circle cx="437.3" cy="220.7" r="7" fill="transparent"><title>67M steps: 0.7%</title></circle>
+<circle cx="441.1" cy="221.0" r="7" fill="transparent"><title>67M steps: 0.6%</title></circle>
+<circle cx="444.9" cy="220.8" r="7" fill="transparent"><title>68M steps: 0.6%</title></circle>
+<circle cx="448.6" cy="221.4" r="7" fill="transparent"><title>69M steps: 0.3%</title></circle>
+<circle cx="452.4" cy="221.5" r="7" fill="transparent"><title>69M steps: 0.2%</title></circle>
+<circle cx="456.2" cy="220.7" r="7" fill="transparent"><title>70M steps: 0.7%</title></circle>
+<circle cx="460.0" cy="220.0" r="7" fill="transparent"><title>70M steps: 1.1%</title></circle>
+<circle cx="463.8" cy="220.6" r="7" fill="transparent"><title>71M steps: 0.8%</title></circle>
+<circle cx="467.6" cy="220.6" r="7" fill="transparent"><title>72M steps: 0.7%</title></circle>
+<circle cx="471.4" cy="221.2" r="7" fill="transparent"><title>72M steps: 0.4%</title></circle>
+<circle cx="475.2" cy="220.5" r="7" fill="transparent"><title>73M steps: 0.8%</title></circle>
+<circle cx="479.0" cy="221.4" r="7" fill="transparent"><title>74M steps: 0.3%</title></circle>
+<circle cx="482.8" cy="221.5" r="7" fill="transparent"><title>74M steps: 0.3%</title></circle>
+<circle cx="486.6" cy="221.3" r="7" fill="transparent"><title>75M steps: 0.4%</title></circle>
+<circle cx="490.4" cy="221.7" r="7" fill="transparent"><title>76M steps: 0.2%</title></circle>
+<circle cx="494.2" cy="221.7" r="7" fill="transparent"><title>76M steps: 0.2%</title></circle>
+<circle cx="498.0" cy="221.3" r="7" fill="transparent"><title>77M steps: 0.4%</title></circle>
+<circle cx="501.8" cy="221.4" r="7" fill="transparent"><title>78M steps: 0.3%</title></circle>
+<circle cx="505.5" cy="221.4" r="7" fill="transparent"><title>78M steps: 0.3%</title></circle>
+<circle cx="509.3" cy="221.5" r="7" fill="transparent"><title>79M steps: 0.2%</title></circle>
+<circle cx="513.1" cy="221.7" r="7" fill="transparent"><title>80M steps: 0.2%</title></circle>
+<circle cx="516.9" cy="221.5" r="7" fill="transparent"><title>80M steps: 0.3%</title></circle>
+<circle cx="520.7" cy="221.4" r="7" fill="transparent"><title>81M steps: 0.3%</title></circle>
+<circle cx="524.5" cy="221.2" r="7" fill="transparent"><title>82M steps: 0.4%</title></circle>
+<circle cx="528.3" cy="221.7" r="7" fill="transparent"><title>82M steps: 0.2%</title></circle>
+<circle cx="532.1" cy="221.7" r="7" fill="transparent"><title>83M steps: 0.2%</title></circle>
+<circle cx="535.9" cy="221.8" r="7" fill="transparent"><title>84M steps: 0.1%</title></circle>
+<circle cx="539.7" cy="221.8" r="7" fill="transparent"><title>84M steps: 0.1%</title></circle>
+<circle cx="542.3" cy="221.4" r="7" fill="transparent"><title>85M steps: 0.3%</title></circle>
+<text class="dl" x="69.7" y="35.5" fill="var(--blue)">teacher</text>
+</svg>
+  </figure>
+</div>
+<div class="charts">
+  <figure class="panel"><figcaption><b>Phase 2 · joint error while the student drives</b></figcaption>
 <svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="c1-t">
 <title id="c1-t">Joint error of the student while it drives, by iteration: 11.1 degrees at first, 6.6 by iteration 42, about 6 once it drives alone; the teacher alone scores 5.83.</title>
 <rect x="52.0" y="34" width="246.0" height="188" fill="var(--amber-soft)" opacity=".55"/>
@@ -450,7 +800,7 @@ table.kv td:first-child { width:150px }
 <text class="dl" x="139.6" y="146.9" fill="var(--blue)">student</text>
 </svg>
   </figure>
-  <figure class="panel"><figcaption><b>Student's episodes ending in a fall</b></figcaption>
+  <figure class="panel"><figcaption><b>Phase 2 · student episodes ending in a fall</b></figcaption>
 <svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="c2-t">
 <title id="c2-t">Share of student-driven episodes that end in a fall, by iteration: about 80 percent at first, 22 by iteration 48, under 3 once the student drives alone.</title>
 <rect x="52.0" y="34" width="246.0" height="188" fill="var(--amber-soft)" opacity=".55"/>
@@ -501,86 +851,27 @@ table.kv td:first-child { width:150px }
 </svg>
   </figure>
 </div>
-
   <div class="panel">
     <table class="rt">
       <thead><tr><th>mc021, driving alone from random starts</th><th style="text-align:right">Joint error</th><th style="text-align:right">Episodes falling</th><th style="text-align:right">Mean episode</th></tr></thead>
       <tbody>
-        <tr><td>Student (L1's inputs), after 40 min</td><td class="w">6.05°</td><td class="w">2.2 %</td><td class="w">163 steps</td></tr>
+        <tr><td>Student (L1's inputs), after 40 min of DAgger</td><td class="w">6.05°</td><td class="w">2.2 %</td><td class="w">163 steps</td></tr>
         <tr><td>Teacher (57M-step snapshot)</td><td class="w">5.83°</td><td class="w">0.7 %</td><td class="w">163 steps</td></tr>
       </tbody>
     </table>
-    <p class="note" style="margin-top:10px">Run distill_mc021. The student also walks each of mc021's three windows to its end from the first frame (Studio: distill_mc021.studio_student).</p>
-  </div>
-</section>
-
-<section aria-labelledby="s-why">
-  <div class="sec-head">
-    <h2 id="s-why">Why from scratch failed</h2>
-    <p>No fixed muscle drive keeps this body up, and more drive only falls faster. An untrained policy is therefore rewarded for lowering its drive, and its calf, knee and hip extensors sank to about 0.02, a corner where learning can barely raise them again. Every from-scratch run collapsed within 2 s, whatever the effort weight, reward shape or training conditions.</p>
-  </div>
-  <div class="panel scroll">
-      <svg class="dia" viewBox="0 0 900 300" role="img" aria-labelledby="drive-t" style="min-width:600px; max-width:900px">
-        <title id="drive-t">Median time to fall from the training starts with every muscle held at one drive: 0.01, 0.43 s; 0.05, 0.78 s; 0.10, 0.93 s; 0.20, 0.50 s; 0.30, 0.33 s; 0.50, 0.25 s.</title>
-        <line class="ax" x1="70" y1="240" x2="880" y2="240"/>
-        <rect x="90" y="154.0" width="80" height="86.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="130" y="146.0" text-anchor="middle">0.43 s</text><text class="axl" x="130" y="262" text-anchor="middle">0.01</text><rect x="220" y="84.0" width="80" height="156.0" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="2"/><text class="seg-n" x="260" y="76.0" text-anchor="middle">0.78 s</text><text class="axl" x="260" y="262" text-anchor="middle">0.05</text><rect x="350" y="54.0" width="80" height="186.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="390" y="46.0" text-anchor="middle">0.93 s</text><text class="axl" x="390" y="262" text-anchor="middle">0.10</text><rect x="480" y="140.0" width="80" height="100.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="520" y="132.0" text-anchor="middle">0.50 s</text><text class="axl" x="520" y="262" text-anchor="middle">0.20</text><rect x="610" y="174.0" width="80" height="66.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="650" y="166.0" text-anchor="middle">0.33 s</text><text class="axl" x="650" y="262" text-anchor="middle">0.30</text><rect x="740" y="190.0" width="80" height="50.0" rx="4" fill="var(--blue)"/><text class="seg-n" x="780" y="182.0" text-anchor="middle">0.25 s</text><text class="axl" x="780" y="262" text-anchor="middle">0.50</text>
-        <text class="axl" x="475" y="288" text-anchor="middle">drive on every one of the 90 muscles</text>
-        <text class="dl rea" x="220" y="280" text-anchor="middle">(untrained policy)</text>
-      </svg>
-    <p class="note">Median time to fall from the training starts (level 0, delays on, no pushes), with every muscle held at one drive. Imitation avoids the problem: it pays for the right joint angles and pelvis height every step, so the policy never has to discover standing by surviving longer.</p>
-  </div>
-</section>
-
-<section aria-labelledby="s-stage1">
-  <div class="sec-head">
-    <h2 id="s-stage1">Stage 1 in detail</h2>
-    <p>The B1 setup the from-scratch runs used, now starting from the distilled student: the clip is gone, the reward is the command plus a style judge.</p>
-  </div>
-  <div class="panel scroll">
-    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="s1-t" style="min-width:860px">
-      <title id="s1-t">Stage 1 loop. The student, started from distillation, drives the body on curriculum terrain. The reward is half speed times heading tracking, half style, minus effort. The style score comes from a judge that learns to tell AB01's human pose pairs from the policy's. PPO updates the student from the reward with a fresh critic.</title>
-      <defs>
-        <marker id="sw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
-        <marker id="sa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
-      </defs>
-      <path class="w" d="M240 90 H342.5" marker-end="url(#sw)"/><text class="lab" x="295" y="62" text-anchor="middle">90</text><text class="lab" x="295" y="80" text-anchor="middle">excitations</text>
-      <path class="w" d="M610 90 H692.5" marker-end="url(#sw)"/><text class="lab" x="650" y="80" text-anchor="middle">state</text>
-      <path class="w" d="M475 135 V202.5" marker-end="url(#sw)"/><text class="lab" x="487" y="174">pose pairs, 25 ms apart</text>
-      <path class="w" d="M610 245 H700 V142.5" marker-end="url(#sw)"/><text class="lab" x="712" y="200">style score</text>
-      <path d="M190 245 H332.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#sa)"/>
-      <text class="lab" x="261" y="235" text-anchor="middle" fill="var(--amber)">human pairs</text>
-      <path class="w train" d="M950 135 V310 H8 V90 H12.5" marker-end="url(#sw)"/><text class="lab" x="542" y="302" text-anchor="middle">PPO update, fresh critic</text>
-      <g class="fn pol"><rect x="20" y="45" width="220" height="90" rx="12"/><text class="t1" x="130" y="78">Student</text><text class="t2" x="130" y="104">from distillation</text></g>
-      <g class="fn"><rect x="350" y="45" width="260" height="90" rx="12"/><text class="t1" x="480" y="72">Body on curriculum ground</text><text class="t2" x="480" y="96">stones · slopes · rough,</text><text class="t2" x="480" y="116">10 levels, pushes</text></g>
-      <g class="fn key"><rect x="700" y="45" width="480" height="90" rx="12"/><text class="t1" x="940" y="72">Reward per step</text><text class="t2" x="940" y="96">½ speed × heading tracking + ½ style − effort</text><text class="t2" x="940" y="116">a fall ends the episode, no penalty</text></g>
-      <g class="fn"><rect x="340" y="210" width="270" height="70" rx="12"/><text class="t1" x="475" y="238">Style judge</text><text class="t2" x="475" y="260">trained alongside: human +1, policy −1</text></g>
-      <g class="fn hum"><rect x="20" y="210" width="170" height="70" rx="12"/><text class="t1" x="105" y="238">AB01</text><text class="t2" x="105" y="260">75,334 pairs</text></g>
-    </svg>
-  </div>
-  <div class="panel">
-    <table class="rt kv">
-      <tbody>
-        <tr><td>Reward</td><td>Speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free; heading exp(−turn-rate error²); style max(0, 1 − ¼ (score − 1)²); effort at fixed weights of 0.0025 each (metabolic power, summed cubed activation, compartment balance).</td></tr>
-        <tr><td>Style pairs</td><td>Two poses 25 ms apart: pelvis height over the ground, its up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned. Human pairs from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. The judge starts fresh in stage 1.</td></tr>
-        <tr><td>Ground</td><td>8 × 8 m tiles in 10 levels; of 10 columns, 6 stepping stones (50 cm stones, 10 cm gaps over 30 cm holes at the easiest level), 3 slopes (3° to 29°), 1 rough (2–10 cm bumps). Start at levels 0–2; up after walking 4 m, down after less than half the commanded distance.</td></tr>
-        <tr><td>Episodes</td><td>A random frame of 152 level AB01 clips (28 % standing frames) with its velocities; the command starts at that frame's speed and heading, and every 10 s a new speed (0–1.5 m/s), same heading. 20 s at most.</td></tr>
-        <tr><td>Disturbances</td><td>Friction ×0.5–2 per world, a constant push up to 7 N per episode, a velocity kick every 4 s. Falls: tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching.</td></tr>
-        <tr><td>Senses</td><td>L1's inputs with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s) and ±5 cm patch drift; the critic also gets the clean state and the full height map.</td></tr>
-        <tr><td>Learner</td><td>SPRINT's PPO with the STC settings, 8,192 worlds, 24 steps per update, symmetry loss; policy and estimator from the student, critic and optimiser fresh. Whether to keep the 0.05 drive floor is open.</td></tr>
-      </tbody>
-    </table>
+    <p class="note" style="margin-top:10px">Phase 1 passed its check (6.1° at 50M steps, pass ≤ ~6°); phase 2 passed (the student nearly matches the teacher). The student also walks each window to its end from the first frame (Studio: distill_mc021.studio_student). Runs recipe_teacher_mc021, distill_mc021.</p>
   </div>
 </section>
 
 <section aria-labelledby="s-status">
   <div class="sec-head">
-    <h2 id="s-status">Status and checks</h2>
+    <h2 id="s-status">Next</h2>
     <p>Every step has a pass mark written down before it runs and a check within about an hour; a step that misses is stopped and diagnosed, not extended.</p>
   </div>
   <ol class="road">
-    <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps, 2 % falls (pass: ~6°)</span></li>
-    <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° / 2.2 % vs teacher 5.83° / 0.7 % in 40 min</span></li>
-    <li class="now"><span class="st">Running</span><b>Teacher, all AB01</b><span>276 windows, ramps included. 50M check passed (8.0°, falling; falls still 76 %). Pass at 200M: ≤ ~6°, ≤ 10 % falls</span></li>
+    <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps</span></li>
+    <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° vs teacher 5.83°</span></li>
+    <li class="now"><span class="st">Running</span><b>Teacher, all AB01</b><span>276 windows. 7.7° at 67M, but 76 % of episodes still fall; from each window's start it falls in 95 %. Open: switch to STC's own setup (FlashSAC, error-weighted starts, reset priming)</span></li>
     <li><span class="st">Next</span><b>Distil, all AB01</b><span>pass: nearly the teacher, ramps included</span></li>
     <li><span class="st">Then</span><b>Stage 1</b><span>from the student: command + style on curriculum ground</span></li>
     <li><span class="st">Then</span><b>The ladder</b><span>every rung starts from stage 1</span></li>
