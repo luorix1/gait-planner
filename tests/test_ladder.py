@@ -40,6 +40,12 @@ def test_ladder_pairs_and_step() -> None:
     _, r, *_ = env.step(torch.full((4, task.nmus), 0.05))
     assert torch.isfinite(torch.as_tensor(r)).all()
     assert env.obs.shape[-1] == sum(b[1] for b in task.blocks)
+    # sensor noise is in physical units, before the scales: at most 0.2 x n_ang and 0.05 x n_qd on the scaled readings
+    task.c = replace(task.c, spike_p=0.0)
+    noisy, clean = task.body_obs(task.body_state(env.state))
+    assert (noisy[1] - clean[1]).abs().max() <= 0.2 * task.c.n_ang + 1e-6
+    assert (noisy[5] - clean[5]).abs().max() <= 0.05 * task.c.n_qd + 1e-6
+    task.c = replace(task.c, spike_p=1e-4)
     # L0.5: the actor's command columns read zeros, the critic's keep the command
     o = [b[0] for b in task.blocks]
     at = lambda name: sum(b[1] for b in task.blocks[:o.index(name)])  # noqa: E731

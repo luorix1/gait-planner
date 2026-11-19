@@ -353,13 +353,15 @@ class WatchYourStep(TorchTask):
         return torch.cat([*noisy, scan_a, *clean, hmap, scan_c], 1).nan_to_num(0.0, 0.0, 0.0)
 
     def body_obs(self, b: dict[str, torch.Tensor]) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        """The body blocks, with the actor's noise and without (the critic's)."""
+        """The body blocks, with the actor's noise and without (the critic's). Noise is in physical units, added
+        before the observation scales (0.2 on the turn rate, 0.05 on joint speeds), as IsaacLab and legged_gym do.
+        Before 2026-11-18 it was added after them: 5x and 20x the intended noise (joint speeds +-30 rad/s)."""
         c = self.c
         sp = lambda x, p, amp: x + amp * (torch.rand(x.shape, device=self.dev, generator=self.gen) < p) * (2 * torch.rand(x.shape, device=self.dev, generator=self.gen) - 1)  # noqa: E731
         noisy = [sp(b["lin"] + self._sym(b["lin"].shape, c.n_lin), c.spike_p, c.spike_lin),
-                 sp(0.2 * b["ang"] + self._sym(b["ang"].shape, c.n_ang), c.spike_p, c.spike_ang),
+                 0.2 * sp(b["ang"] + self._sym(b["ang"].shape, c.n_ang), c.spike_p, c.spike_ang),
                  b["grav"] + self._sym(b["grav"].shape, c.n_grav), self.cmd,
-                 b["qrel"] + self._sym(b["qrel"].shape, c.n_q), 0.05 * b["qd"] + self._sym(b["qd"].shape, c.n_qd),
+                 b["qrel"] + self._sym(b["qrel"].shape, c.n_q), 0.05 * (b["qd"] + self._sym(b["qd"].shape, c.n_qd)),
                  self.prev_action.clamp(-10, 10)]
         clean = [b["lin"], 0.2 * b["ang"], b["grav"], self.cmd, b["qrel"], 0.05 * b["qd"], self.prev_action.clamp(-10, 10)]
         return noisy, clean
