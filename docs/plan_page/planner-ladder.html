@@ -220,6 +220,11 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   .mgrid { grid-template-columns:minmax(0, 1fr) }
 }
 @media (max-width:560px) { .road { grid-template-columns:minmax(0, 1fr) } .road li::after { content:none !important } .panel { padding:16px } }
+.charts { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px }
+.charts figure { margin:0; display:grid; gap:8px; align-content:start }
+.charts figcaption { font-size:15px }
+table.kv td:first-child { width:150px }
+@media (max-width:900px) { .charts { grid-template-columns:minmax(0, 1fr) } }
 </style>
 
 <div class="wrap">
@@ -227,11 +232,11 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <header>
   <p class="eyebrow">gait_planner · B1 · L1 · 19 Nov 2026</p>
   <h1>Distilling L1 from an imitation teacher</h1>
-  <p class="lede">L1's policy (a blind foot placement estimator, two terrain patches and a 90-muscle policy) never learned to walk from scratch. The new route: train an ordinary imitation teacher that sees the clip, then distil it into L1's two networks, which never see the clip. One clip first; expand once the student copies the teacher.</p>
+  <p class="lede">L1's policy (a blind foot placement estimator, two terrain patches and a 90-muscle policy) never learned to walk from scratch. The new route: train an ordinary imitation teacher that sees the clip, then distil it into L1's two networks, which never see the clip. On one clip (mc021) the student now copies the teacher nearly exactly; the teacher is training on all of AB01.</p>
   <div class="chips">
-    <span class="chip next"><i></i>Teacher training on one clip (mc021, 1.2 m/s)</span>
-    <span class="chip todo"><i></i>Then: distil into the student</span>
-    <span class="chip todo"><i></i>Then: all of AB01, then stage 1</span>
+    <span class="chip"><i style="background:var(--good)"></i>mc021: teacher and student passed</span>
+    <span class="chip next"><i></i>Teacher training on all of AB01 (276 windows)</span>
+    <span class="chip todo"><i></i>Then: distil on AB01, then stage 1</span>
   </div>
 </header>
 
@@ -302,14 +307,33 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <g class="fn pol"><rect x="640" y="90" width="260" height="170" rx="12"/><text class="t1" x="770" y="140">Muscle policy</text><text class="t2" x="770" y="166">687 inputs → 90 outputs</text><text class="t2" x="770" y="188">network 512-2048-512-2048-512</text><text class="t2" x="770" y="210">40 times a second</text></g>
       <g class="fn"><rect x="990" y="120" width="190" height="110" rx="12"/><text class="t1" x="1085" y="150">Muscles</text><text class="t2" x="1085" y="174">excitation arrives after</text><text class="t2" x="1085" y="194">10, 20 or 40 ms;</text><text class="t2" x="1085" y="214">they move the body</text></g>
     </svg>
-    <p class="note">In the student the estimator is fixed: fitted to human footsteps (below) or to where the teacher's feet land. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. During distillation the ground is flat or a straight ramp, and the patches read it.</p>
+    <p class="note">In the student the estimator is fixed: fitted to human footsteps (below) or to where the teacher's feet land. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. During distillation each clip walks on its own ground (flat or its ramp), and the patches read it.</p>
   </div>
 </section>
 
 <section aria-labelledby="s-teacher">
   <div class="sec-head">
     <h2 id="s-teacher">The teacher</h2>
-    <p>STC's imitation recipe, unchanged except for the EMG term (AB01 has no EMG): SPRINT's recommended imitation reward, inputs, physics and PPO. The policy sees where the clip is going and is rewarded for following it. Run recipe_teacher_mc021.</p>
+    <p>STC's imitation recipe, unchanged except for the EMG term (AB01 has no EMG): SPRINT's recommended reward, inputs, physics and PPO with its left-right symmetry loss, 4,096 worlds, motor delays of 10, 20 and 40 ms. It sees where the clip is going and is paid for following it.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 190" role="img" aria-labelledby="taps-t" style="min-width:760px">
+      <title id="taps-t">The teacher reads the clip at 8 future frames, 1, 2, 3, 5, 8, 14, 24 and 40 control steps ahead (25 ms to 1 s), each as the error from the body now; one clip frame passes per 40 Hz control step.</title>
+      <defs><marker id="tw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <line class="w" x1="80" y1="100" x2="1132" y2="100" marker-end="url(#tw)"/>
+      <circle cx="80" cy="100" r="9" fill="var(--ink)"/>
+      <text class="t1" x="80" y="70" text-anchor="middle">now: the body</text>
+      <!-- x = 80 + 26 * steps -->
+      <g fill="var(--blue)">
+        <circle cx="106" cy="100" r="7"/><circle cx="132" cy="100" r="7"/><circle cx="158" cy="100" r="7"/><circle cx="210" cy="100" r="7"/>
+        <circle cx="288" cy="100" r="7"/><circle cx="444" cy="100" r="7"/><circle cx="704" cy="100" r="7"/><circle cx="1120" cy="100" r="7"/>
+      </g>
+      <g class="axl" text-anchor="middle">
+        <text x="132" y="138">1 · 2 · 3</text><text x="210" y="138">5</text><text x="288" y="138">8</text><text x="444" y="138">14</text><text x="704" y="138">24</text><text x="1120" y="138">40 steps</text>
+        <text x="444" y="160">350 ms</text><text x="704" y="160">600 ms</text><text x="1120" y="160">1 s</text>
+      </g>
+      <text class="lab" x="600" y="40" text-anchor="middle">at each tap: joint angles, pelvis height, orientation, velocity and position, both feet — as errors from the body now</text>
+    </svg>
   </div>
   <div class="panel scroll">
     <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
@@ -328,25 +352,165 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis position 0.05 · torso 0.05</text>
       <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
     </svg>
-    <p class="note">SPRINT's recommended imitation terms (recommended() without EMG), as STC trains this body.</p>
-  </div>
-  <div class="cards">
-    <div class="card"><span class="tag">Inputs</span><h3>The recipe's own</h3><p>Body and muscle state, the clip 1, 2, 3, 5, 8, 14, 24 and 40 steps ahead (up to 1 s), and a height scan. The teacher never needs L1's inputs: the distillation computes those separately from the same simulated body.</p></div>
-    <div class="card"><span class="tag">Timing</span><h3>The clip plays at its own rate</h3><p>One clip frame per 40 Hz control step, the same rate as the policy and the estimator. Seeing the clip ahead, the teacher can stay in step on its own.</p></div>
-    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>The recipe's: a random frame of mc021's three windows on flat ground, with small reset noise. An episode ends when the pelvis is 30 cm from the clip or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>The recipe's PPO</h3><p>SPRINT's default PPO with its left-right symmetry loss, 4,096 worlds; effort as STC weighs it (metabolic, cubed activation, compartment balance at 0.02 each); motor delays 10/20/40 ms. SPRINT updated so the symmetry loss mirrors this body correctly.</p></div>
+    <p class="note">The reward. Episodes start at a random frame with small noise and end when the pelvis is 30 cm from the clip or 60° off for 3 steps, when the clip ends, or after 10 s. Effort: metabolic power, cubed activation and compartment balance, 0.02 each.</p>
   </div>
 </section>
 
 <section aria-labelledby="s-distill">
   <div class="sec-head">
-    <h2 id="s-distill">Distillation into the student</h2>
-    <p>Supervised, not reinforcement learning: the student learns to output the teacher's 90 excitations from L1's inputs alone.</p>
+    <h2 id="s-distill">Distillation into the student (DAgger)</h2>
+    <p>Supervised, not reinforcement learning. One simulated body, two views of it: the teacher's inputs and L1's. Every state is labelled with the teacher's action, whoever is driving, and the student is fitted to every label so far. Because the student increasingly drives, it collects labels in the states its own mistakes lead to, which copying only the teacher's states would never show it.</p>
   </div>
-  <div class="cards">
-    <div class="card"><span class="tag">DAgger</span><h3>Labels on the states the student visits</h3><p>Roll out a mix of teacher and student, moving toward the student; label every state with the teacher's action; fit the student to all labels so far. Copying only the teacher's own states would leave the student lost after its first mistake. At each state the teacher reads its own inputs and the student reads L1's, both computed from the same simulated body.</p></div>
-    <div class="card"><span class="tag">Estimator</span><h3>Fixed during distillation</h3><p>Either the estimator fitted to AB01's footsteps (held-out clips: about 5–7 cm median error while walking, 43 cm when starting, stopping or standing, against 57 cm for fixed spots) or one fitted to where the teacher's feet land. On flat ground the patches are constant, so for mc021 it does not matter.</p></div>
-    <div class="card"><span class="tag">Pass</span><h3>Nearly the teacher</h3><p>Within about 30 minutes of distillation the student tracks mc021 nearly as well as the teacher: most episodes finish the clip, joint error close to the teacher's. If it cannot, L1's inputs are missing something the teacher uses, and we find out what.</p></div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 480" role="img" aria-labelledby="dag-t" style="min-width:860px">
+      <title id="dag-t">DAgger loop. The simulated body feeds two views: the teacher's inputs, with the clip, go to the frozen teacher, whose action is the label; L1's 687 inputs go to the student. Each episode is driven by the teacher with probability beta, else by the student, and the chosen action runs the next 25 ms step. Student inputs and teacher actions fill a buffer of the last 2 million states, and the student is fitted to it after every 24 steps.</title>
+      <defs>
+        <marker id="dw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="da" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <!-- body -> both views -->
+      <path class="w" d="M250 205 H290 V80 H322.5" marker-end="url(#dw)"/>
+      <path class="w" d="M250 255 H290 V370 H322.5" marker-end="url(#dw)"/>
+      <text class="lab" x="300" y="150">same state</text>
+      <!-- views -> networks -->
+      <path class="w" d="M560 80 H622.5" marker-end="url(#dw)"/>
+      <path class="w" d="M560 370 H622.5" marker-end="url(#dw)"/>
+      <!-- networks -> switch -->
+      <path class="w" d="M860 80 H990 V177.5" marker-end="url(#dw)"/>
+      <path class="w" d="M860 370 H990 V282.5" marker-end="url(#dw)"/>
+      <text class="lab" x="876" y="70">teacher's action</text>
+      <text class="lab" x="876" y="392">student's action</text>
+      <!-- switch -> next step -> body -->
+      <path class="w" d="M1140 230 H1172 V455 H140 V287.5" marker-end="url(#dw)"/>
+      <text class="lab" x="656" y="446" text-anchor="middle">the driver's 90 excitations run the next 25 ms step</text>
+      <!-- labels: teacher action + student inputs -> buffer -> fit student -->
+      <path d="M745 125 V177.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#da)"/>
+      <text class="lab" x="757" y="156" fill="var(--amber)">label</text>
+      <path d="M445 315 V230 H622.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#da)"/>
+      <text class="lab" x="455" y="222" fill="var(--amber)">inputs</text>
+      <path d="M745 275 V317.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#da)"/>
+      <text class="lab" x="757" y="302" fill="var(--amber)">fit (MSE)</text>
+      <g class="fn"><rect x="20" y="180" width="230" height="100" rx="12"/><text class="t1" x="135" y="210">Simulated body</text><text class="t2" x="135" y="234">the recipe's environment</text><text class="t2" x="135" y="254">mc021, 4,096 worlds</text></g>
+      <g class="fn"><rect x="330" y="35" width="230" height="90" rx="12"/><text class="t1" x="445" y="62">Teacher's inputs</text><text class="t2" x="445" y="86">body and muscle state,</text><text class="t2" x="445" y="106">the clip 1 s ahead</text></g>
+      <g class="fn"><rect x="330" y="315" width="230" height="110" rx="12"/><text class="t1" x="445" y="342">L1's inputs (687)</text><text class="t2" x="445" y="366">body and muscle state,</text><text class="t2" x="445" y="386">command from the clip,</text><text class="t2" x="445" y="406">foot patches (estimator)</text></g>
+      <g class="fn pol"><rect x="630" y="35" width="230" height="90" rx="12"/><text class="t1" x="745" y="68">Teacher</text><text class="t2" x="745" y="94">frozen snapshot</text></g>
+      <g class="fn pol"><rect x="630" y="325" width="230" height="90" rx="12"/><text class="t1" x="745" y="358">Student</text><text class="t2" x="745" y="384">stage 1's network</text></g>
+      <g class="fn hum"><rect x="630" y="185" width="230" height="90" rx="12"/><text class="t1" x="745" y="214">Label buffer</text><text class="t2" x="745" y="238">L1 inputs + teacher action</text><text class="t2" x="745" y="258">last 2 million states</text></g>
+      <g class="fn key"><rect x="910" y="185" width="230" height="90" rx="12"/><text class="t1" x="1025" y="214">Who drives?</text><text class="t2" x="1025" y="238">per episode: the teacher</text><text class="t2" x="1025" y="258">with probability β</text></g>
+    </svg>
+    <p class="note">β is 1 for the first 5 iterations (they also set the student's input normaliser), then falls linearly to 0 by iteration 85. Each iteration: 24 steps of all 4,096 worlds, then 64 gradient steps of 8,192 labels on the teacher's pre-squash mean. The estimator stays fixed, fitted to AB01's footsteps; on mc021's flat ground the patches read flat anyway. Script distill.py.</p>
+  </div>
+<div class="charts">
+  <figure class="panel"><figcaption><b>Joint error while the student drives</b></figcaption>
+<svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="c1-t">
+<title id="c1-t">Joint error of the student while it drives, by iteration: 11.1 degrees at first, 6.6 by iteration 42, about 6 once it drives alone; the teacher alone scores 5.83.</title>
+<rect x="52.0" y="34" width="246.0" height="188" fill="var(--amber-soft)" opacity=".55"/>
+<text class="axl" x="175.0" y="24" text-anchor="middle">teacher's share 1 → 0</text>
+<text class="axl" x="422.4" y="24" text-anchor="middle">student drives alone</text>
+<line class="ax" x1="52" x2="544" y1="195.1" y2="195.1" opacity=".6"/><text class="axl" x="44" y="199.1" text-anchor="end">6°</text>
+<line class="ax" x1="52" x2="544" y1="141.4" y2="141.4" opacity=".6"/><text class="axl" x="44" y="145.4" text-anchor="end">8°</text>
+<line class="ax" x1="52" x2="544" y1="87.7" y2="87.7" opacity=".6"/><text class="axl" x="44" y="91.7" text-anchor="end">10°</text>
+<line class="ax" x1="52" x2="544" y1="34.0" y2="34.0" opacity=".6"/><text class="axl" x="44" y="38.0" text-anchor="end">12°</text>
+<text class="axl" x="52.0" y="242" text-anchor="middle">0</text>
+<text class="axl" x="167.8" y="242" text-anchor="middle">40</text>
+<text class="axl" x="283.5" y="242" text-anchor="middle">80</text>
+<text class="axl" x="399.3" y="242" text-anchor="middle">120</text>
+<text class="axl" x="515.1" y="242" text-anchor="middle">160</text>
+<text class="axl" x="298" y="258" text-anchor="middle">iteration (98,304 states each)</text>
+<line x1="52" x2="544" y1="199.7" y2="199.7" stroke="var(--teal)" stroke-width="2" stroke-dasharray="6 5"/><text class="dl" x="544" y="217.7" text-anchor="end" fill="var(--teal)">teacher alone 5.83°</text>
+<path d="M79.5 58.7 L96.9 138.8 L114.2 139.6 L131.6 156.9 L149.0 160.9 L166.3 179.8 L183.7 180.0 L201.0 185.0 L218.4 183.1 L235.8 185.3 L253.1 192.0 L270.5 193.1 L287.9 191.0 L305.2 191.3 L322.6 195.5 L340.0 192.8 L357.3 191.9 L374.7 193.1 L392.1 197.4 L409.4 196.5 L426.8 195.7 L444.2 194.6 L461.5 195.1 L478.9 197.0 L496.2 195.9 L513.6 197.7 L531.0 195.8 L541.1 193.7" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="79.5" cy="58.7" r="7" fill="transparent"><title>iteration 10: 11.1°</title></circle>
+<circle cx="96.9" cy="138.8" r="7" fill="transparent"><title>iteration 16: 8.1°</title></circle>
+<circle cx="114.2" cy="139.6" r="7" fill="transparent"><title>iteration 22: 8.1°</title></circle>
+<circle cx="131.6" cy="156.9" r="7" fill="transparent"><title>iteration 28: 7.4°</title></circle>
+<circle cx="149.0" cy="160.9" r="7" fill="transparent"><title>iteration 34: 7.3°</title></circle>
+<circle cx="166.3" cy="179.8" r="7" fill="transparent"><title>iteration 40: 6.6°</title></circle>
+<circle cx="183.7" cy="180.0" r="7" fill="transparent"><title>iteration 46: 6.6°</title></circle>
+<circle cx="201.0" cy="185.0" r="7" fill="transparent"><title>iteration 52: 6.4°</title></circle>
+<circle cx="218.4" cy="183.1" r="7" fill="transparent"><title>iteration 58: 6.4°</title></circle>
+<circle cx="235.8" cy="185.3" r="7" fill="transparent"><title>iteration 64: 6.4°</title></circle>
+<circle cx="253.1" cy="192.0" r="7" fill="transparent"><title>iteration 70: 6.1°</title></circle>
+<circle cx="270.5" cy="193.1" r="7" fill="transparent"><title>iteration 76: 6.1°</title></circle>
+<circle cx="287.9" cy="191.0" r="7" fill="transparent"><title>iteration 82: 6.2°</title></circle>
+<circle cx="305.2" cy="191.3" r="7" fill="transparent"><title>iteration 88: 6.1°</title></circle>
+<circle cx="322.6" cy="195.5" r="7" fill="transparent"><title>iteration 94: 6.0°</title></circle>
+<circle cx="340.0" cy="192.8" r="7" fill="transparent"><title>iteration 100: 6.1°</title></circle>
+<circle cx="357.3" cy="191.9" r="7" fill="transparent"><title>iteration 106: 6.1°</title></circle>
+<circle cx="374.7" cy="193.1" r="7" fill="transparent"><title>iteration 112: 6.1°</title></circle>
+<circle cx="392.1" cy="197.4" r="7" fill="transparent"><title>iteration 118: 5.9°</title></circle>
+<circle cx="409.4" cy="196.5" r="7" fill="transparent"><title>iteration 124: 6.0°</title></circle>
+<circle cx="426.8" cy="195.7" r="7" fill="transparent"><title>iteration 130: 6.0°</title></circle>
+<circle cx="444.2" cy="194.6" r="7" fill="transparent"><title>iteration 136: 6.0°</title></circle>
+<circle cx="461.5" cy="195.1" r="7" fill="transparent"><title>iteration 142: 6.0°</title></circle>
+<circle cx="478.9" cy="197.0" r="7" fill="transparent"><title>iteration 148: 5.9°</title></circle>
+<circle cx="496.2" cy="195.9" r="7" fill="transparent"><title>iteration 154: 6.0°</title></circle>
+<circle cx="513.6" cy="197.7" r="7" fill="transparent"><title>iteration 160: 5.9°</title></circle>
+<circle cx="531.0" cy="195.8" r="7" fill="transparent"><title>iteration 166: 6.0°</title></circle>
+<circle cx="541.1" cy="193.7" r="7" fill="transparent"><title>iteration 169: 6.1°</title></circle>
+<text class="dl" x="139.6" y="146.9" fill="var(--blue)">student</text>
+</svg>
+  </figure>
+  <figure class="panel"><figcaption><b>Student's episodes ending in a fall</b></figcaption>
+<svg class="dia" viewBox="0 0 560 262" role="img" aria-labelledby="c2-t">
+<title id="c2-t">Share of student-driven episodes that end in a fall, by iteration: about 80 percent at first, 22 by iteration 48, under 3 once the student drives alone.</title>
+<rect x="52.0" y="34" width="246.0" height="188" fill="var(--amber-soft)" opacity=".55"/>
+<text class="axl" x="175.0" y="24" text-anchor="middle">teacher's share 1 → 0</text>
+<text class="axl" x="422.4" y="24" text-anchor="middle">student drives alone</text>
+<line class="ax" x1="52" x2="544" y1="222.0" y2="222.0" opacity=".6"/><text class="axl" x="44" y="226.0" text-anchor="end">0%</text>
+<line class="ax" x1="52" x2="544" y1="175.0" y2="175.0" opacity=".6"/><text class="axl" x="44" y="179.0" text-anchor="end">20%</text>
+<line class="ax" x1="52" x2="544" y1="128.0" y2="128.0" opacity=".6"/><text class="axl" x="44" y="132.0" text-anchor="end">40%</text>
+<line class="ax" x1="52" x2="544" y1="81.0" y2="81.0" opacity=".6"/><text class="axl" x="44" y="85.0" text-anchor="end">60%</text>
+<line class="ax" x1="52" x2="544" y1="34.0" y2="34.0" opacity=".6"/><text class="axl" x="44" y="38.0" text-anchor="end">80%</text>
+<text class="axl" x="52.0" y="242" text-anchor="middle">0</text>
+<text class="axl" x="167.8" y="242" text-anchor="middle">40</text>
+<text class="axl" x="283.5" y="242" text-anchor="middle">80</text>
+<text class="axl" x="399.3" y="242" text-anchor="middle">120</text>
+<text class="axl" x="515.1" y="242" text-anchor="middle">160</text>
+<text class="axl" x="298" y="258" text-anchor="middle">iteration (98,304 states each)</text>
+<line x1="52" x2="544" y1="220.4" y2="220.4" stroke="var(--teal)" stroke-width="2" stroke-dasharray="6 5"/><text class="dl" x="544" y="212.4" text-anchor="end" fill="var(--teal)">teacher alone 0.7 %</text>
+<path d="M79.5 35.0 L96.9 37.1 L114.2 64.8 L131.6 87.7 L149.0 102.2 L166.3 153.8 L183.7 170.1 L201.0 186.8 L218.4 195.6 L235.8 192.2 L253.1 208.7 L270.5 216.5 L287.9 215.1 L305.2 214.5 L322.6 217.1 L340.0 216.0 L357.3 217.5 L374.7 217.3 L392.1 218.1 L409.4 218.2 L426.8 218.0 L444.2 217.8 L461.5 218.6 L478.9 218.9 L496.2 219.0 L513.6 219.3 L531.0 219.5 L541.1 217.9" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="79.5" cy="35.0" r="7" fill="transparent"><title>iteration 10: 79.6%</title></circle>
+<circle cx="96.9" cy="37.1" r="7" fill="transparent"><title>iteration 16: 78.7%</title></circle>
+<circle cx="114.2" cy="64.8" r="7" fill="transparent"><title>iteration 22: 66.9%</title></circle>
+<circle cx="131.6" cy="87.7" r="7" fill="transparent"><title>iteration 28: 57.1%</title></circle>
+<circle cx="149.0" cy="102.2" r="7" fill="transparent"><title>iteration 34: 51.0%</title></circle>
+<circle cx="166.3" cy="153.8" r="7" fill="transparent"><title>iteration 40: 29.0%</title></circle>
+<circle cx="183.7" cy="170.1" r="7" fill="transparent"><title>iteration 46: 22.1%</title></circle>
+<circle cx="201.0" cy="186.8" r="7" fill="transparent"><title>iteration 52: 15.0%</title></circle>
+<circle cx="218.4" cy="195.6" r="7" fill="transparent"><title>iteration 58: 11.3%</title></circle>
+<circle cx="235.8" cy="192.2" r="7" fill="transparent"><title>iteration 64: 12.7%</title></circle>
+<circle cx="253.1" cy="208.7" r="7" fill="transparent"><title>iteration 70: 5.7%</title></circle>
+<circle cx="270.5" cy="216.5" r="7" fill="transparent"><title>iteration 76: 2.3%</title></circle>
+<circle cx="287.9" cy="215.1" r="7" fill="transparent"><title>iteration 82: 2.9%</title></circle>
+<circle cx="305.2" cy="214.5" r="7" fill="transparent"><title>iteration 88: 3.2%</title></circle>
+<circle cx="322.6" cy="217.1" r="7" fill="transparent"><title>iteration 94: 2.1%</title></circle>
+<circle cx="340.0" cy="216.0" r="7" fill="transparent"><title>iteration 100: 2.6%</title></circle>
+<circle cx="357.3" cy="217.5" r="7" fill="transparent"><title>iteration 106: 1.9%</title></circle>
+<circle cx="374.7" cy="217.3" r="7" fill="transparent"><title>iteration 112: 2.0%</title></circle>
+<circle cx="392.1" cy="218.1" r="7" fill="transparent"><title>iteration 118: 1.7%</title></circle>
+<circle cx="409.4" cy="218.2" r="7" fill="transparent"><title>iteration 124: 1.6%</title></circle>
+<circle cx="426.8" cy="218.0" r="7" fill="transparent"><title>iteration 130: 1.7%</title></circle>
+<circle cx="444.2" cy="217.8" r="7" fill="transparent"><title>iteration 136: 1.8%</title></circle>
+<circle cx="461.5" cy="218.6" r="7" fill="transparent"><title>iteration 142: 1.5%</title></circle>
+<circle cx="478.9" cy="218.9" r="7" fill="transparent"><title>iteration 148: 1.3%</title></circle>
+<circle cx="496.2" cy="219.0" r="7" fill="transparent"><title>iteration 154: 1.3%</title></circle>
+<circle cx="513.6" cy="219.3" r="7" fill="transparent"><title>iteration 160: 1.1%</title></circle>
+<circle cx="531.0" cy="219.5" r="7" fill="transparent"><title>iteration 166: 1.1%</title></circle>
+<circle cx="541.1" cy="217.9" r="7" fill="transparent"><title>iteration 169: 1.7%</title></circle>
+<text class="dl" x="139.6" y="77.7" fill="var(--blue)">student</text>
+</svg>
+  </figure>
+</div>
+
+  <div class="panel">
+    <table class="rt">
+      <thead><tr><th>mc021, driving alone from random starts</th><th style="text-align:right">Joint error</th><th style="text-align:right">Episodes falling</th><th style="text-align:right">Mean episode</th></tr></thead>
+      <tbody>
+        <tr><td>Student (L1's inputs), after 40 min</td><td class="w">6.05°</td><td class="w">2.2 %</td><td class="w">163 steps</td></tr>
+        <tr><td>Teacher (57M-step snapshot)</td><td class="w">5.83°</td><td class="w">0.7 %</td><td class="w">163 steps</td></tr>
+      </tbody>
+    </table>
+    <p class="note" style="margin-top:10px">Run distill_mc021. The student also walks each of mc021's three windows to its end from the first frame (Studio: distill_mc021.studio_student).</p>
   </div>
 </section>
 
@@ -370,17 +534,41 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <section aria-labelledby="s-stage1">
   <div class="sec-head">
     <h2 id="s-stage1">Stage 1 in detail</h2>
-    <p>The B1 setup the from-scratch runs used, now starting from the walker.</p>
+    <p>The B1 setup the from-scratch runs used, now starting from the distilled student: the clip is gone, the reward is the command plus a style judge.</p>
   </div>
-  <div class="cards">
-    <div class="card"><span class="tag">Reward</span><h3>Per control step</h3><p>½ × speed × heading + ½ × style − effort. Speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free; heading exp(−turn-rate error²); effort at fixed weights of 0.0025 each (metabolic power, summed cubed activation, compartment balance). A fall ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Style</span><h3>The style judge</h3><p>GAIT_amp's adversarial judge, trained alongside the policy: it learns to score human pose pairs +1 and the policy's −1, and the style reward is max(0, 1 − ¼ (score − 1)²). Each pair is two poses 25 ms apart: pelvis height over the ground, the pelvis's up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned between them. Human pairs: 75,334 from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. It starts fresh in stage 1: the teacher and the student never use it.</p></div>
-    <div class="card"><span class="tag">Body</span><h3>Body and physics</h3><p>Rajagopal lower body: 90 muscles, 23 joints. 40 control steps a second, 75 physics steps each. Motor delays: 10 ms for hip and trunk muscles, 20 ms knee, 40 ms ankle and foot.</p></div>
-    <div class="card"><span class="tag">World</span><h3>Ground</h3><p>8 × 8 m tiles in 10 levels. Of the 10 columns, 6 are stepping stones (50 cm stones, 10 cm gaps over 30 cm holes at the easiest level), 3 slopes (up to 3° easiest, 29° hardest), 1 rough (2–10 cm bumps at every level). Worlds start at levels 0–2, go up after walking 4 m and down after less than half the commanded distance.</p></div>
-    <div class="card"><span class="tag">Senses</span><h3>What the policy senses</h3><p>Body state with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s), the command, five states per muscle, and 98 heights in two patches where the blind guesser expects the feet to land (±5 cm drift). The critic also gets the clean state and the full map.</p></div>
-    <div class="card"><span class="tag">Episodes</span><h3>Starts and commands</h3><p>A random frame of 152 level AB01 clips (walking, start-stop, standing; 28 % standing frames), with the clip's velocities. The command starts at that frame's speed and heading; every 10 s a new random speed (0–1.5 m/s) with the same heading: stage 1 walks straight. 20 s at most.</p></div>
-    <div class="card"><span class="tag">Disturbances</span><h3>Pushes and falls</h3><p>Friction ×0.5–2 per world, a constant push of up to 7 N per episode, a velocity kick every 4 s. A fall (tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching) ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Starts from the distilled student's policy and estimator, with a fresh critic and optimiser. Whether stage 1 keeps the 0.05 drive floor of the from-scratch runs is still open.</p></div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="s1-t" style="min-width:860px">
+      <title id="s1-t">Stage 1 loop. The student, started from distillation, drives the body on curriculum terrain. The reward is half speed times heading tracking, half style, minus effort. The style score comes from a judge that learns to tell AB01's human pose pairs from the policy's. PPO updates the student from the reward with a fresh critic.</title>
+      <defs>
+        <marker id="sw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="sa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <path class="w" d="M240 90 H342.5" marker-end="url(#sw)"/><text class="lab" x="295" y="62" text-anchor="middle">90</text><text class="lab" x="295" y="80" text-anchor="middle">excitations</text>
+      <path class="w" d="M610 90 H692.5" marker-end="url(#sw)"/><text class="lab" x="650" y="80" text-anchor="middle">state</text>
+      <path class="w" d="M475 135 V202.5" marker-end="url(#sw)"/><text class="lab" x="487" y="174">pose pairs, 25 ms apart</text>
+      <path class="w" d="M610 245 H700 V142.5" marker-end="url(#sw)"/><text class="lab" x="712" y="200">style score</text>
+      <path d="M190 245 H332.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#sa)"/>
+      <text class="lab" x="261" y="235" text-anchor="middle" fill="var(--amber)">human pairs</text>
+      <path class="w train" d="M950 135 V310 H8 V90 H12.5" marker-end="url(#sw)"/><text class="lab" x="542" y="302" text-anchor="middle">PPO update, fresh critic</text>
+      <g class="fn pol"><rect x="20" y="45" width="220" height="90" rx="12"/><text class="t1" x="130" y="78">Student</text><text class="t2" x="130" y="104">from distillation</text></g>
+      <g class="fn"><rect x="350" y="45" width="260" height="90" rx="12"/><text class="t1" x="480" y="72">Body on curriculum ground</text><text class="t2" x="480" y="96">stones · slopes · rough,</text><text class="t2" x="480" y="116">10 levels, pushes</text></g>
+      <g class="fn key"><rect x="700" y="45" width="480" height="90" rx="12"/><text class="t1" x="940" y="72">Reward per step</text><text class="t2" x="940" y="96">½ speed × heading tracking + ½ style − effort</text><text class="t2" x="940" y="116">a fall ends the episode, no penalty</text></g>
+      <g class="fn"><rect x="340" y="210" width="270" height="70" rx="12"/><text class="t1" x="475" y="238">Style judge</text><text class="t2" x="475" y="260">trained alongside: human +1, policy −1</text></g>
+      <g class="fn hum"><rect x="20" y="210" width="170" height="70" rx="12"/><text class="t1" x="105" y="238">AB01</text><text class="t2" x="105" y="260">75,334 pairs</text></g>
+    </svg>
+  </div>
+  <div class="panel">
+    <table class="rt kv">
+      <tbody>
+        <tr><td>Reward</td><td>Speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free; heading exp(−turn-rate error²); style max(0, 1 − ¼ (score − 1)²); effort at fixed weights of 0.0025 each (metabolic power, summed cubed activation, compartment balance).</td></tr>
+        <tr><td>Style pairs</td><td>Two poses 25 ms apart: pelvis height over the ground, its up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned. Human pairs from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. The judge starts fresh in stage 1.</td></tr>
+        <tr><td>Ground</td><td>8 × 8 m tiles in 10 levels; of 10 columns, 6 stepping stones (50 cm stones, 10 cm gaps over 30 cm holes at the easiest level), 3 slopes (3° to 29°), 1 rough (2–10 cm bumps). Start at levels 0–2; up after walking 4 m, down after less than half the commanded distance.</td></tr>
+        <tr><td>Episodes</td><td>A random frame of 152 level AB01 clips (28 % standing frames) with its velocities; the command starts at that frame's speed and heading, and every 10 s a new speed (0–1.5 m/s), same heading. 20 s at most.</td></tr>
+        <tr><td>Disturbances</td><td>Friction ×0.5–2 per world, a constant push up to 7 N per episode, a velocity kick every 4 s. Falls: tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching.</td></tr>
+        <tr><td>Senses</td><td>L1's inputs with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s) and ±5 cm patch drift; the critic also gets the clean state and the full height map.</td></tr>
+        <tr><td>Learner</td><td>SPRINT's PPO with the STC settings, 8,192 worlds, 24 steps per update, symmetry loss; policy and estimator from the student, critic and optimiser fresh. Whether to keep the 0.05 drive floor is open.</td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
@@ -389,24 +577,14 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <h2 id="s-status">Status and checks</h2>
     <p>Every step has a pass mark written down before it runs and a check within about an hour; a step that misses is stopped and diagnosed, not extended.</p>
   </div>
-  <div class="cards">
-    <div class="card" id="status-now"><span class="tag">Running</span><h3>Single clip passed; all of AB01 next</h3><p>mc021: the teacher passed (6.1° at 50M steps), and the distilled student, driving alone, tracks it nearly as well: 6.05° joint error and 2.2 % falls, against the teacher's 5.83° and 0.7 %, in 40 min of distillation. L1's inputs are enough on this clip. Now running: the teacher on AB01's 276 walking, start-stop and standing windows, ramps included (recipe_teacher_ab01). Check at 50M steps: at or under about 8° and falling. Pass at 200M: at or under about 6°, at most 10 % of episodes falling. Then distil again.</p></div>
-    <div class="card"><span class="tag">Teacher passes if</span><h3>It tracks the clip</h3><p>By about 50M steps: most episodes finish the 10 s clip, joint error under about 6°, calf, knee and hip extensors working in stance. If it lags the same way the custom teacher did, the body is slower to learn than H2190 and the pass mark is recalibrated rather than the method doubted.</p></div>
-    <div class="card"><span class="tag">Then</span><h3>Student, then expand</h3><p>Distil on mc021 (pass: nearly the teacher). Only then: all of AB01 (276 windows, ramps included) for teacher and student, then stage 1 from the student.</p></div>
-  </div>
+  <ol class="road">
+    <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps, 2 % falls (pass: ~6°)</span></li>
+    <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° / 2.2 % vs teacher 5.83° / 0.7 % in 40 min</span></li>
+    <li class="now"><span class="st">Running</span><b>Teacher, all AB01</b><span>276 windows, ramps included. 50M: ≤ ~8° and falling. 200M: ≤ ~6°, ≤ 10 % falls</span></li>
+    <li><span class="st">Next</span><b>Distil, all AB01</b><span>pass: nearly the teacher, ramps included</span></li>
+    <li><span class="st">Then</span><b>Stage 1</b><span>from the student: command + style on curriculum ground</span></li>
+    <li><span class="st">Then</span><b>The ladder</b><span>every rung starts from stage 1</span></li>
+  </ol>
 </section>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 </div>
