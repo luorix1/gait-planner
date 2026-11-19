@@ -39,3 +39,24 @@ def test_reference_scores_one() -> None:
     env.reset()
     _, r, *_ = env.step(torch.full((4, task.nmus), 0.05))
     assert torch.isfinite(torch.as_tensor(r)).all()
+
+
+def test_ramp_starts_line_up() -> None:
+    """Ramp clips start on the strip of their grade: right after a reset every world sits on its reference frame
+    (all tracking terms ~1, pelvis height within its reset lift), and the ground under a ramp world rises at the
+    strip's grade along +x."""
+    from train_wys import build
+
+    trials = ("ab01_mc019", "ab01_mc026", "ab01_mc031", "ab01_mc010")      # level, up 5, up 10, down 10
+    env, task = build(8, 0, "cpu", None, PretrainConfig(ramp_share=0.5), kind="pretrain", trials=trials)
+    env.reset()
+    s = env.state
+    terms, eh, angle = task.track(s, task.ref_f)
+    for k, v in terms.items():
+        assert (v > 0.95).all(), (k, v)
+    assert eh.abs().max() < 0.05 and angle.max() < 1e-3
+    assert task.wgrade.tolist() == [0, 0, 0, 0, 1, 1, 2, 2]
+    x, z = s.body_pos[:, task.root, 0:1], s.body_pos[:, task.root, 2:3]
+    slope = (task.ground(x + 0.5, z) - task.ground(x - 0.5, z))[:, 0]
+    want = torch.tan(torch.deg2rad(torch.tensor([0.0, 5.0, 10.0])))[task.wgrade]
+    assert torch.allclose(slope, want, atol=0.01), (slope, want)

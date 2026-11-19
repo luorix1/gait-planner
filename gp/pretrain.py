@@ -28,7 +28,9 @@ import torch
 
 from .amp import AMPConfig
 from .ladder import Ladder, LadderConfig, _yaw
+from .terrain import hf_height
 from .wys import _heading, _irot, _rot
+from .wys_terrain import COLS
 
 
 def _qmul(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -89,6 +91,21 @@ class PretrainConfig(LadderConfig):
     fall_height_error: float = 0.15       # m, pelvis height off the reference's (STC cfg_4)
     fall_angle_deg: float = 60.0          # pelvis orientation off the reference's
     fall_steps: int = 3                   # in a row (STC)
+    #: Ramp strips: (grade in degrees, columns); the last columns of the map. Ramp clips start on the strip of their
+    #: grade (|grade| within ``ramp_match`` degrees), everything else on flat columns.
+    ramps: tuple = ((5.0, 2), (10.0, 2))
+    ramp_match: float = 1.5
+    #: Share of the worlds on ramps (split evenly over the grades that have clips; none without ramp clips).
+    ramp_share: float = 0.3
+
+    def ramp_columns(self) -> dict[int, float]:
+        """Column -> grade for the ramp strips."""
+        cols, c = {}, COLS
+        for g, k in reversed(self.ramps):
+            for _ in range(k):
+                c -= 1
+                cols[c] = g
+        return cols
 
 
 class Pretrain(Ladder):
@@ -114,6 +131,7 @@ class Pretrain(Ladder):
         lo = torch.maximum(self.ex_first_f, i - c.speed_window)
         hi = torch.minimum(self.ex_last_f, i + c.speed_window)
         self.ex_speed_f = (cs[hi + 1] - cs[lo]) / (hi - lo + 1).float()
+        self._ramp_setup()
         n = self.n
         self.ref_f = torch.zeros(n, dtype=torch.long, device=dev)
         self.ref_start = torch.zeros(n, dtype=torch.long, device=dev)
@@ -121,6 +139,62 @@ class Pretrain(Ladder):
         self.far = torch.zeros(n, dtype=torch.long, device=dev)
         self.tilted = torch.zeros(n, dtype=torch.long, device=dev)
         self._ended = torch.zeros(n, dtype=torch.bool, device=dev)
+
+    def _ramp_setup(self) -> None:
+        """Start pools by ground grade (level, then each ramp grade) and every world's column and pool."""
+        c, D, dev = self.c, self.D, self.dev
+        grades = [0.0] + [g for g, _ in c.ramps]
+        pools: list[list[int]] = [[] for _ in grades]
+        for clip, p0, p1 in zip(self.ex_clips, self.ex_pstart[:-1], self.ex_pstart[1:], strict=True):
+            if D["mode"][clip] not in c.start_modes:
+                continue
+            g = abs(float(D["grade_deg"][clip])) if str(D["terrain_class"][clip]) != "level" else 0.0
+            near = [abs(g - q) for q in grades]
+            if min(near) <= c.ramp_match:
+                pools[int(np.argmin(near))] += range(int(p0), int(p1))
+        self.pools = [torch.as_tensor(p, dtype=torch.long, device=dev) for p in pools]
+        ramp_cols = c.ramp_columns()
+        flat_cols = [k for k in range(COLS) if k not in ramp_cols]
+        live = [gi for gi in range(1, len(grades)) if len(self.pools[gi])]
+        n = self.n
+        n_ramp = int(round(n * c.ramp_share)) if live else 0
+        share = [n - n_ramp] + [0] * (len(grades) - 1)
+        for k, gi in enumerate(live):
+            share[gi] = n_ramp // len(live) + (k < n_ramp % len(live))
+        wg, col = [], []
+        for gi, m in enumerate(share):
+            cols = flat_cols if gi == 0 else [k for k, g in ramp_cols.items() if g == grades[gi]]
+            wg += [gi] * m
+            col += [cols[r % len(cols)] for r in range(m)]
+        self.wgrade = torch.as_tensor(wg, device=dev)
+        self.col = torch.as_tensor(col, device=dev)
+        print(f"[pretrain] start windows by grade {dict(zip(grades, [len(p) for p in self.pools], strict=True))} pairs; "
+              f"worlds {dict(zip(grades, share, strict=True))}", flush=True)
+
+    def place(self, s: Any, i: torch.Tensor) -> None:
+        """A random frame from the start pool of the world's ground grade, its velocities kept, its pelvis over a
+        random point of the tile's centre (+-0.5 m) at the clip's own height over its ground (plus its reset lift), on
+        the ground straight under the pelvis (flat or a ramp: no steps to clear)."""
+        c, k = self.c, len(i)
+        j = torch.empty(k, dtype=torch.long, device=self.dev)
+        g = self.wgrade[i]
+        for gi, pool in enumerate(self.pools):
+            m = g == gi
+            if bool(m.any()):
+                j[m] = pool[torch.randint(len(pool), (int(m.sum()),), device=self.dev, generator=self.gen)]
+        f = self.ex_frame[j]
+        q, qd = self.ex_q[f].clone(), self.ex_qd[f].clone()
+        dx, dz = self._sym((k,), c.reset_pos), self._sym((k,), c.reset_pos)
+        off = self._offset[i]
+        under = hf_height(self.hf_h, self.hf_b, self.T.cell, self.T.origin, dx[:, None] + off[:, :1], dz[:, None] + off[:, 1:])[:, 0]
+        p = self.pel
+        q[:, p["ty"]] += self.ex_lift[f] - self.ex_gy[f] + under + 0.01
+        q[:, p["tx"]], q[:, p["tz"]] = dx, dz
+        self.nominal[i] = self.q0[self.jidx] + self._sym((k, self.nj), c.nominal_jitter)
+        s.qpos[i], s.qvel[i] = q, qd
+        self.prev_qvel[i] = qd
+        self.prev_action[i] = 0.0
+        self.start_pair[i] = j
 
     def reset(self, s: Any, worlds: torch.Tensor) -> None:
         super().reset(s, worlds)

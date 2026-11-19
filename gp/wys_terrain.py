@@ -233,6 +233,19 @@ def build(seed: int = SEED) -> Terrain:
     return Terrain(heights, block, CELL, (0.0, 0.0), centres, types, diff)
 
 
+def ramp_strips(T: Terrain, grades: dict[int, float]) -> None:
+    """Turn whole columns (strips along x, every row) into straight ramps rising along +x at ``grades[col]``
+    degrees, zero at the map's middle: AB01's ramp clips all have their ground rising along +x (uphill clips walk +x,
+    downhill clips -x). Neighbouring columns keep their own heights (a step at the strip's sides)."""
+    nb = int(round(BORDER / CELL))
+    x = T.origin[0] + np.arange(T.heights.shape[1]) * T.cell
+    mid = x[-1] / 2
+    for c, g in grades.items():
+        j0, j1 = nb + c * N_PX, nb + (c + 1) * N_PX
+        T.heights[j0:j1 + 1, :] = _q(np.tan(np.deg2rad(g)) * (x - mid))[None]
+        T.block[j0:j1, :] = np.nan
+
+
 def summary(T: Terrain) -> dict[str, Any]:
     """Per type: columns and the height range of its tiles at the lowest and highest level."""
     out: dict[str, Any] = {}

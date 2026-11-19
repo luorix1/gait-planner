@@ -161,6 +161,7 @@ class Ladder(WatchYourStep):
         pairs = self.pair((f[a], p[a], psi[a]), (f[a + 1], p[a + 1], psi[a + 1]))
         pstart = np.r_[0, np.cumsum(n - 1)]
         self.ex_frame, self.ex_psi = a, psi[a]
+        self.ex_clips, self.ex_pstart = clips, pstart                            # each clip's first pair
         self.ex_vf = pairs[:, 2 * f.shape[1]]                                   # forward speed, heading frame
         level = np.isin(D["mode"][clips], c.start_modes) & (D["terrain_class"][clips] == "level")
         self.st_start = torch.as_tensor(pstart[:-1][level], device=dev)

@@ -78,21 +78,22 @@ def build(worlds: int, seed: int, device: str, out: Path | None = None, config: 
           trials: tuple = ()):
     """``kind`` "wys" (gp.wys), "ladder" (gp.ladder, on ``dataset``'s training clips; ``config`` a LadderConfig) or
     "pretrain" (gp.pretrain, stage 0: imitation of the clips, always on levelled tiles); ``flat``: every tile levelled;
-    ``trials``: only these trials' windows (e.g. "ab01_mc021"), from any split."""
+    ``trials``: only these trials' windows (e.g. "ab01_mc021"). Clips come from every split."""
     flat = flat or kind == "pretrain"
     T = WT.build()
     if flat:
         T.heights[:] = 0.0
         T.block[:] = np.nan
+    if kind == "pretrain":
+        WT.ramp_strips(T, (config or PretrainConfig()).ramp_columns())
     model = data.load_model(device)
     c = recipe_config()
     if kind in ("ladder", "pretrain"):
         cfg = config or (PretrainConfig() if kind == "pretrain" else LadderConfig())
+        # every split (user 11-18: data is short, the final training uses all clips)
+        D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / dataset)
         if trials:
-            D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / dataset)
             D = data.take(D, [k for k, n in enumerate(D["name"]) if any(str(n).startswith(t + "_") for t in trials)])
-        else:
-            D = data.load("train", src=data.ROOT / "data" / dataset)
         cls = Pretrain if kind == "pretrain" else Ladder
         task: WatchYourStep = cls(T, D, cfg, seed=seed, log_dir=out, foot_model=foot_model)
     else:
