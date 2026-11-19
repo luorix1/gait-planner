@@ -234,7 +234,7 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
     <span class="chip todo"><i></i>L4 to L6 need a following reward or a planner</span>
     <span class="chip ill"><i></i>Scenes are illustrations, not simulation output</span>
   </div>
-  <div class="links"><a href="https://claude.ai/artifact/JEJTXyCWPxEBVHdF3iomaD">Plan page (plan v2)</a></div>
+  <div class="links"><a href="#s-setup">How L1 trains now (two stages)</a><a href="#s-rew2">Rewards from L3 on</a><a href="https://claude.ai/artifact/JEJTXyCWPxEBVHdF3iomaD">Plan page (plan v2)</a></div>
 </header>
 
 <section aria-labelledby="s-why">
@@ -476,6 +476,28 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   <div class="sec-head">
     <h2 id="s-setup">How L1 trains now: two stages</h2>
     <p>Trained from scratch, L1's policy never learned to bear weight: from its untrained start no uniform muscle drive keeps this body up, so a reward for staying up pushes the extensors down. So L1 now trains in two stages. Stage 0 learns to walk by imitating AB01's level clips, as STC trains this same model. Stage 1 starts from that walker with the ladder's reward on the whole stage-1 setup (cards below). Every rung starts from the same stage-0 walker.</p>
+  </div>
+  <div class="panel scroll" style="margin-bottom:16px">
+    <svg class="dia" viewBox="0 0 1200 270" role="img" aria-labelledby="stages-t" style="min-width:760px">
+      <title id="stages-t">Two stages. AB01 clips give the reference to stage 0's reward only; stage 0 learns to walk by imitation on level ground; its weights start stage 1, the ladder's reward on terrain; every rung starts from that walker. Both stages give the policy the same inputs.</title>
+      <defs><marker id="sw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <path class="w" d="M220 160 H312.5" marker-end="url(#sw)"/>
+      <path class="w" d="M590 160 H682.5" marker-end="url(#sw)"/>
+      <path class="w" d="M960 160 H1022.5" marker-end="url(#sw)"/>
+      <path class="w train" d="M460 66 V92.5" marker-end="url(#sw)"/>
+      <path class="w train" d="M830 66 V92.5" marker-end="url(#sw)"/>
+      <text class="lab" x="275" y="134" text-anchor="middle">reference,</text><text class="lab" x="275" y="150" text-anchor="middle">reward only</text>
+      <text class="lab" x="645" y="150" text-anchor="middle">weights</text>
+      <text class="lab" x="1000" y="150" text-anchor="middle">start</text>
+      <g class="fn dash"><rect x="380" y="12" width="530" height="54" rx="12"/><text class="t1" x="645" y="36">The policy's inputs, the same in both stages</text><text class="t2" x="645" y="56">body state, command, muscle states, two patches</text></g>
+      <g class="fn hum"><rect x="20" y="118" width="200" height="84" rx="12"/><text class="t1" x="120" y="150">AB01 clips</text><text class="t2" x="120" y="172">level walking, start-stop,</text><text class="t2" x="120" y="190">standing (152 windows)</text></g>
+      <g class="fn pol"><rect x="330" y="110" width="260" height="100" rx="12"/><text class="t1" x="460" y="142">Stage 0 · imitation</text><text class="t2" x="460" y="166">follows the clip, every step</text><text class="t2" x="460" y="186">level ground · 300M steps</text></g>
+      <g class="fn pol"><rect x="700" y="110" width="260" height="100" rx="12"/><text class="t1" x="830" y="142">Stage 1 · ladder reward</text><text class="t2" x="830" y="166">speed × heading + style − effort</text><text class="t2" x="830" y="186">terrain, delays, pushes</text></g>
+      <g class="fn"><rect x="1040" y="118" width="140" height="84" rx="12"/><text class="t1" x="1110" y="150">Every rung</text><text class="t2" x="1110" y="172">L0 to L6, from</text><text class="t2" x="1110" y="190">the same walker</text></g>
+      <text class="lab" x="460" y="236" text-anchor="middle">the command is the clip's speed and heading;</text>
+      <text class="lab" x="460" y="254" text-anchor="middle">the clip's clock follows the walker (±0.25 s)</text>
+      <text class="lab" x="830" y="236" text-anchor="middle">the setup in the cards below</text>
+    </svg>
   </div>
   <div class="cards" style="margin-bottom:16px">
     <div class="card"><span class="tag">Stage 0</span><h3>Imitation pretraining (run b1_pretrain)</h3><p>L1's inputs, with no reference clip in them. Reward: SPRINT's imitation terms against AB01's level walking, start-stop and standing clips on flat ground (joint angles 0.30, joint speeds 0.15, pelvis height 0.05, pelvis orientation 0.10, feet 0.20, body points 0.15, torso 0.05), minus STC's effort (0.02 each). The command follows the clip's speed and heading; the clip's clock follows the walker's step timing, within 0.25 s of real time. An episode ends when the pelvis is 15 cm off the clip's height, or 60° off its orientation, for 3 steps. 300M steps.</p></div>
