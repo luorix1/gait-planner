@@ -50,6 +50,7 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=0.8)
     ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--assist", type=float, default=0.0, help="keep a helper pull of this x weight on (training's is 0.5 at level 0)")
+    ap.add_argument("--per-tile", type=int, default=1, help="episodes per terrain type (each from a different start)")
     ap.add_argument("--to-studio", action="store_true", help="also copy the folder into SPRINT Studio's results folder")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
@@ -63,7 +64,7 @@ def main() -> None:
             if kind == "ladder" else WysConfig())
     types = WT.column_types()
     kinds = [t for t in dict.fromkeys(types) if kind != "ladder" or t in base.types]
-    tiles = tuple((a.level, types.index(t)) for t in kinds)                         # first column of each type
+    tiles = tuple((a.level, types.index(t)) for t in kinds) * a.per_tile            # first column of each type
     cfg = replace(base, training=False, eval_assist=a.assist, eval_tiles=tiles, lin_x=(a.speed, a.speed), lin_y=(0.0, 0.0),
                   ang_z=(0.0, 0.0), heading_stiffness=0.0, standing_frac=0.0, turning_frac=0.0,
                   resample_s=a.seconds + 1, xy_drift=0.0, z_drift=0.0, scan_noise=0.0,
