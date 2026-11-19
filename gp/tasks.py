@@ -67,13 +67,7 @@ class TerrainImitation(Imitation):
         self.start_weights = None if start_weights is None else np.asarray(start_weights, np.float64)
 
     def bind(self, model: Any) -> None:
-        super().bind(model)
-        if self.symmetric:
-            # the left/right mirror PPO's symmetry loss uses: SPRINT's axis-based coord_signs gets Rajagopal's hip
-            # adduction, hip rotation and knee wrong (gp.data.coord_mirror_signs); rebuild the blocks with FK signs
-            self.csign = gpdata.coord_mirror_signs(model)
-            self.blocks = self._blocks(model)
-            self._obs_dim = sum(b[1] for b in self.blocks)
+        super().bind(model)                               # SPRINT >= 5c6f34e: FK mirror signs (Rajagopal-correct)
         nf, nl = len(SCAN_FORWARD), len(SCAN_LATERAL)
         perm = [f * nl + (nl - 1 - k) for f in range(nf) for k in range(nl)]
         self.blocks.append(("height_scan", nf * nl, perm, [1.0] * (nf * nl)))

@@ -63,11 +63,19 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--starts", choices=("uniform", "sqrt"), default="uniform",
                     help="episode start clips: uniform (the recipe's) or sqrt (gp.data.clip_weights; for mixed datasets)")
+    ap.add_argument("--dataset", default="", help="data/<dataset> clips from every split (default: the train split of data.OUT)")
+    ap.add_argument("--trials", default="", help="with --dataset: only these trials' windows, comma-separated (e.g. ab01_mc021)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
     torch.manual_seed(a.seed)
-    D = data.load("train")
+    if a.dataset:
+        D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / a.dataset)
+        trials = tuple(t for t in a.trials.split(",") if t)
+        if trials:
+            D = data.take(D, [k for k, n in enumerate(D["name"]) if any(str(n).startswith(t + "_") for t in trials)])
+    else:
+        D = data.load("train")
     env, task = build(a.task, D, a.worlds, a.seed, a.device, a.prior, start_by=a.starts)
     cfg = default_ppo()
     cfg = replace(cfg, symmetry_coef=cfg.symmetry_coef if task.symmetric else 0.0)
@@ -76,7 +84,8 @@ def main() -> None:
     dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=Path(__file__).parent, capture_output=True,
                                 text=True).stdout.strip())
     record = dict(args=vars(a), gait_planner_git=git, dirty=dirty, sprint=sprint.__version__, torch=torch.__version__,
-                  split=json.loads((data.OUT / "split.json").read_text()), clips=len(D["name"]),
+                  split=None if a.dataset else json.loads((data.OUT / "split.json").read_text()), clips=len(D["name"]),
+                  clip_names=[str(n) for n in D["name"]] if a.dataset else None,
                   imitation=task.config.to_dict(), plan=asdict(task.plan) if a.task == "planner" else None,
                   ppo={k: list(v) if isinstance(v, tuple) else v for k, v in asdict(cfg).items()},
                   specific_tension_pa=data.SPECIFIC_TENSION, symmetric=task.symmetric, obs_dim=task.obs_dim, actor_inputs=len(task.actor_columns()),
