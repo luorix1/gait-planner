@@ -33,6 +33,15 @@ from gp import data
 from gp.tasks import PlanConfig, PlanTracking, TerrainImitation, recipe_config
 
 
+def load_clips(dataset: str, trials: str = "", modes: str = "") -> dict:
+    """data/<dataset>'s windows from every split, optionally only some trials' and some modes' (comma-separated)."""
+    D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / dataset)
+    tr, md = tuple(t for t in trials.split(",") if t), tuple(m for m in modes.split(",") if m)
+    keep = [k for k, n in enumerate(D["name"]) if (not tr or any(str(n).startswith(t + "_") for t in tr))
+            and (not md or str(D["mode"][k]) in md)]
+    return data.take(D, keep)
+
+
 def build(task_name: str, D: dict, worlds: int, seed: int, device: str, prior: str = "", starts: list | None = None,
           plan: dict | None = None, start_by: str = "uniform"):
     """``plan``: a run's recorded PlanConfig (record.json), so evaluation scores with the bands the run trained on.
@@ -65,15 +74,13 @@ def main() -> None:
                     help="episode start clips: uniform (the recipe's) or sqrt (gp.data.clip_weights; for mixed datasets)")
     ap.add_argument("--dataset", default="", help="data/<dataset> clips from every split (default: the train split of data.OUT)")
     ap.add_argument("--trials", default="", help="with --dataset: only these trials' windows, comma-separated (e.g. ab01_mc021)")
+    ap.add_argument("--modes", default="", help="with --dataset: only windows of these modes, comma-separated (e.g. walk,start_stop,stand)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
     torch.manual_seed(a.seed)
     if a.dataset:
-        D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / a.dataset)
-        trials = tuple(t for t in a.trials.split(",") if t)
-        if trials:
-            D = data.take(D, [k for k, n in enumerate(D["name"]) if any(str(n).startswith(t + "_") for t in trials)])
+        D = load_clips(a.dataset, a.trials, a.modes)
     else:
         D = data.load("train")
     env, task = build(a.task, D, a.worlds, a.seed, a.device, a.prior, start_by=a.starts)

@@ -38,11 +38,11 @@ import torch
 from sprint.recipes.ppo import PPO, ActorCritic, RunningNorm, env_action_bounds
 from sprint.recipes.study import default_ppo
 
-from gp import data
 from gp import fpm as FPM
 from gp.pretrain import Pretrain, PretrainConfig
 from gp.wys import _heading, _wrap
 from train import build as build_recipe
+from train import load_clips
 
 
 class StudentView(Pretrain):
@@ -166,6 +166,7 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--dataset", default="ab01")
     ap.add_argument("--trials", default="", help="only these trials' windows, comma-separated (the teacher's)")
+    ap.add_argument("--modes", default="walk,start_stop,stand", help="only these modes' windows (the student's clip tables hold these)")
     ap.add_argument("--foot-model", default="models/fpm_ab01.pt")
     ap.add_argument("--minutes", type=float, default=30)
     ap.add_argument("--worlds", type=int, default=2048)
@@ -187,10 +188,7 @@ def main() -> None:
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
     torch.manual_seed(a.seed)
     # the teacher's environment and its snapshot (a running teacher rewrites checkpoint.pt every 10 min)
-    D = data.load(("train", "test_trial", "test_terrain"), src=data.ROOT / "data" / a.dataset)
-    trials = tuple(t for t in a.trials.split(",") if t)
-    if trials:
-        D = data.take(D, [k for k, n in enumerate(D["name"]) if any(str(n).startswith(t + "_") for t in trials)])
+    D = load_clips(a.dataset, a.trials, a.modes)
     env, task = build_recipe("baseline", D, a.worlds, a.seed, a.device)
     shutil.copy2(Path(a.teacher) / "checkpoint.pt", out / "teacher.pt")
     tcfg = default_ppo()
