@@ -1,4 +1,4 @@
-<title>Two-Stage L1 Training</title>
+<title>L1 Teacher Distillation</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -225,54 +225,47 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
 <div class="wrap">
 
 <header>
-  <p class="eyebrow">gait_planner · B1 · L1 · 18 Nov 2026</p>
-  <h1>Two-stage training for L1</h1>
-  <p class="lede">Trained from scratch, L1's policy (Watch Your Step's blind foothold guesser and two terrain patches, on our 90-muscle body) never learned to bear weight. This test trains it in two stages: first it learns to walk by imitating AB01's clips, then it switches to the ladder's own reward.</p>
+  <p class="eyebrow">gait_planner · B1 · L1 · 19 Nov 2026</p>
+  <h1>Distilling L1 from an imitation teacher</h1>
+  <p class="lede">L1's policy (a blind foot placement estimator, two terrain patches and a 90-muscle policy) never learned to walk from scratch. The new route: train an ordinary imitation teacher that sees the clip, then distil it into L1's two networks, which never see the clip. One clip first; expand once the student copies the teacher.</p>
   <div class="chips">
-    <span class="chip next"><i></i>Stage 0 test running: one trial (mc021, 1.2 m/s)</span>
-    <span class="chip todo"><i></i>Then all of AB01, level and ramps</span>
-    <span class="chip todo"><i></i>Stage 1 starts from stage 0's walker</span>
+    <span class="chip next"><i></i>Teacher training on one clip (mc021, 1.2 m/s)</span>
+    <span class="chip todo"><i></i>Then: distil into the student</span>
+    <span class="chip todo"><i></i>Then: all of AB01, then stage 1</span>
   </div>
 </header>
 
-<section aria-labelledby="s-stages">
+<section aria-labelledby="s-plan">
   <div class="sec-head">
-    <h2 id="s-stages">The two stages</h2>
-    <p>The policy's inputs are the same in both stages, so stage 1 picks up stage 0's weights unchanged. The clip appears only in stage 0's reward, never in the policy's input.</p>
+    <h2 id="s-plan">The plan</h2>
+    <p>The teacher and the student run in the same simulation, so every state the student visits can be labelled with the teacher's action. The student's inputs are a subset of the teacher's: everything except the clip.</p>
   </div>
-  <div class="panel scroll" style="margin-bottom:16px">
-    <svg class="dia" viewBox="0 0 1200 270" role="img" aria-labelledby="stages-t" style="min-width:760px">
-      <title id="stages-t">Two stages. AB01 clips give the reference to stage 0's reward only; stage 0 learns to walk by imitation on level ground; its weights start stage 1, the ladder's reward on terrain; every rung starts from that walker. Both stages give the policy the same inputs.</title>
-      <defs><marker id="sw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
-      <path class="w" d="M220 160 H312.5" marker-end="url(#sw)"/>
-      <path class="w" d="M590 160 H682.5" marker-end="url(#sw)"/>
-      <path class="w" d="M960 160 H1022.5" marker-end="url(#sw)"/>
-      <path class="w train" d="M460 66 V92.5" marker-end="url(#sw)"/>
-      <path class="w train" d="M830 66 V92.5" marker-end="url(#sw)"/>
-      <text class="lab" x="275" y="134" text-anchor="middle">reference,</text><text class="lab" x="275" y="150" text-anchor="middle">reward only</text>
-      <text class="lab" x="645" y="150" text-anchor="middle">weights</text>
-      <text class="lab" x="1000" y="150" text-anchor="middle">start</text>
-      <g class="fn dash"><rect x="380" y="12" width="530" height="54" rx="12"/><text class="t1" x="645" y="36">The policy's inputs, the same in both stages</text><text class="t2" x="645" y="56">body state, command, muscle states, two patches</text></g>
-      <g class="fn hum"><rect x="20" y="118" width="200" height="84" rx="12"/><text class="t1" x="120" y="150">AB01 clips</text><text class="t2" x="120" y="172">walk, start-stop, stand;</text><text class="t2" x="120" y="190">level and ramps (276)</text></g>
-      <g class="fn pol"><rect x="330" y="110" width="260" height="100" rx="12"/><text class="t1" x="460" y="142">Stage 0 · imitation</text><text class="t2" x="460" y="166">follows the clip, every step</text><text class="t2" x="460" y="186">flat ground and 5°/10° ramps</text></g>
-      <g class="fn pol"><rect x="700" y="110" width="260" height="100" rx="12"/><text class="t1" x="830" y="142">Stage 1 · ladder reward</text><text class="t2" x="830" y="166">speed × heading + style − effort</text><text class="t2" x="830" y="186">terrain, delays, pushes</text></g>
-      <g class="fn"><rect x="1040" y="118" width="140" height="84" rx="12"/><text class="t1" x="1110" y="150">Every rung</text><text class="t2" x="1110" y="172">L0 to L6, from</text><text class="t2" x="1110" y="190">the same walker</text></g>
-      <text class="lab" x="460" y="236" text-anchor="middle">the command is the clip's speed and heading;</text>
-      <text class="lab" x="460" y="254" text-anchor="middle">the clip's clock follows the walker (±0.25 s)</text>
-      <text class="lab" x="830" y="236" text-anchor="middle">the setup in the cards below</text>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 260" role="img" aria-labelledby="plan-t" style="min-width:780px">
+      <title id="plan-t">AB01 clips give the teacher its reference, in its input and its reward. The student, the foot placement estimator and muscle policy, copies the teacher's actions by DAgger in the same simulation. Stage 1 starts from the student, and every rung starts from it.</title>
+      <defs><marker id="pw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <path class="w" d="M190 152 H252.5" marker-end="url(#pw)"/>
+      <path class="w" d="M500 152 H572.5" marker-end="url(#pw)"/>
+      <path class="w" d="M830 152 H902.5" marker-end="url(#pw)"/>
+      <text class="lab" x="226" y="144" text-anchor="middle">the clip</text>
+      <text class="lab" x="536" y="128" text-anchor="middle">copy its</text><text class="lab" x="536" y="144" text-anchor="middle">actions</text>
+      <text class="lab" x="866" y="144" text-anchor="middle">start</text>
+      <g class="fn dash"><rect x="270" y="14" width="560" height="50" rx="12"/><text class="t1" x="550" y="36">One simulation</text><text class="t2" x="550" y="55">the student's inputs are the teacher's minus the clip</text></g>
+      <path class="w train" d="M385 64 V82.5" marker-end="url(#pw)"/><path class="w train" d="M710 64 V82.5" marker-end="url(#pw)"/>
+      <g class="fn hum"><rect x="20" y="110" width="170" height="84" rx="12"/><text class="t1" x="105" y="142">AB01 clip</text><text class="t2" x="105" y="164">mc021 first,</text><text class="t2" x="105" y="182">then all 276</text></g>
+      <g class="fn pol"><rect x="270" y="100" width="230" height="104" rx="12"/><text class="t1" x="385" y="132">Teacher</text><text class="t2" x="385" y="156">imitation, sees the clip</text><text class="t2" x="385" y="176">PPO, tracking reward</text></g>
+      <g class="fn pol"><rect x="590" y="100" width="240" height="104" rx="12"/><text class="t1" x="710" y="132">Student</text><text class="t2" x="710" y="156">estimator + muscle policy</text><text class="t2" x="710" y="176">L1's inputs, no clip</text></g>
+      <g class="fn"><rect x="920" y="100" width="260" height="104" rx="12"/><text class="t1" x="1050" y="132">Stage 1 · ladder reward</text><text class="t2" x="1050" y="156">speed × heading + style − effort</text><text class="t2" x="1050" y="176">every rung starts here</text></g>
+      <text class="lab" x="385" y="234" text-anchor="middle">RL, with the clip's next 1 s in its input</text>
+      <text class="lab" x="710" y="234" text-anchor="middle">DAgger: supervised, on states it visits</text>
     </svg>
-  </div>
-  <div class="cards">
-    <div class="card"><span class="tag">Stage 0</span><h3>Imitation</h3><p>Rewarded every step for matching an AB01 clip's joint angles, pelvis and foot positions. The policy gets only the clip's speed and heading, as its command. Tested first on one trial (mc021: 1.2 m/s treadmill walking in its belt frame, run b1_pretrain_mc021), then on all of AB01: flat ground and 5°/10° ramps.</p></div>
-    <div class="card"><span class="tag">Stage 1</span><h3>The ladder's reward</h3><p>Starts from stage 0's policy, critic and guesser. ½ speed × heading + ½ style − effort, on the terrain curriculum with delays, sensor noise and pushes.</p></div>
-    <div class="card"><span class="tag">Fair comparison</span><h3>One walker for every rung</h3><p>Every rung of the ladder will start from the same stage-0 walker, so differences between rungs still come from the rung.</p></div>
   </div>
 </section>
 
 <section aria-labelledby="s-nets">
   <div class="sec-head">
-    <h2 id="s-nets">The foot placement estimator and the muscle policy</h2>
-    <p>Two networks run 40 times a second. The estimator guesses where each foot will land next; the terrain is read only at those two spots; the muscle policy turns everything into 90 muscle excitations. The same wiring in both stages.</p>
+    <h2 id="s-nets">The student: foot placement estimator and muscle policy</h2>
+    <p>L1's two networks, both at the clip's 40 Hz. The estimator guesses where each foot will land next; the terrain is read only at those two spots; the muscle policy turns everything into 90 muscle excitations. This is what the teacher is distilled into, and what stage 1 trains.</p>
   </div>
   <div class="panel scroll">
     <svg class="dia" viewBox="0 0 1200 570" role="img" aria-labelledby="nets-t" style="min-width:820px">
@@ -309,7 +302,51 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
       <g class="fn pol"><rect x="640" y="90" width="260" height="170" rx="12"/><text class="t1" x="770" y="140">Muscle policy</text><text class="t2" x="770" y="166">687 inputs → 90 outputs</text><text class="t2" x="770" y="188">network 512-2048-512-2048-512</text><text class="t2" x="770" y="210">40 times a second</text></g>
       <g class="fn"><rect x="990" y="120" width="190" height="110" rx="12"/><text class="t1" x="1085" y="150">Muscles</text><text class="t2" x="1085" y="174">excitation arrives after</text><text class="t2" x="1085" y="194">10, 20 or 40 ms;</text><text class="t2" x="1085" y="214">they move the body</text></g>
     </svg>
-    <p class="note">The estimator is refitted every 500 training iterations on where the policy's feet actually landed; for the first 500 it places the patches at fixed spots beside the feet. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. In stage 0 the ground is flat or a straight ramp, and the patches read it.</p>
+    <p class="note">In the student the estimator is fixed: fitted to human footsteps (below) or to where the teacher's feet land. A critic (training only) also gets the noise-free state and the full 33 × 21 height map. During distillation the ground is flat or a straight ramp, and the patches read it.</p>
+  </div>
+</section>
+
+<section aria-labelledby="s-teacher">
+  <div class="sec-head">
+    <h2 id="s-teacher">The teacher</h2>
+    <p>Ordinary imitation, the way STC trains this same body: the policy sees where the clip is going and is rewarded for following it. Run teacher_mc021.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
+      <title id="track-t">The teacher's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis height 0.05, torso 0.05, minus effort.</title>
+      <rect x="20" y="40" width="208" height="30" rx="5" fill="var(--blue)"/>
+      <rect x="230" y="40" width="103" height="30" rx="5" fill="var(--blue)" opacity=".8"/>
+      <rect x="335" y="40" width="138" height="30" rx="5" fill="var(--teal)"/>
+      <rect x="475" y="40" width="103" height="30" rx="5" fill="var(--teal)" opacity=".8"/>
+      <rect x="580" y="40" width="68" height="30" rx="5" fill="var(--blue)" opacity=".6"/>
+      <rect x="650" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".45"/>
+      <rect x="685" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".3"/>
+      <text class="seg-l" x="124" y="90" text-anchor="middle">joint angles 0.30</text>
+      <text class="seg-l" x="281" y="90" text-anchor="middle">joint speeds 0.15</text>
+      <text class="seg-l" x="404" y="90" text-anchor="middle">feet 0.20</text>
+      <text class="seg-l" x="526" y="90" text-anchor="middle">body points 0.15</text>
+      <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis height 0.05 · torso 0.05</text>
+      <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
+    </svg>
+    <p class="note">SPRINT's recommended imitation terms; feet and body points relative to the pelvis in its heading frame, the pelvis by its height over the ground.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">Inputs</span><h3>L1's, plus the clip</h3><p>Everything the student gets (body state, command, muscle states, two patches), plus the clip 1, 2, 3, 5, 8, 14, 24 and 40 steps ahead (up to 1 s): joint angles, pelvis height, orientation, velocity and position, and the feet relative to the pelvis, each as the error from the body now.</p></div>
+    <div class="card"><span class="tag">Timing</span><h3>The clip plays at its own rate</h3><p>One clip frame per 40 Hz control step, the same rate as the policy and the estimator. Seeing the clip ahead, the teacher can stay in step on its own.</p></div>
+    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>Starts from a random frame of the clip on flat ground (ramp clips on 5° or 10° ramp strips once all of AB01 is in). An episode ends when the pelvis is 15 cm off the clip's height or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
+    <div class="card"><span class="tag">Learner</span><h3>As before</h3><p>SPRINT's PPO with the STC settings, 8,192 worlds; effort as STC weighs it (metabolic, cubed activation, compartment balance at 0.02 each); motor delays 10/20/40 ms.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s-distill">
+  <div class="sec-head">
+    <h2 id="s-distill">Distillation into the student</h2>
+    <p>Supervised, not reinforcement learning: the student learns to output the teacher's 90 excitations from L1's inputs alone.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">DAgger</span><h3>Labels on the states the student visits</h3><p>Roll out a mix of teacher and student, moving toward the student; label every state with the teacher's action; fit the student to all labels so far. Copying only the teacher's own states would leave the student lost after its first mistake.</p></div>
+    <div class="card"><span class="tag">Estimator</span><h3>Fixed during distillation</h3><p>Either the estimator fitted to AB01's footsteps (held-out clips: about 5–7 cm median error while walking, 43 cm when starting, stopping or standing, against 57 cm for fixed spots) or one fitted to where the teacher's feet land. On flat ground the patches are constant, so for mc021 it does not matter.</p></div>
+    <div class="card"><span class="tag">Pass</span><h3>Nearly the teacher</h3><p>Within about 30 minutes of distillation the student tracks mc021 nearly as well as the teacher: most episodes finish the clip, joint error close to the teacher's. If it cannot, L1's inputs are missing something the teacher uses, and we find out what.</p></div>
   </div>
 </section>
 
@@ -330,40 +367,6 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   </div>
 </section>
 
-<section aria-labelledby="s-stage0">
-  <div class="sec-head">
-    <h2 id="s-stage0">Stage 0 in detail</h2>
-    <p>SPRINT's recommended imitation terms and STC's effort and fall rule, adapted so the policy never sees the clip.</p>
-  </div>
-  <div class="panel scroll">
-      <svg class="dia" viewBox="0 0 960 110" role="img" aria-labelledby="track-t" style="min-width:640px; max-width:960px">
-        <title id="track-t">Stage 0's reward to scale: joint angles 0.30, joint speeds 0.15, feet 0.20, body points 0.15, pelvis orientation 0.10, pelvis height 0.05, torso 0.05, minus effort.</title>
-        <rect x="20" y="40" width="208" height="30" rx="5" fill="var(--blue)"/>
-        <rect x="230" y="40" width="103" height="30" rx="5" fill="var(--blue)" opacity=".8"/>
-        <rect x="335" y="40" width="138" height="30" rx="5" fill="var(--teal)"/>
-        <rect x="475" y="40" width="103" height="30" rx="5" fill="var(--teal)" opacity=".8"/>
-        <rect x="580" y="40" width="68" height="30" rx="5" fill="var(--blue)" opacity=".6"/>
-        <rect x="650" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".45"/>
-        <rect x="685" y="40" width="33" height="30" rx="5" fill="var(--blue)" opacity=".3"/>
-        <text class="seg-l" x="124" y="90" text-anchor="middle">joint angles 0.30</text>
-        <text class="seg-l" x="281" y="90" text-anchor="middle">joint speeds 0.15</text>
-        <text class="seg-l" x="404" y="90" text-anchor="middle">feet 0.20</text>
-        <text class="seg-l" x="526" y="90" text-anchor="middle">body points 0.15</text>
-        <text class="seg-l" x="649" y="28" text-anchor="middle">orientation 0.10 · pelvis height 0.05 · torso 0.05</text>
-        <text class="seg-n" x="736" y="60">− effort (0.02 each)</text>
-      </svg>
-    <p class="note">Most a step can earn: 1.0. Feet and body points are compared relative to the pelvis in its heading frame, and the pelvis by its height over the ground: with no clip in its input, the walker's position in the world drifts.</p>
-  </div>
-  <div class="cards">
-    <div class="card"><span class="tag">Inputs</span><h3>What the policy sees</h3><p>L1's inputs: body state, command, five states per muscle, two terrain patches (flat here). No reference clip.</p></div>
-    <div class="card"><span class="tag">Command and clock</span><h3>Following the clip without seeing it</h3><p>The command is the clip's forward speed (averaged over 1 s) and a turn rate toward its heading; the reward still compares the pelvis velocity in every direction, in each body's own heading frame. The clip's clock follows the walker: each step it may slip or gain 2 frames toward the walker's pose, never more than 0.25 s from real time, so a slightly different step rhythm isn't punished and the walker can't stall it.</p></div>
-    <div class="card"><span class="tag">Episodes</span><h3>Starts and falls</h3><p>Starts from a random frame of AB01's 276 non-running windows (all splits): level clips on flat ground, ramp clips on straight 5° or 10° ramp strips of their grade (30 % of the worlds; the ground rises along the clips' own x, so no turning is needed). No pushes or friction spread. An episode ends when the pelvis is 15 cm off the clip's height or 60° off its orientation for 3 steps, when the clip ends, or after 10 s.</p></div>
-    <div class="card"><span class="tag">Effort and learner</span><h3>As STC weighs it</h3><p>Metabolic power, summed cubed activation and compartment balance at 0.02 each. SPRINT's PPO with the STC settings, no drive floor, every muscle starting at 0.05 drive.</p></div>
-    <div class="card"><span class="tag">Not yet</span><h3>Left out</h3><p>Running (15 windows, faster than stage 1's 1.5 m/s commands). No EMG reward (data/ab01 has no EMG). No pre-filled muscle activation at the start of an episode.</p></div>
-    <div class="card"><span class="tag">Check</span><h3>A body on its clip scores 1</h3><p>A test puts the body exactly on its reference frame: all seven terms score above 0.99, so frames, heading frames and body points line up.</p></div>
-  </div>
-</section>
-
 <section aria-labelledby="s-stage1">
   <div class="sec-head">
     <h2 id="s-stage1">Stage 1 in detail</h2>
@@ -371,28 +374,39 @@ a.rewlink { cursor:pointer } a.rewlink:hover rect { stroke:var(--blue) }
   </div>
   <div class="cards">
     <div class="card"><span class="tag">Reward</span><h3>Per control step</h3><p>½ × speed × heading + ½ × style − effort. Speed exp(−2 × (error − 0.1)²), the first 0.1 m/s free; heading exp(−turn-rate error²); effort at fixed weights of 0.0025 each (metabolic power, summed cubed activation, compartment balance). A fall ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Style</span><h3>The style judge</h3><p>GAIT_amp's adversarial judge, trained alongside the policy: it learns to score human pose pairs +1 and the policy's −1, and the style reward is max(0, 1 − ¼ (score − 1)²). Each pair is two poses 25 ms apart: pelvis height over the ground, the pelvis's up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned between them. Human pairs: 75,334 from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. It starts fresh in stage 1: stage 0 does not train it.</p></div>
+    <div class="card"><span class="tag">Style</span><h3>The style judge</h3><p>GAIT_amp's adversarial judge, trained alongside the policy: it learns to score human pose pairs +1 and the policy's −1, and the style reward is max(0, 1 − ¼ (score − 1)²). Each pair is two poses 25 ms apart: pelvis height over the ground, the pelvis's up direction, the 17 joint angles, both heels relative to the pelvis, and how far the pelvis moved and turned between them. Human pairs: 75,334 from AB01's 198 walking, start-stop and standing windows (all grades), mirrored half the time. It starts fresh in stage 1: the teacher and the student never use it.</p></div>
     <div class="card"><span class="tag">Body</span><h3>Body and physics</h3><p>Rajagopal lower body: 90 muscles, 23 joints. 40 control steps a second, 75 physics steps each. Motor delays: 10 ms for hip and trunk muscles, 20 ms knee, 40 ms ankle and foot.</p></div>
     <div class="card"><span class="tag">World</span><h3>Ground</h3><p>8 × 8 m tiles in 10 levels. Of the 10 columns, 6 are stepping stones (50 cm stones, 10 cm gaps over 30 cm holes at the easiest level), 3 slopes (up to 3° easiest, 29° hardest), 1 rough (2–10 cm bumps at every level). Worlds start at levels 0–2, go up after walking 4 m and down after less than half the commanded distance.</p></div>
     <div class="card"><span class="tag">Senses</span><h3>What the policy senses</h3><p>Body state with sensor noise (joint speeds ±1.5 rad/s, body speed ±0.15 m/s), the command, five states per muscle, and 98 heights in two patches where the blind guesser expects the feet to land (±5 cm drift). The critic also gets the clean state and the full map.</p></div>
     <div class="card"><span class="tag">Episodes</span><h3>Starts and commands</h3><p>A random frame of 152 level AB01 clips (walking, start-stop, standing; 28 % standing frames), with the clip's velocities. The command starts at that frame's speed and heading; every 10 s a new random speed (0–1.5 m/s) with the same heading: stage 1 walks straight. 20 s at most.</p></div>
     <div class="card"><span class="tag">Disturbances</span><h3>Pushes and falls</h3><p>Friction ×0.5–2 per world, a constant push of up to 7 N per episode, a velocity kick every 4 s. A fall (tilt over 40°, pelvis under 0.5 m above the ground, or a thigh or shank touching) ends the episode with no penalty.</p></div>
-    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Starts from stage 0's policy, critic and guesser with a fresh optimiser. Whether stage 1 keeps the 0.05 drive floor of the from-scratch runs is still open.</p></div>
+    <div class="card"><span class="tag">Learner</span><h3>Learner</h3><p>SPRINT's PPO with the STC settings: a 512-2048-512-2048-512 network, 8,192 worlds, 24 steps per update, 2 × 40 minibatches, a left-right symmetry loss. Starts from the distilled student's policy and estimator, with a fresh critic and optimiser. Whether stage 1 keeps the 0.05 drive floor of the from-scratch runs is still open.</p></div>
   </div>
 </section>
 
 <section aria-labelledby="s-status">
   <div class="sec-head">
-    <h2 id="s-status">Status</h2>
-    <p>Stage 0 is first tested on a single trial, to see whether a policy that never sees the clip can learn to walk by imitation at all.</p>
+    <h2 id="s-status">Status and checks</h2>
+    <p>Every step has a pass mark written down before it runs and a check within about an hour; a step that misses is stopped and diagnosed, not extended.</p>
   </div>
   <div class="cards">
-    <div class="card" id="status-now"><span class="tag">Running</span><h3>Single-trial test (b1_pretrain_mc021)</h3><p>AB01 mc021: 1.2 m/s treadmill walking in its belt frame, three 10 s windows. 150M steps, about 2.5 h, from 21:05.</p></div>
-    <div class="card"><span class="tag">Works if</span><h3>It tracks the trial</h3><p>Joint error down to about 5° or less, most episodes running the full 10 s of the clip, and calf, knee and hip extensors working during stance, well above the 0.05 start. SPRINT's single-clip walkers reach about 2–4° and finish almost every episode.</p></div>
-    <div class="card"><span class="tag">Next</span><h3>All of AB01, with ramps</h3><p>If it works: all 276 non-running windows on flat ground and 5°/10° ramps (built and tested), then stage 1 from that walker.</p></div>
-    <div class="card"><span class="tag">Fixed</span><h3>Sensor noise</h3><p>Before 18 Nov the policy's joint-speed and turn-rate readings had their noise added after scaling: 20× the intended noise on joint speeds (equivalent to ±30 rad/s) and 5× on turn rate. Fixed (594f565); every earlier run had it and was deleted.</p></div>
-    <div class="card"><span class="tag">Changed</span><h3>The command</h3><p>Forward speed and turn rate only (the sideways command was always zero). Stage 1 holds its starting heading.</p></div>
+    <div class="card" id="status-now"><span class="tag">Running</span><h3>Teacher on mc021</h3><p>Run teacher_mc021, 150M steps, started 19 Nov. Check at about 50M steps (about 1 h).</p></div>
+    <div class="card"><span class="tag">Teacher passes if</span><h3>It tracks the clip</h3><p>By about 50M steps: most episodes finish the 10 s clip, joint error under about 6°, calf, knee and hip extensors working in stance. If not, the problem is in our environment (the method is proven) and we debug it there.</p></div>
+    <div class="card"><span class="tag">Then</span><h3>Student, then expand</h3><p>Distil on mc021 (pass: nearly the teacher). Only then: all of AB01 (276 windows, ramps included) for teacher and student, then stage 1 from the student.</p></div>
   </div>
 </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 </div>
