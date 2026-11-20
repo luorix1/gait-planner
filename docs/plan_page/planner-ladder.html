@@ -942,7 +942,7 @@ table.kv td:first-child { width:150px }
     <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps</span></li>
     <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° vs teacher 5.83°</span></li>
     <li><span class="st">Done</span><b>Teacher, all AB01</b><span>276 windows. At 373M steps, from each window's start: 4 % fall, 98 % of each clip played, 5.2° (the 200M check: 5.9°, but falls only reached ≤ 10 % by ~230M)</span></li>
-    <li class="now"><span class="st">Missed</span><b>Distil, all AB01</b><span>90 min: student 6.5°, 35 % falls from random starts (teacher 4.9°, 2 %); from each window's start it falls in 84 % (teacher 4 %). Loss 10× mc021's. Next: tell an information gap from too little training</span></li>
+    <li class="now"><span class="st">Diagnosed</span><b>Distil, all AB01</b><span>L1 inputs only: 6.5°, 35 % falls (teacher 4.9°, 2 %). Same run with the teacher's inputs added: 4.87°, 1.9 %, i.e. the teacher. Cause: an information gap (the teacher acts on the clip), not training. Next: find which part of the clip, then fix</span></li>
     <li><span class="st">Then</span><b>Stage 1</b><span>from the student: command + style on curriculum ground</span></li>
     <li><span class="st">Then</span><b>The ladder</b><span>every rung starts from stage 1</span></li>
   </ol>
