@@ -7,6 +7,8 @@ ab01_mc025_w0
 ab01_mc030_w0
 # PARC capture: the fastest jump up onto the 0.58 m platform (4.4 m/s, +0.69 m), the fastest jump down (4.4 m/s,
 # -0.52 m), the deepest knee (150 deg, past the model's 140 deg limit).
+# Added 19 Nov (user): a milder climb, from rest, ~3.2 m/s at take-off, onto a 1.2 x 2.0 m block and off its far side.
+parc_platform_platform_003_w0
 parc_platform_platform_005_w0
 parc_platform_platform_007_w0
 parc_platform_platform_022_w0
