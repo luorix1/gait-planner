@@ -116,12 +116,13 @@ class StudentView(Pretrain):
             raise ValueError("a recipe clip is not among the student's clip tables (LadderConfig.style_modes)")
 
 
-def student_net(view: StudentView, env: Any, cfg: Any, obs_dim: int) -> ActorCritic:
-    """The network stage 1's PPO builds for the ladder task (PPO.__init__'s, all muscles)."""
+def student_net(view: StudentView, env: Any, cfg: Any, obs_dim: int, extra: int = 0) -> ActorCritic:
+    """The network stage 1's PPO builds for the ladder task (PPO.__init__'s, all muscles). ``extra``: that many more
+    actor inputs appended after L1's whole observation (--privileged: the teacher's)."""
     lo, hi = env_action_bounds(env, cfg.excitation_min)
+    cols = np.r_[np.arange(view.n_actor), np.arange(obs_dim - extra, obs_dim)].astype(np.int64)
     return ActorCritic(obs_dim, env.action_dim, cfg, action_low=lo, action_high=hi,
-                       initial_mean=[cfg.initial_action_mean] * env.action_dim,
-                       actor_cols=np.arange(view.n_actor, dtype=np.int64))
+                       initial_mean=[cfg.initial_action_mean] * env.action_dim, actor_cols=cols)
 
 
 def student_loc(net: ActorCritic, x_actor: torch.Tensor) -> torch.Tensor:
@@ -184,6 +185,9 @@ def main() -> None:
     ap.add_argument("--eval-steps", type=int, default=800)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--privileged", action="store_true",
+                    help="a diagnostic upper bound: the student also reads the teacher's whole observation (the clip "
+                         "included); its labels are kept in float16. Not loadable by stage 1")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
@@ -202,15 +206,17 @@ def main() -> None:
                        seed=a.seed, foot_model=a.foot_model)
     view.bind(env.model)
     view.attach(env, task)
-    obs_dim = sum(b[1] for b in view.blocks)
+    extra = env.obs_dim if a.privileged else 0
+    obs_dim = sum(b[1] for b in view.blocks) + extra
     scfg = replace(default_ppo(), rollout_steps=view.c.steps_per_iter)
-    S = student_net(view, env, scfg, obs_dim).to(view.dev)
+    S = student_net(view, env, scfg, obs_dim, extra).to(view.dev)
+    full = (lambda so, o: torch.cat([so, o], 1)) if a.privileged else (lambda so, o: so)  # noqa: E731
     with torch.no_grad():
         S.raw_std.copy_(T.raw_std)
     opt = torch.optim.Adam(S.pi.parameters(), lr=a.lr)
     seed_norm = RunningNorm(obs_dim, ema_decay=None).to(view.dev)
-    na, dev = view.n_actor, view.dev
-    bx = torch.zeros(a.buffer, na, device=dev)
+    na, dev = len(S.actor_cols), view.dev
+    bx = torch.zeros(a.buffer, na, device=dev, dtype=torch.float16 if a.privileged else torch.float32)
     by = torch.zeros(a.buffer, env.action_dim, device=dev)
     fill = head = 0
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent, capture_output=True, text=True).stdout.strip()
@@ -240,11 +246,11 @@ def main() -> None:
         with torch.no_grad():
             for _ in range(a.rollout):
                 if it < a.norm_iters:
-                    seed_norm.update(so)
+                    seed_norm.update(full(so, obs))
                 y = T.actor(obs)                                     # the teacher's pre-squash mean: the label
-                x = so[:, :na]
+                x = full(so, obs)[:, S.actor_cols]
                 bi = (head + torch.arange(a.worlds, device=dev)) % a.buffer
-                bx[bi], by[bi] = x, y
+                bx[bi], by[bi] = x.to(bx.dtype), y
                 head, fill = int((head + a.worlds) % a.buffer), min(fill + a.worlds, a.buffer)
                 act = torch.where(by_teacher[:, None], T._squash(y), S._squash(student_loc(S, x)))
                 obs, _, term, trunc, _ = env.step(act)
@@ -272,7 +278,7 @@ def main() -> None:
             S.norm.count.copy_(seed_norm.count)
         for _ in range(a.updates if it >= a.norm_iters else 0):
             j = torch.randint(fill, (a.batch,), device=dev)
-            loss = (student_loc(S, bx[j]) - by[j]).pow(2).mean()
+            loss = (student_loc(S, bx[j].float()) - by[j]).pow(2).mean()
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(S.pi.parameters(), 1.0)
@@ -299,7 +305,7 @@ def main() -> None:
     torch.save(dict(net=S.state_dict(), distilled_from=str(a.teacher), iterations=it), out / "checkpoint.pt")
     torch.save(dict(fpm=view.fpm.state_dict(), fpm_ready=True), out / "task_state.pt")
     S.eval()
-    res = dict(student=evaluate(env, task, view, lambda o, s: S._squash(student_loc(S, s[:, :na])), a.eval_steps),
+    res = dict(student=evaluate(env, task, view, lambda o, s: S._squash(student_loc(S, full(s, o)[:, S.actor_cols])), a.eval_steps),
                teacher=evaluate(env, task, view, lambda o, s: T.actor(o, squashed=True), a.eval_steps))
     (out / "eval.json").write_text(json.dumps(res, indent=1))
     record.update(finished=time.strftime("%Y-%m-%d %H:%M:%S"), iterations=it, eval=res)
