@@ -14,7 +14,7 @@ flags. GP_DATASET picks the dataset whose rules apply. The page can hide them al
 left to the source checkboxes. The joint-speed check reads every clip once; results are cached in
 seed_library/data/viewer_cache.json by file modification time.
 
-PARC clips carry a rough difficulty (easy/medium/hard and why, seed_viewer/difficulty.py).
+PARC, AB01 and Bones SEED clips carry a rough difficulty (easy/medium/hard and why, seed_viewer/difficulty.py).
 Clips can be flagged; flags go to seed_library/data/viewer_flags.json. SEED is confidential: the server binds to
 127.0.0.1 only, reads the library in place and copies nothing.
 
@@ -39,7 +39,7 @@ from gp import data  # noqa: E402
 HERE = Path(__file__).resolve().parent
 LIB = data.SEED                                            # seed_library/data/osim_export
 FLAGS = LIB.parent / "viewer_flags.json"
-LEVELS = LIB.parent / "viewer_difficulty.json"             # PARC only, written by seed_viewer/difficulty.py
+LEVELS = LIB.parent / "viewer_difficulty.json"             # PARC, AB01, SEED; written by seed_viewer/difficulty.py
 CACHE = LIB.parent / "viewer_cache.json"
 THREE = Path.home() / "Jinwoo/GaitStudio/sprint_studio/web/vendor/three"
 SEGMENTS = [("pelvis", "femur_l"), ("pelvis", "femur_r"), ("femur_l", "tibia_l"), ("femur_r", "tibia_r"),
