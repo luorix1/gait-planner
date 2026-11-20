@@ -935,8 +935,8 @@ table.kv td:first-child { width:150px }
 
 <section aria-labelledby="s-gap">
   <div class="sec-head">
-    <h2 id="s-gap">All of AB01: why the student failed, and the test now running</h2>
-    <p>On all 276 AB01 windows the student copied the teacher badly (6.5°, 35 % falls, against 4.9° and 2 %). The teacher acts on the clip it follows; the student never sees the clip, so it learns the average of the teacher's actions over the clips, and the average falls. The test running now gives the student only the part of the clip a footstep planner could supply.</p>
+    <h2 id="s-gap">All of AB01: why the student failed, and the plan test</h2>
+    <p>On all 276 AB01 windows the student copied the teacher badly (6.5°, 35 % falls, against 4.9° and 2 %). The teacher acts on the clip it follows; the student never sees the clip, so it learns the average of the teacher's actions over the clips, and the average falls. The plan test gives the student only the part of the clip a footstep planner could supply, and that recovers most of the gap.</p>
   </div>
   <div class="panel scroll">
     <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k frozen">frozen here (learned earlier)</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
@@ -981,7 +981,7 @@ table.kv td:first-child { width:150px }
   </div>
   <div class="panel scroll">
     <svg class="dia" viewBox="0 0 1200 316" role="img" aria-labelledby="mat-t" style="min-width:880px">
-      <title id="mat-t">What each network sees, of three kinds of information, and the result. Teacher: all three, 4.9 degrees and 2 percent falls. Earlier student: body only, 6.5 degrees and 35 percent. Test A: all three, 4.87 degrees and 1.9 percent, the teacher's level. Plan test, running: body and the plan, without the future pose.</title>
+      <title id="mat-t">What each network sees, of three kinds of information, and the result. Teacher: all three, 4.9 degrees and 2 percent falls. Earlier student: body only, 6.5 degrees and 35 percent. Test A: all three, 4.87 degrees and 1.9 percent, the teacher's level. Plan test: body and the plan, without the future pose: 5.44 degrees and 12.9 percent falls after 45 minutes.</title>
       <text class="lab" x="20" y="40" style="font-weight:600">network</text>
       <g text-anchor="middle" style="font:600 14px var(--body); fill:var(--ink)">
         <text x="430" y="32">own body, muscles,</text><text x="430" y="50">terrain near the feet</text>
@@ -1014,10 +1014,10 @@ table.kv td:first-child { width:150px }
         <text x="1050" y="101" fill="var(--ink)">4.9° · 2 % fall</text>
         <text x="1050" y="161" fill="var(--bad)">6.5° · 35 % fall</text>
         <text x="1050" y="221" fill="var(--good)">4.87° · 1.9 % fall</text>
-        <text x="1050" y="281" fill="var(--amber)">running</text>
+        <text x="1050" y="281" fill="var(--amber)">5.44° · 12.9 % fall</text>
       </g>
     </svg>
-    <p class="note">"Student" is the muscle policy, the only part trained here, plus the frozen foot placement estimator, which only chooses where the two terrain patches are read. The estimator works from the student's own body state and command, so it adds no information about the clip; with a plan it becomes redundant, and a planner would replace it (patches read at the planned footholds). In this test L1 is left unchanged, so the patches stay at the estimator's landings (flat on most AB01 windows). Same distillation in every student row (DAgger, the same teacher, network and budget); only the student's inputs differ. Test A reached the teacher's level in about 15 minutes, so training is not the limit. If the plan test also gets there, a footstep + COM plan carries what the student was missing, and the controller should take a plan from a planner. Runs distill_ab01, distill_ab01_privileged, distill_ab01_plan.</p>
+    <p class="note">"Student" is the muscle policy, the only part trained here, plus the frozen foot placement estimator, which only chooses where the two terrain patches are read. The estimator works from the student's own body state and command, so it adds no information about the clip; with a plan it becomes redundant, and a planner would replace it (patches read at the planned footholds). In this test L1 is left unchanged, so the patches stay at the estimator's landings (flat on most AB01 windows). Same distillation in every student row (DAgger, the same teacher, network and budget); only the student's inputs differ. Test A reached the teacher's level in about 15 minutes, so training is not the limit. The plan test (45 minutes, half the others' budget) closed most of the gap and was still improving when it stopped: falls in its last iterations were 8 %. From each window's first frame it falls in 33 % of the 276 windows, against 84 % with L1's inputs only and 4 % for the teacher. A footstep + COM plan carries most of what the student was missing. Runs distill_ab01, distill_ab01_privileged, distill_ab01_plan.</p>
   </div>
   <div class="panel scroll">
     <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k op">fixed computation</span><span class="k frozen">frozen network</span><span class="k sim">simulation / the world</span></div>
@@ -1072,7 +1072,7 @@ table.kv td:first-child { width:150px }
     <li><span class="st">Done</span><b>Teacher, mc021</b><span>6.1° at 50M steps</span></li>
     <li><span class="st">Done</span><b>Distil, mc021</b><span>student 6.05° vs teacher 5.83°</span></li>
     <li><span class="st">Done</span><b>Teacher, all AB01</b><span>276 windows. At 373M steps, from each window's start: 4 % fall, 98 % of each clip played, 5.2° (the 200M check: 5.9°, but falls only reached ≤ 10 % by ~230M)</span></li>
-    <li class="now"><span class="st">Diagnosed</span><b>Distil, all AB01</b><span>L1 inputs only: 6.5°, 35 % falls (teacher 4.9°, 2 %). Same run with the teacher's inputs added: 4.87°, 1.9 %, i.e. the teacher. Cause: an information gap (the teacher acts on the clip), not training. Next: find which part of the clip, then fix</span></li>
+    <li class="now"><span class="st">Diagnosed</span><b>Distil, all AB01</b><span>Information gap. Student falls per window: L1 inputs 84 %, L1 + the clip's footstep/COM plan 33 % (45 min, still improving), teacher 4 %. Next: a planner-fed controller</span></li>
     <li><span class="st">Then</span><b>Stage 1</b><span>from the student: command + style on curriculum ground</span></li>
     <li><span class="st">Then</span><b>The ladder</b><span>every rung starts from stage 1</span></li>
   </ol>
