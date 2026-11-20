@@ -1017,7 +1017,32 @@ table.kv td:first-child { width:150px }
         <text x="1050" y="281" fill="var(--amber)">running</text>
       </g>
     </svg>
-    <p class="note">Same distillation in every student row (DAgger, the same teacher, network and budget); only the student's inputs differ. Test A reached the teacher's level in about 15 minutes, so training is not the limit. If the plan test also gets there, a footstep + COM plan carries what the student was missing, and the controller should take a plan from a planner. Runs distill_ab01, distill_ab01_privileged, distill_ab01_plan.</p>
+    <p class="note">"Student" is the muscle policy, the only part trained here, plus the frozen foot placement estimator, which only chooses where the two terrain patches are read. The estimator works from the student's own body state and command, so it adds no information about the clip; with a plan it becomes redundant, and a planner would replace it (patches read at the planned footholds). In this test L1 is left unchanged, so the patches stay at the estimator's landings (flat on most AB01 windows). Same distillation in every student row (DAgger, the same teacher, network and budget); only the student's inputs differ. Test A reached the teacher's level in about 15 minutes, so training is not the limit. If the plan test also gets there, a footstep + COM plan carries what the student was missing, and the controller should take a plan from a planner. Runs distill_ab01, distill_ab01_privileged, distill_ab01_plan.</p>
+  </div>
+  <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k op">fixed computation</span><span class="k sim">simulation / the world</span></div>
+    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="rt-t" style="min-width:880px">
+      <title id="rt-t">At run time there is no clip. The command, the terrain map and the body state go to the planner, which replans a few times a second: the next footholds with their timing and the centre-of-mass path for about one second. Every 25 ms the muscle policy reads that plan relative to its pelvis, terrain patches at the planned footholds and its own senses, and drives the 90 muscles; the body's new state feeds the planner and the policy again.</title>
+      <defs><marker id="rw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+      <text x="600" y="22" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--blue)">AT RUN TIME (PLANNER VERSION) · NO CLIP</text>
+      <path class="w" d="M200 70 H272.5" marker-end="url(#rw)"/>
+      <path class="w" d="M200 145 H236 V95 H272.5" marker-end="url(#rw)"/>
+      <path class="w" d="M990 301 H250 V120 H272.5" marker-end="url(#rw)"/><text class="lab" x="600" y="292" text-anchor="middle">body state, every 25 ms</text>
+      <path class="w" d="M500 90 H572.5" marker-end="url(#rw)"/><text class="lab" x="536" y="80" text-anchor="middle">plan</text>
+      <path class="w" d="M690 130 V172.5" marker-end="url(#rw)"/><text class="lab" x="702" y="158">planned footholds</text>
+      <path class="w" d="M800 90 H860 V160 H882.5" marker-end="url(#rw)"/>
+      <path class="w" d="M800 211 H882.5" marker-end="url(#rw)"/><text class="lab" x="842" y="201" text-anchor="middle">patches</text>
+      <path class="w" d="M1140 240 V272.5" marker-end="url(#rw)"/><text class="lab" x="1152" y="262">90</text>
+      <path class="w" d="M1030 280 V247.5" marker-end="url(#rw)"/><text class="lab" x="1018" y="266" text-anchor="end">senses</text>
+      <g class="fn obs"><rect x="20" y="40" width="180" height="60" rx="12"/><text class="t1" x="110" y="66" style="font-size:16px">Command</text><text class="t2" x="110" y="86">speed, turn (user)</text></g>
+      <g class="fn sim"><rect x="20" y="115" width="180" height="55" rx="12"/><text class="t1" x="110" y="139" style="font-size:16px">Terrain map</text><text class="t2" x="110" y="158">the ground ahead</text></g>
+      <g class="fn pol"><rect x="280" y="45" width="220" height="90" rx="12"/><text class="t1" x="390" y="76">Planner</text><text class="t2" x="390" y="100">replans 2–5× a second</text><text class="t2" x="390" y="120">trained on human clips</text></g>
+      <g class="fn obs"><rect x="580" y="45" width="220" height="85" rx="12"/><text class="t1" x="690" y="74">Plan, next ~1 s</text><text class="t2" x="690" y="98">footholds + timing,</text><text class="t2" x="690" y="118">COM path</text></g>
+      <g class="fn op"><rect x="580" y="180" width="220" height="62" rx="12"/><text class="t1" x="690" y="206" style="font-size:16px">Patch lookup</text><text class="t2" x="690" y="228">7 × 7 heights at each</text></g>
+      <g class="fn pol"><rect x="890" y="140" width="290" height="100" rx="12"/><text class="t1" x="1035" y="172">Muscle policy (40 Hz)</text><text class="t2" x="1035" y="196">plan, patches, own senses</text><text class="t2" x="1035" y="216">and muscle states</text></g>
+      <g class="fn sim"><rect x="990" y="280" width="190" height="42" rx="10"/><text class="t1" x="1085" y="307" style="font-size:16px">Body (90 muscles)</text></g>
+    </svg>
+    <p class="note">The planner is the foot placement estimator grown up: the same body state and command as input, plus the terrain, and as output the next footholds with timing and the centre-of-mass path instead of one landing per foot; its plan goes into the muscle policy, not only into where the patches are read. Both are trained from human clips. In distillation the plan comes from the clip; before deployment the policy is trained once more on the planner's own plans (DAgger or stage 1), so it copes with imperfect ones. Without a planner (L1 as built), the estimator places the patches and the policy has state, command and patches only, which is what failed on all of AB01.</p>
   </div>
 </section>
 
