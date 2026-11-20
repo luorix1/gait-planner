@@ -75,10 +75,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const SHOW = ["⚑", "name", "source", "mode_src", "terrain_class", "seconds", "ik_cm", "skate_cms", "worst_sole_cm", "out_of_range_pct", "hip_excess_deg", "toe_stuck_pct", "joint_speed", "speed_mps", "grade_deg", "not_used"];
+const SHOW = ["⚑", "name", "difficulty", "source", "mode_src", "terrain_class", "seconds", "ik_cm", "skate_cms", "worst_sole_cm", "out_of_range_pct", "hip_excess_deg", "toe_stuck_pct", "joint_speed", "speed_mps", "grade_deg", "not_used"];
 // debug thresholds: worse than every source's p95 in seed_bones_QA.md, roughly
-const BAD = { ik_cm: v => v > 2.2, skate_cms: v => v > 5, worst_sole_cm: v => v < -2.5, out_of_range_pct: v => v > 20, hip_excess_deg: v => v > 10, toe_stuck_pct: v => v > 10, joint_speed: v => v > 20 };
-const TIP = { ik_cm: "IK marker rms (cm), red > 2.2", skate_cms: "flat-foot skate (cm/s), red > 5", worst_sole_cm: "worst model contact sphere vs terrain (cm), red < -2.5", out_of_range_pct: "frames with a coordinate out of its range (%), red > 20", hip_excess_deg: "hip rotation past its range (deg, SEED only), red > 10", toe_stuck_pct: "toe stuck frames (%), red > 10", joint_speed: "fastest joint after the dataset build's low-pass (rad/s); the build drops clips > 20", not_used: "why the dataset build leaves it out, or your flag" };
+const BAD = { difficulty: v => v === "hard", ik_cm: v => v > 2.2, skate_cms: v => v > 5, worst_sole_cm: v => v < -2.5, out_of_range_pct: v => v > 20, hip_excess_deg: v => v > 10, toe_stuck_pct: v => v > 10, joint_speed: v => v > 20 };
+const TIP = { ik_cm: "IK marker rms (cm), red > 2.2", skate_cms: "flat-foot skate (cm/s), red > 5", worst_sole_cm: "worst model contact sphere vs terrain (cm), red < -2.5", out_of_range_pct: "frames with a coordinate out of its range (%), red > 20", hip_excess_deg: "hip rotation past its range (deg, SEED only), red > 10", toe_stuck_pct: "toe stuck frames (%), red > 10", joint_speed: "fastest joint after the dataset build's low-pass (rad/s); the build drops clips > 20", not_used: "why the dataset build leaves it out, or your flag", difficulty: "PARC only, rough: speed at each 0.6 m level change, cuts at speed, top speed, knee past 140 deg, flight (hover a cell for why)" };
 
 let cols, rows, flags = {}, view = [], sortKey = "name", sortDir = 1, sel = null, clip = null;
 const C = (r, k) => r[cols.indexOf(k)];
@@ -114,7 +114,7 @@ function refresh() {
   $("body").innerHTML = shown.map((r, n) => `<tr data-n="${n}" class="${reason(r) ? "rej" : ""} ${r === sel ? "sel" : ""}">` + SHOW.map(k => {
     if (k === "⚑") return `<td class="flag" title="${(flags[C(r, "name")] || "").replace(/"/g, "&quot;")}">${C(r, "name") in flags ? "⚑" : ""}</td>`;
     const v = k === "not_used" ? reason(r) : C(r, k); const bad = v != null && BAD[k] && BAD[k](v);
-    return `<td class="${bad ? "bad" : ""}" title="${k === "not_used" || k === "name" ? String(v || "").replace(/"/g, "&quot;") : ""}">${v == null ? "" : v}</td>`; }).join("") + "</tr>").join("");
+    return `<td class="${bad ? "bad" : ""}" title="${k === "not_used" || k === "name" ? String(v || "").replace(/"/g, "&quot;") : k === "difficulty" ? String(C(r, "difficulty_why") || "").replace(/"/g, "&quot;") : ""}">${v == null ? "" : v}</td>`; }).join("") + "</tr>").join("");
   $("body").onclick = (e) => { const tr = e.target.closest("tr"); if (tr) pick(view[+tr.dataset.n]); };
 }
 
@@ -257,6 +257,7 @@ async function pick(r) {
   buildClip(c); pose(0);
   const m = c.meta, skip = new Set(["license"]);
   $("meta").innerHTML = `<b>terrain</b> ${JSON.stringify(c.terrain)}<br>`
+    + (C(r, "difficulty") ? `<b>difficulty</b> ${C(r, "difficulty")}: ${C(r, "difficulty_why")}<br>` : "")
     + (reason(r) ? `<b style="color:var(--bad)">not used</b> ${reason(r)}<br>` : "") + Object.entries(m).filter(([k]) => !skip.has(k)).map(([k, v]) => `<b>${k}</b> ${typeof v === "number" ? +v.toFixed(4) : v}`).join(" · ");
   $("flag").classList.toggle("on", C(r, "name") in flags);
 }

@@ -14,6 +14,7 @@ flags. GP_DATASET picks the dataset whose rules apply. The page can hide them al
 left to the source checkboxes. The joint-speed check reads every clip once; results are cached in
 seed_library/data/viewer_cache.json by file modification time.
 
+PARC clips carry a rough difficulty (easy/medium/hard and why, seed_viewer/difficulty.py).
 Clips can be flagged; flags go to seed_library/data/viewer_flags.json. SEED is confidential: the server binds to
 127.0.0.1 only, reads the library in place and copies nothing.
 
@@ -38,6 +39,7 @@ from gp import data  # noqa: E402
 HERE = Path(__file__).resolve().parent
 LIB = data.SEED                                            # seed_library/data/osim_export
 FLAGS = LIB.parent / "viewer_flags.json"
+LEVELS = LIB.parent / "viewer_difficulty.json"             # PARC only, written by seed_viewer/difficulty.py
 CACHE = LIB.parent / "viewer_cache.json"
 THREE = Path.home() / "Jinwoo/GaitStudio/sprint_studio/web/vendor/three"
 SEGMENTS = [("pelvis", "femur_l"), ("pelvis", "femur_r"), ("femur_l", "tibia_l"), ("femur_r", "tibia_r"),
@@ -45,7 +47,7 @@ SEGMENTS = [("pelvis", "femur_l"), ("pelvis", "femur_r"), ("femur_l", "tibia_l")
             ("calcn_l", "toes_l"), ("calcn_r", "toes_r"), ("pelvis", "torso"), ("torso", "head")]
 COLS = ["name", "source", "subject", "mode", "mode_src", "terrain_class", "seconds", "exported", "not_used", "file",
         "ik_cm", "skate_cms", "worst_sole_cm", "out_of_range_pct", "hip_excess_deg", "toe_stuck_pct", "speed_mps",
-        "grade_deg", "uses_hands", "joint_speed"]
+        "grade_deg", "uses_hands", "joint_speed", "difficulty", "difficulty_why"]
 
 
 def _num(v, k=1.0, nd=2):
@@ -108,6 +110,7 @@ def not_used(r: dict, speed: float | str | None) -> str:
 def index(names: list[str]) -> list[list]:
     man = [r for f in sorted(LIB.glob("manifest_*.json")) for r in json.loads(f.read_text())]
     speed = joint_speeds([r["file"] for r in man if r.get("exported") and r.get("file")], names)
+    levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
     rows = []
     for r in man:
         rows.append([r["name"], r.get("source"), r.get("subject"), r.get("mode"), r.get("mode_src"),
@@ -116,7 +119,8 @@ def index(names: list[str]) -> list[list]:
                      _num(r.get("ik_rms_m"), 100), _num(r.get("skate"), 100), _num(r.get("model_worst_contact_sole_m"), 100),
                      _num(r.get("coord_out_of_range_frac"), 100, 1), _num(r.get("hip_rotation_excess_deg"), 1, 1),
                      _num(r.get("toe_stuck_frac"), 100, 1), _num(r.get("speed_path_mps")), _num(r.get("grade_deg"), 1, 1),
-                     bool(r.get("uses_hands")), sp if isinstance(sp := speed.get(r.get("file")), float) else None])
+                     bool(r.get("uses_hands")), sp if isinstance(sp := speed.get(r.get("file")), float) else None,
+                     *levels.get(r["name"], [None, None])])
     return rows
 
 
