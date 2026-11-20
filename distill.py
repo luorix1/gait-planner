@@ -157,6 +157,17 @@ def plan_inputs(task: Any, D: dict[str, Any]) -> Any:
     return f
 
 
+def student_inputs(env: Any, task: Any, D: dict[str, Any], privileged: bool, plan: bool) -> tuple[int, Any]:
+    """(extra actor inputs, ``full(so, teacher_obs) -> the student's whole observation``): L1's, then the teacher's
+    observation (--privileged) or the clip's plan (--plan)."""
+    if privileged:
+        return env.obs_dim, lambda so, o: torch.cat([so, o], 1)
+    if plan:
+        f = plan_inputs(task, D)
+        return 15 * len(task.taps), lambda so, o: torch.cat([so, f(env.state)], 1)
+    return 0, lambda so, o: so
+
+
 def evaluate(env: Any, task: Any, view: StudentView, act: Any, steps: int) -> dict[str, float]:
     """Every world driven by ``act(teacher_obs, student_obs) -> excitation`` for ``steps`` control steps from fresh
     recipe starts: ended episodes' length and fall share, joint error over all steps."""
@@ -213,6 +224,8 @@ def main() -> None:
     ap.add_argument("--privileged", action="store_true",
                     help="a diagnostic upper bound: the student also reads the teacher's whole observation (the clip "
                          "included); its labels are kept in float16. Not loadable by stage 1")
+    ap.add_argument("--init-from", default="", help="a distill.py run with the same inputs: start from its student "
+                    "(weights and normaliser), no normaliser iterations, the student drives every episode (beta 0)")
     ap.add_argument("--plan", action="store_true",
                     help="the student also reads the clip's plan (plan_inputs: footholds with timing and the centre of "
                          "mass at the lookahead taps, no pose): is a footstep + COM plan enough? Not loadable by stage 1")
@@ -234,19 +247,15 @@ def main() -> None:
                        seed=a.seed, foot_model=a.foot_model)
     view.bind(env.model)
     view.attach(env, task)
-    plan = plan_inputs(task, D) if a.plan else None
-    extra = env.obs_dim if a.privileged else 15 * len(task.taps) if a.plan else 0
+    extra, full = student_inputs(env, task, D, a.privileged, a.plan)
     obs_dim = sum(b[1] for b in view.blocks) + extra
     scfg = replace(default_ppo(), rollout_steps=view.c.steps_per_iter)
     S = student_net(view, env, scfg, obs_dim, extra).to(view.dev)
-
-    def full(so: torch.Tensor, o: torch.Tensor) -> torch.Tensor:
-        """The student's whole observation: L1's, then any --privileged / --plan extra."""
-        if a.privileged:
-            return torch.cat([so, o], 1)
-        return torch.cat([so, plan(env.state)], 1) if plan is not None else so
     with torch.no_grad():
         S.raw_std.copy_(T.raw_std)
+    if a.init_from:                              # resume: its weights and normaliser; the student drives from the start
+        S.load_state_dict(torch.load(Path(a.init_from) / "checkpoint.pt", map_location=view.dev, weights_only=False)["net"])
+        a.norm_iters = 0
     opt = torch.optim.Adam(S.pi.parameters(), lr=a.lr)
     seed_norm = RunningNorm(obs_dim, ema_decay=None).to(view.dev)
     na, dev = len(S.actor_cols), view.dev
@@ -266,15 +275,20 @@ def main() -> None:
     obs = env.torch(env.reset())
     view.new_episode(torch.ones(a.worlds, dtype=torch.bool, device=dev))
     so = view.observe(env.state)
-    by_teacher = torch.ones(a.worlds, dtype=torch.bool, device=dev)
+    by_teacher = torch.full((a.worlds,), not a.init_from, dtype=torch.bool, device=dev)
     t_ep = torch.zeros(a.worlds, device=dev)
     f = (out / "progress.csv").open("w", buffering=1)
     tb = SummaryWriter(out / "tb", flush_secs=30)
     w: csv.DictWriter | None = None
     start, it = time.time(), 0
-    deadline = start + a.minutes * 60
+    deadline, saved = start + a.minutes * 60, start
+
+    def save(it: int) -> None:
+        """As stage 1 loads it (train_wys.py --init-from)."""
+        torch.save(dict(net=S.state_dict(), distilled_from=str(a.teacher), iterations=it), out / "checkpoint.pt")
+        torch.save(dict(fpm=view.fpm.state_dict(), fpm_ready=True), out / "task_state.pt")
     while time.time() < deadline:
-        beta = min(1.0, max(0.0, 1.0 - (it - a.norm_iters) / max(a.beta_iters, 1)))
+        beta = 0.0 if a.init_from else min(1.0, max(0.0, 1.0 - (it - a.norm_iters) / max(a.beta_iters, 1)))
         ended = {"s_ep": 0, "s_fell": 0, "s_len": 0.0}
         s_err, t_err, loss_sum = [], [], 0.0
         with torch.no_grad():
@@ -332,12 +346,13 @@ def main() -> None:
         for k, v in row.items():
             if k != "iteration" and isinstance(v, (int, float)) and math.isfinite(v):
                 tb.add_scalar(k, v, it)
+        if time.time() - saved > 600:            # every 10 min, so a dead session keeps the latest student
+            save(it)
+            saved = time.time()
         if it % 10 == 1:
             print("  ".join(f"{k} {v:.4g}" if isinstance(v, float) else f"{k} {v}" for k, v in row.items()), flush=True)
     tb.close()
-    # save as stage 1 loads it (train_wys.py --init-from)
-    torch.save(dict(net=S.state_dict(), distilled_from=str(a.teacher), iterations=it), out / "checkpoint.pt")
-    torch.save(dict(fpm=view.fpm.state_dict(), fpm_ready=True), out / "task_state.pt")
+    save(it)
     S.eval()
     res = dict(student=evaluate(env, task, view, lambda o, s: S._squash(student_loc(S, full(s, o)[:, S.actor_cols])), a.eval_steps),
                teacher=evaluate(env, task, view, lambda o, s: T.actor(o, squashed=True), a.eval_steps))
