@@ -41,14 +41,22 @@ def main() -> None:
     ap.add_argument("--modes", default="walk,start_stop,stand")
     ap.add_argument("--holdout", type=int, default=10)
     ap.add_argument("--pose", action="store_true", help="full-pose planner: plan + pelvis + every joint coordinate")
+    ap.add_argument("--pose2", action="store_true", help="full-pose planner v2 (gp.pose_planner): absolute heights, "
+                    "foot points + contact losses, goal guidance, smoothed heading")
+    ap.add_argument("--contact-w", type=float, default=0.1, help="--pose2: weight of each geometric loss")
+    ap.add_argument("--goal-drop", type=float, default=0.1, help="--pose2: share of training windows without the goal")
     ap.add_argument("--balance", action="store_true", help="batches by gp.data.clip_weights(D, 'sqrt'), not uniform")
     ap.add_argument("--seed-cleared", action="store_true", help="allow Bones SEED clips in a --pose planner "
                     "(its licence forbids motion generators unless cleared)")
+    ap.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True,
+                    help="bfloat16 autocast for the network (2x faster on a 4090; the weights and EMA stay fp32)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                      # a fresh folder per run, never overwrite one
     torch.manual_seed(0)
+    torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = True
+    amp = torch.autocast("cuda", dtype=torch.bfloat16, enabled=a.bf16 and a.device.startswith("cuda"))
     if a.dataset:
         D = load_clips(a.dataset, "", a.modes)
         trial = [str(n).rsplit("_", 1)[0] for n in D["name"]]
@@ -57,11 +65,20 @@ def main() -> None:
         (out / "held_out_trials.txt").write_text("\n".join(sorted(held)) + "\n")
     else:
         Dtr, Dte = data.load("train"), data.load(("test_trial", "test_terrain"))
-    if a.pose and not a.seed_cleared and "seed_bones" in set(map(str, Dtr["source"])):
+    if (a.pose or a.pose2) and not a.seed_cleared and "seed_bones" in set(map(str, Dtr["source"])):
         raise SystemExit("Bones SEED in a motion generator needs --seed-cleared (licence section 6)")
-    W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
+    if a.pose2:
+        from gp import footfk
+        from gp.pose_planner import PosePlanner
+        from gp.pose_planner import Windows as Windows2
+        fk = footfk.fit(Dtr, a.device, data.ROOT / "data" / "foot_fk.pt")
+        W, Wt = Windows2(Dtr, a.device, fk, a.balance), Windows2(Dte, a.device, fk)
+    else:
+        W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
-    planner = Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device)
+    planner = (PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
+                           goal_drop=a.goal_drop).to(a.device).attach(fk) if a.pose2
+               else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
     gen = torch.Generator(device=a.device).manual_seed(1)
@@ -70,7 +87,8 @@ def main() -> None:
     tb = SummaryWriter(out / "tb", flush_secs=30)
     t0, run, best = time.time(), 0.0, float("inf")
     for it in range(1, a.iters + 1):
-        loss = planner.loss(*W.batch(a.batch))
+        with amp:
+            loss = planner.loss(*W.batch(a.batch))
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(planner.net.parameters(), 1.0)
@@ -82,18 +100,21 @@ def main() -> None:
         run = 0.99 * run + 0.01 * float(loss.detach()) if it > 1 else float(loss.detach())
         if it % 100 == 0:
             tb.add_scalar("loss/train", run, it)
+            for k, v in getattr(planner, "parts", {}).items():
+                tb.add_scalar(f"parts/{k}", v, it)
         if it % 500 == 0 or it == a.iters:
-            with torch.no_grad():
+            with torch.no_grad(), amp:
                 held = float(planner.loss(*Wt.batch(2048, gen, mirrored=False)))
             log.writerow([it, round(time.time() - t0), round(run, 5), round(held, 5)])
             tb.add_scalar("loss/held_out", held, it)
-            print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
+            parts = "  ".join(f"{k} {v:.4f}" for k, v in getattr(planner, "parts", {}).items())
+            print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}  {parts}", flush=True)
             if held < best:
                 best = held
                 planner.save(out / "planner_best.pt", iters=it, held_out=held, data=a.dataset or str(data.OUT),
-                             mirrored=True, pose=a.pose)
+                             mirrored=True, pose=a.pose, pose2=a.pose2)
         if it % 2000 == 0 or it == a.iters:
-            planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose)
+            planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
     tb.close()
 
 

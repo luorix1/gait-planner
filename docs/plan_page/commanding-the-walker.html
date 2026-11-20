@@ -3,21 +3,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: wide lab-notebook page (same tokens as the planner pages); why in three cards, how in four diagrams. */
+/* Layout: wide lab-notebook page (same tokens as the planner pages); why in three cards, how in diagrams. */
 :root {
   --paper:#F4F6F9; --panel:#FFFFFF; --ink:#1B2633; --muted:#55606D; --line:#D5DDE7; --wire:#7C8895;
   --blue:#2F6FB0; --blue-soft:#E6EEF8; --teal:#1F8A86; --teal-soft:#DDF1EF; --amber:#C98A1E; --amber-soft:#F7EBD4;
-  --grey-soft:#EEF1F5;
+  --bad:#C0463A; --grey-soft:#EEF1F5; --terrain:#DFE5EC; --ghost:#B9C3CF;
   --display:"Space Grotesk", "Segoe UI", system-ui, sans-serif; --body:"Inter", system-ui, -apple-system, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
   --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
-  --grey-soft:#1C2530; color-scheme:dark } }
+  --bad:#EC7F72; --grey-soft:#1C2530; --terrain:#243040; --ghost:#3E4C5B; color-scheme:dark } }
 :root[data-theme="dark"] {
   --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
   --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
-  --grey-soft:#1C2530; color-scheme:dark }
+  --bad:#EC7F72; --grey-soft:#1C2530; --terrain:#243040; --ghost:#3E4C5B; color-scheme:dark }
 body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
   padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 64px }
 .wrap { max-width:1320px; margin:0 auto; display:grid; gap:56px }
@@ -30,6 +30,10 @@ input:focus-visible { outline:3px solid var(--blue); outline-offset:3px }
 .eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
 header { display:grid; gap:14px; max-width:900px }
 .lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:62ch }
+.chips { display:flex; flex-wrap:wrap; gap:8px }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; font-size:14px; font-weight:500; border:1px solid var(--line); background:var(--panel) }
+.chip i { width:9px; height:9px; border-radius:50%; background:var(--blue) }
+.chip.next i { background:transparent; border:2px solid var(--blue); width:7px; height:7px }
 section { display:grid; gap:18px }
 .sec-head { display:grid; gap:6px; max-width:860px }
 .sec-head p { color:var(--muted); max-width:70ch }
@@ -38,8 +42,11 @@ section { display:grid; gap:18px }
 svg.dia { width:100%; height:auto; display:block }
 .dia-wide { min-width:860px }
 .cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px }
-.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:6px; align-content:start; min-width:0 }
+.grid2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:8px; align-content:start; min-width:0 }
 .card p { color:var(--muted); font-size:15px }
+.card .tag { font:600 12px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--blue) }
+.card svg { width:100%; height:auto; display:block; background:var(--grey-soft); border-radius:8px }
 
 .n { fill:var(--panel); stroke:var(--line); stroke-width:1.5 }
 .n.hl { fill:var(--blue-soft); stroke:var(--blue) }
@@ -50,11 +57,16 @@ svg.dia { width:100%; height:auto; display:block }
 .tm { fill:var(--muted); font:500 11.5px var(--mono) }
 .tb { fill:var(--blue); font:600 12.5px var(--body) }
 .tt { fill:var(--teal); font:600 12.5px var(--body) }
+.ta { fill:var(--amber); font:600 12.5px var(--body) }
+.tw { fill:#FFFFFF; font:600 12.5px var(--body) }
 .ar { fill:none; stroke:var(--wire); stroke-width:2 }
-.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) }
-.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) }
+.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) } .ar.amb { stroke:var(--amber) }
+.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) } .mk.amb { fill:var(--amber) }
 .cell-h { fill:var(--ink) } .cell-f { fill:var(--blue) }
 .grid-line { stroke:var(--line); stroke-width:1 }
+.gfill { fill:var(--terrain); stroke:var(--wire); stroke-width:2; stroke-linejoin:round }
+.bone { fill:none; stroke:var(--ghost); stroke-width:5; stroke-linecap:round; stroke-linejoin:round }
+.head { fill:var(--panel); stroke:var(--ghost); stroke-width:3 }
 
 .cmd { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr); gap:24px; align-items:center }
 .cmd > * { min-width:0 }
@@ -67,15 +79,19 @@ svg.dia { width:100%; height:auto; display:block }
 .readout span { font-size:13.5px; color:var(--muted) }
 
 @media (max-width:980px) { .cmd { grid-template-columns:1fr } }
-@media (max-width:700px) { .cards { grid-template-columns:1fr } }
+@media (max-width:760px) { .cards, .grid2 { grid-template-columns:1fr } }
 </style>
 
 <div class="wrap">
 
 <header>
-  <span class="eyebrow">gait_planner · baseline</span>
+  <span class="eyebrow">gait_planner · full-pose planner</span>
   <h1>A planner that sketches motion, a muscle policy that carries it out</h1>
   <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only the pelvis, foot and trunk targets from it.</p>
+  <div class="chips">
+    <span class="chip"><i></i>Plain planner, 17 h of motion: training, done ~7:50 pm</span>
+    <span class="chip next"><i></i>This design (v2): starts after it, done ~10:15 pm</span>
+  </div>
 </header>
 
 <section>
@@ -95,7 +111,7 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="eyebrow">How · the planner</span>
     <h2>One window in, 1.2 seconds out</h2>
-    <p>Everything is relative to the body at "now": positions from its centre of mass, directions from where it faces.</p>
+    <p>Positions are relative to the pelvis at "now" and its smoothed heading. Heights are measured from the ground directly underneath.</p>
   </div>
   <div class="panel scroll">
     <svg class="dia dia-wide" viewBox="0 0 1280 320" role="img" aria-label="Inputs: 0.4 s of history, a ground height patch and a goal point go into the diffusion model, which outputs 1.2 s of whole-body motion.">
@@ -109,7 +125,7 @@ svg.dia { width:100%; height:auto; display:block }
       <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m</text>
       <g id="patch"></g>
       <text class="t" x="20" y="272">Goal</text>
-      <text class="ts" x="20" y="292">centre of mass in 1.2 s</text>
+      <text class="ts" x="20" y="292">pelvis position in 1.2 s</text>
       <circle cx="300" cy="282" r="9" fill="none" stroke="var(--teal)" stroke-width="3"/><circle cx="300" cy="282" r="3" fill="var(--teal)"/>
 
       <path class="ar" d="M372,70 C440,70 440,165 486,165" marker-end="url(#ah)"/>
@@ -124,10 +140,98 @@ svg.dia { width:100%; height:auto; display:block }
 
       <text class="t" x="792" y="34">Next 1.2 s of motion</text>
       <g id="fut"></g>
-      <text class="tb" x="792" y="270">feet, footholds, COM, pelvis</text>
-      <text class="ts" x="1000" y="270">joint angles</text>
-      <text class="ts" x="792" y="300">blue rows reach the muscle policy; grey rows are generated and dropped</text>
+      <text class="ts" x="792" y="300">24 frames at 20 Hz, 45 numbers each</text>
     </svg>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia dia-wide" viewBox="0 0 1280 150" role="img" aria-label="The 45 numbers of a frame: 4 contact flags, 4 foothold numbers, 3 pelvis position numbers and 5 heading and tilt numbers reach the muscle policy; 17 joint angles and 12 foot point numbers stay in the planner.">
+      <g id="frameBar"></g>
+      <rect x="20" y="118" width="14" height="14" rx="3" fill="var(--blue)"/><text class="ts" x="42" y="130">reaches the muscle policy</text>
+      <rect x="230" y="118" width="14" height="14" rx="3" fill="var(--wire)" opacity=".45"/><text class="ts" x="252" y="130">stays in the planner: shapes the motion, then dropped</text>
+    </svg>
+  </div>
+</section>
+
+<!-- four design choices -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · what keeps it physical</span>
+    <h2>Four design choices</h2>
+    <p>Borrowed from large motion models (Kimodo, MotionBricks) and sized for our data.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Side view on a slope: the pelvis height and each foot point's height are measured to the ground directly below them.">
+        <defs><marker id="ahA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <path class="gfill" d="M0,205 L180,205 L420,150 L520,150 L520,230 L0,230 Z"/>
+        <path class="bone" d="M250,92 L258,30"/><circle class="head" cx="260" cy="16" r="11"/>
+        <path class="bone" d="M250,92 L262,140 L270,181"/><path class="bone" d="M250,92 L232,138 L214,190" opacity=".7"/>
+        <circle cx="250" cy="92" r="7" fill="var(--blue)"/>
+        <path class="ar blue" d="M250,100 V184" marker-end="url(#ahA)" stroke-dasharray="5 4"/>
+        <text class="tb" x="140" y="140">pelvis height</text>
+        <circle cx="272" cy="179" r="5" fill="var(--blue)"/><circle cx="212" cy="192" r="5" fill="var(--blue)"/>
+        <text class="ts" x="300" y="172">each foot point: height over</text>
+        <text class="ts" x="300" y="187">the ground below it</text>
+      </svg>
+      <span class="tag">1 · Absolute heights</span>
+      <h3>Heights from the ground, not from the body</h3>
+      <p>The pelvis and every foot point carry their height above the terrain directly below. The floor can't drift away between replans.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Foot points predicted directly must match the foot points computed from the predicted joint angles; a point on the ground in the data must stay put.">
+        <defs><marker id="ahT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect x="0" y="190" width="520" height="40" fill="var(--terrain)"/><line x1="0" y1="190" x2="520" y2="190" stroke="var(--wire)" stroke-width="2"/>
+        <!-- left: consistency -->
+        <path class="bone" d="M120,30 L132,100 L124,168" /><path d="M110,172 L160,180" class="bone"/>
+        <circle cx="112" cy="173" r="6" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle cx="152" cy="179" r="6" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
+        <circle cx="116" cy="168" r="5" fill="var(--teal)"/><circle cx="157" cy="172" r="5" fill="var(--teal)"/>
+        <text class="ts" x="20" y="30">from the joints</text><text class="ts" x="20" y="46">(open circles)</text>
+        <text class="tt" x="176" y="150">predicted directly</text>
+        <text class="tt" x="176" y="166">must agree</text>
+        <!-- right: stance -->
+        <rect x="350" y="180" width="70" height="10" rx="3" fill="var(--blue)"/>
+        <path class="ar" d="M350,150 H440" marker-end="url(#ahT)" style="stroke:var(--wire)"/>
+        <path d="M384,136 L406,160 M406,136 L384,160" stroke="var(--bad)" stroke-width="3" stroke-linecap="round"/>
+        <text class="ts" x="320" y="110">on the ground in the data:</text>
+        <text class="ts" x="320" y="126">stays put, stays at ground height</text>
+      </svg>
+      <span class="tag">2 · Foot points + contact losses</span>
+      <h3>Feet that agree with the joints and stay planted</h3>
+      <p>The planner also outputs heel and ball positions. Training checks them against the feet computed from its own joint angles, and holds still any point the data has on the ground.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Guidance: the no-goal prediction, the goal prediction, and the guided result twice as far along the same direction.">
+        <defs><marker id="ahG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahG2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <circle cx="90" cy="170" r="9" fill="var(--wire)"/>
+        <text class="ts" x="40" y="200">no-goal prediction</text>
+        <path class="ar" d="M98,164 L240,104" marker-end="url(#ahG2)"/>
+        <circle cx="250" cy="100" r="9" fill="var(--blue)"/>
+        <text class="tb" x="190" y="84">with the goal</text>
+        <path class="ar tl" d="M258,96 L400,36" marker-end="url(#ahG)" stroke-dasharray="6 5" style="stroke-width:2.5"/>
+        <circle cx="410" cy="32" r="10" fill="none" stroke="var(--teal)" stroke-width="3"/>
+        <text class="tt" x="330" y="70">guided, w = 2</text>
+        <text class="ts" x="300" y="170">training hides the goal</text>
+        <text class="ts" x="300" y="186">10 % of the time, so one</text>
+        <text class="ts" x="300" y="202">network learns both</text>
+      </svg>
+      <span class="tag">3 · Goal guidance</span>
+      <h3>Follow the command more firmly</h3>
+      <p>Each step predicts with and without the goal and pushes twice as far toward the goal. Rare fast commands stop drifting back to the average speed.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Pelvis yaw swings with each step; the anchor heading is its one-second average.">
+        <line x1="30" y1="200" x2="500" y2="200" stroke="var(--wire)" stroke-width="1.5"/>
+        <text class="tm" x="30" y="220">time</text>
+        <path id="wiggle" fill="none" stroke="var(--wire)" stroke-width="2.5"/>
+        <path id="smooth" fill="none" stroke="var(--blue)" stroke-width="3.5"/>
+        <text class="ts" x="40" y="40">pelvis heading swings with every step</text>
+        <text class="tb" x="40" y="60">anchor heading: its 1-second average</text>
+      </svg>
+      <span class="tag">4 · Smoothed heading</span>
+      <h3>A steady frame to plan in</h3>
+      <p>Each plan is laid out along the pelvis heading averaged over the last second, not its momentary yaw, so replans don't twist with every step.</p>
+    </div>
   </div>
 </section>
 
@@ -136,13 +240,13 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="eyebrow">How · commanding it</span>
     <h2>A command is a goal point</h2>
-    <p>Speed sets how far ahead the point is: speed × 1.2 s. Direction sets where it is, and it doesn't have to be where the body faces.</p>
+    <p>Speed sets how far ahead the pelvis should be in 1.2 s. Direction sets where, and it doesn't have to be where the body faces.</p>
   </div>
   <div class="panel cmd">
     <div class="scroll">
       <svg class="dia" viewBox="0 0 620 360" style="min-width:460px" role="img" aria-label="Top view: the body, the direction it faces, and the goal point at the commanded distance and direction.">
         <defs>
-          <marker id="ahT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ahT3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="ahK" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
         <rect x="0" y="0" width="620" height="360" rx="10" fill="var(--grey-soft)"/>
@@ -150,7 +254,7 @@ svg.dia { width:100%; height:auto; display:block }
         <path class="ar" d="M180,180 L250,180" marker-end="url(#ahK)" style="stroke:var(--ink)"/>
         <text class="ts" x="196" y="170">facing</text>
         <ellipse cx="180" cy="180" rx="12" ry="20" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/>
-        <path id="goalLine" class="ar tl" d="M180,180 L410,180" marker-end="url(#ahT)" style="stroke-width:3"/>
+        <path id="goalLine" class="ar tl" d="M180,180 L410,180" marker-end="url(#ahT3)" style="stroke-width:3"/>
         <circle id="goalDot" cx="410" cy="180" r="10" fill="none" stroke="var(--teal)" stroke-width="3"/>
         <text id="goalLbl" class="tt" x="410" y="160" text-anchor="middle">goal</text>
       </svg>
@@ -164,7 +268,7 @@ svg.dia { width:100%; height:auto; display:block }
         <label for="dir">Direction from facing: <span id="dirOut">0</span>°</label>
         <input id="dir" type="range" min="-180" max="180" step="15" value="0">
       </div>
-      <div class="readout"><b id="goalM">1.92 m ahead</b><span id="goalNote">straight on</span></div>
+      <div class="readout"><b id="goalM">1.92 m</b><span id="goalNote">straight on</span></div>
     </div>
   </div>
 </section>
@@ -256,7 +360,8 @@ svg.dia { width:100%; height:auto; display:block }
 
 <script>
 const NS = "http://www.w3.org/2000/svg";
-const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); parent.appendChild(e); return e; };
+const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); for (const k in a) if (a[k] != null) e.setAttribute(k, a[k]); parent.appendChild(e); return e; };
+const txt = (s, a, parent) => { const e = el("text", a, parent); e.textContent = s; return e; };
 
 (function () {
   const h = document.getElementById("hist");
@@ -266,15 +371,47 @@ const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); fo
   for (let i = 0; i < 18; i++) for (let j = 0; j < 4; j++)
     el("rect", { x: 20 + i * 19, y: 198 + j * 12, width: 17, height: 10, rx: 2, fill: "var(--wire)", opacity: ((i > 10 ? 0.55 : 0.18) + 0.04 * j).toFixed(2) }, p);
   const f = document.getElementById("fut");
-  for (let i = 0; i < 24; i++) for (let r = 0; r < 12; r++)
-    el("rect", { x: 792 + i * 19.5, y: 56 + r * 15, width: 16.5, height: 11, rx: 2, class: r < 5 ? "cell-f" : "", fill: r < 5 ? null : "var(--wire)", opacity: r < 5 ? "0.9" : "0.3" }, f);
+  for (let i = 0; i < 24; i++) for (let r = 0; r < 14; r++)
+    el("rect", { x: 792 + i * 19.5, y: 56 + r * 15, width: 16.5, height: 11, rx: 2, fill: r < 6 ? "var(--blue)" : "var(--wire)", opacity: r < 6 ? "0.9" : "0.3" }, f);
+})();
+
+// frame composition bar
+(function () {
+  const g = document.getElementById("frameBar");
+  const parts = [["contacts", 4, true, "heel + ball, each foot"], ["footholds", 4, true, "next landing, each foot"],
+                 ["pelvis", 3, true, "position + height"], ["heading, tilt", 5, true, "pelvis orientation"],
+                 ["joint angles", 17, false, "hips, trunk, knees, ankles, toes"], ["foot points", 12, false, "heel + ball positions"]];
+  const x0 = 20, W = 1240, unit = W / 45;
+  let x = x0;
+  for (const [name, n, sent, sub] of parts) {
+    const w = n * unit;
+    el("rect", { x: x + 1, y: 20, width: w - 2, height: 44, rx: 6, fill: sent ? "var(--blue)" : "var(--wire)", opacity: sent ? "0.92" : "0.45" }, g);
+    txt(String(n), { x: x + w / 2, y: 48, class: sent ? "tw" : "t", "text-anchor": "middle" }, g);
+    txt(name, { x: x + 4, y: 84, class: sent ? "tb" : "ts" }, g);
+    if (w > 150) txt(sub, { x: x + 4, y: 100, class: "ts" }, g);
+    x += w;
+  }
+})();
+
+// smoothed heading sketch
+(function () {
+  let w = "", s = "";
+  for (let i = 0; i <= 470; i += 5) {
+    const t = i / 470, x = 30 + i;
+    const base = 150 - 50 * t;                           // a slow turn
+    const y = base + 28 * Math.sin(i / 470 * Math.PI * 2 * 4.5);
+    w += (i ? "L" : "M") + x + "," + y.toFixed(1);
+    s += (i ? "L" : "M") + x + "," + (base + 6).toFixed(1);
+  }
+  document.getElementById("wiggle").setAttribute("d", w);
+  document.getElementById("smooth").setAttribute("d", s);
 })();
 
 (function () {
   const g = document.getElementById("rings");
   for (const m of [1, 2, 3]) {
     el("circle", { cx: 180, cy: 180, r: m * 70, fill: "none", stroke: "var(--line)", "stroke-width": 1.2, "stroke-dasharray": "4 5" }, g);
-    const t = el("text", { x: 180 + m * 70 + 4, y: 196, class: "tm" }, g); t.textContent = m + " m";
+    txt(m + " m", { x: 180 + m * 70 + 4, y: 196, class: "tm" }, g);
   }
 })();
 const PX = 70;
@@ -302,13 +439,13 @@ update();
   for (let k = 0; k <= 15; k++) {
     const s = k * 0.2, x = x0 + s * px;
     el("line", { x1: x, y1: 20, x2: x, y2: 210, class: "grid-line" }, g);
-    if (k % 2 === 0) { const t = el("text", { x: x, y: 236, class: "tm", "text-anchor": "middle" }, g); t.textContent = s.toFixed(1) + " s"; }
+    if (k % 2 === 0) txt(s.toFixed(1) + " s", { x: x, y: 236, class: "tm", "text-anchor": "middle" }, g);
   }
   for (let i = 0; i < 9; i++) {
     const s = i * 0.2, x = x0 + s * px, y = 26 + i * 20;
     el("rect", { x: x, y: y, width: Math.min(1.2 * px, 1260 - x), height: 12, rx: 3, fill: "var(--blue-soft)", stroke: "var(--blue)", "stroke-width": 1 }, g);
     el("rect", { x: x, y: y, width: 0.2 * px, height: 12, rx: 3, fill: "var(--blue)" }, g);
-    const t = el("text", { x: 10, y: y + 10, class: "tm" }, g); t.textContent = "plan " + (i + 1);
+    txt("plan " + (i + 1), { x: 10, y: y + 10, class: "tm" }, g);
   }
 })();
 </script>
