@@ -230,20 +230,22 @@ class Planner(nn.Module):
 
     @torch.no_grad()
     def generate(self, hist: torch.Tensor, p: torch.Tensor, g: torch.Tensor, gen: torch.Generator | None = None,
-                 ema: bool = True) -> torch.Tensor:
-        """The future ``[B, FUT, C]`` after ``hist`` ``[B, HIST, C]``: deterministic DDIM over every diffusion step."""
+                 ema: bool = True, stride: int = 1) -> torch.Tensor:
+        """The future ``[B, FUT, C]`` after ``hist`` ``[B, HIST, C]``: deterministic DDIM over every ``stride``-th
+        diffusion step (1 = all)."""
         pad = hist.new_zeros(len(hist), FUT, C)
         h, p, g = self._n(torch.cat([hist, pad], 1), p, g)
         h = h[:, :HIST]
         net = self.ema if ema else self.net
         x = torch.randn(len(h), FUT, C, device=h.device, generator=gen)
-        for t in range(self.cfg["T"] - 1, -1, -1):
+        ts = list(range(self.cfg["T"] - 1, -1, -stride))
+        for t, t_prev in zip(ts, [*ts[1:], -1], strict=True):
             x0 = net(torch.cat([h, x], 1), torch.full((len(h),), t, device=h.device), p, g)[:, HIST:]
-            if t == 0:
+            if t_prev < 0:
                 x = x0
                 break
             eps = (x - self.ab[t].sqrt() * x0) / (1 - self.ab[t]).sqrt()
-            x = self.ab[t - 1].sqrt() * x0 + (1 - self.ab[t - 1]).sqrt() * eps
+            x = self.ab[t_prev].sqrt() * x0 + (1 - self.ab[t_prev]).sqrt() * eps
         return x * self.x_std + self.x_mean
 
     def save(self, path: str | Path, **extra: Any) -> None:
@@ -324,3 +326,132 @@ def plan_course(planner: Planner, tiles: list[dict[str, Any]], D: dict[str, Any]
     return [to_plan(*(f[b] for f in full),
                     ground=lambda x, z, T=T: hf_height(T["heights"], T["block"], T["cell"], T["origin"], x, z))
             for b, T in enumerate(tiles)]
+
+
+# --- in the loop ---------------------------------------------------------------------------------------------------
+
+LIFT = 0.009                # the foot point's height over the ground in contact (AB01 median), for generated footholds
+GOAL_FRAMES = STRIDE * FUT  # the goal: where the centre of mass is this many 40 Hz frames on
+
+
+def plan_obs(task: Any, s: Any, contact: torch.Tensor, hold: torch.Tensor, td: torch.Tensor, lo: torch.Tensor,
+             com: torch.Tensor) -> torch.Tensor:
+    """The student's plan inputs ``[N, 15 x taps]`` from a plan at its taps (contact ``[N, K, 2]``, foothold
+    ``[N, K, 2, 3]``, td, lo ``[N, K, 2]``, com ``[N, K, 3]``, world frame): per tap and foot down, foothold from the
+    pelvis in its heading frame, time to touchdown and to lift-off; the centre of mass from the body's."""
+    from sprint.recipes.imitation import _heading
+    M = _heading(s.body_quat[:, task.root])
+    fh = torch.einsum("nij,nkfj->nkfi", M, hold - s.body_com_pos()[:, task.root][:, None, None])
+    dc = torch.einsum("nij,nkj->nki", M, com - task.com(s)[:, None])
+    feet = torch.cat([contact.float()[..., None], fh, td[..., None], lo[..., None]], -1).flatten(2)   # [N, K, 12]
+    return torch.nan_to_num(torch.cat([feet, dc], -1).flatten(1), 0.0, 0.0, 0.0)
+
+
+def _next(flag: torch.Tensor) -> torch.Tensor:
+    """Index of the first frame at or after each frame where ``flag`` [N, K, 2] holds; K where none does."""
+    K = flag.shape[1]
+    i = torch.arange(K, device=flag.device)[None, :, None].expand_as(flag)
+    pos = torch.where(flag, i, K)
+    return pos.flip(1).cummin(1).values.flip(1)
+
+
+class Replanner:
+    """The planner in the loop of a recipe environment (gp.tasks.TerrainImitation): each world follows a 40 Hz plan
+    fixed in the world, ``STRIDE * FUT + 1`` frames from its last generation, and replans every ``every`` control
+    steps and at each touchdown (``min_gap`` steps apart at least).
+
+    A generation sees the body's measured last 0.4 s (down = vertical foot force over 5 % of body weight; a down
+    foot's foothold = its point, a swinging foot's = the plan's; centre of mass; pelvis), the ground around it (the
+    task's) and a goal: the clip's own centre-of-mass travel over the next 1.2 s in the clip's heading frame (an
+    intent, ``go this far``, never a correction toward the clip). A new episode's history is its clip's past (the
+    initial condition the recipe starts the body in). ``self(s)``, once per control step: the student's plan inputs
+    (:func:`plan_obs`), as gp distill's ``--plan`` reads the clip's."""
+
+    def __init__(self, planner: Planner, task: Any, D: dict[str, Any], every: int = 8, min_gap: int = 2,
+                 stride: int = 5, seed: int = 0) -> None:
+        self.P, self.task, self.every, self.min_gap, self.stride = planner, task, every, min_gap, stride
+        dev = self.dev = task.dev
+        self.W = Windows(D, dev)                         # the clip tables (history at reset, goals)
+        n, L, R = task.n, STRIDE * FUT + 1, STRIDE * (HIST - 1) + 1
+        z = lambda *k, dt=torch.float32: torch.zeros(n, *k, device=dev, dtype=dt)  # noqa: E731
+        self.contact, self.hold, self.td, self.lo, self.com = z(L, 2, dt=torch.bool), z(L, 2, 3), z(L, 2), z(L, 2), z(L, 3)
+        self.p = torch.zeros(n, dtype=torch.long, device=dev)          # "now" in the plan
+        self.since = torch.zeros(n, dtype=torch.long, device=dev)      # steps since the last generation
+        self.h_down, self.h_hold, self.h_com = z(R, 2, dt=torch.bool), z(R, 2, 2), z(R, 3)   # measured, 40 Hz
+        self.h_psi, self.h_quat = z(R), z(R, 4)
+        self.taps = torch.as_tensor(task.taps, device=dev)
+        self.g = torch.tensor([(f, lat) for f in PATCH_F for lat in PATCH_L], dtype=torch.float32, device=dev)
+        self.gen = torch.Generator(device=dev).manual_seed(seed)
+        self.replans = 0
+
+    def _clip_history(self, w: torch.Tensor) -> None:
+        """Worlds ``w`` (indices): their clip's frames before the episode's first (held at the clip start), so the
+        measured first frame completes a 0.4 s history."""
+        t, W = self.task, self.W
+        R = self.h_down.shape[1]
+        k = (t.frame[w, None] + torch.arange(-R, 0, device=self.dev)).clamp(min=t.clip_start[t.clip[w]][:, None])
+        self.h_down[w], self.h_hold[w], self.h_com[w] = W.down[k], W.hold[k], W.com[k]
+        self.h_psi[w], self.h_quat[w] = W.psi[k], W.quat[k]
+        h = self.hold[w]                                                # the swinging foot's foothold until the first plan
+        h[:, 0, :, 0], h[:, 0, :, 2] = W.hold[t.frame[w]][..., 0], W.hold[t.frame[w]][..., 1]
+        self.hold[w] = h
+
+    def _measure(self, s: Any) -> None:
+        t, n = self.task, self.task.n
+        bw = 9.81 * float(torch.as_tensor(s.total_mass).flatten()[0])
+        down = t.foot_force(s) > 0.05 * bw
+        i = torch.arange(n, device=self.dev)
+        hold = torch.where(down[..., None], t.foot_points(s)[..., [0, 2]], self.hold[i, self.p][..., [0, 2]])
+        q = s.body_quat[:, t.root]
+        for h, v in ((self.h_down, down), (self.h_hold, hold), (self.h_com, t.com(s)), (self.h_psi, heading(q)),
+                     (self.h_quat, q)):
+            h.copy_(torch.cat([h[:, 1:], v[:, None]], 1))
+
+    @torch.no_grad()
+    def _replan(self, w: torch.Tensor) -> None:
+        t, W, dev = self.task, self.W, self.dev
+        sl = slice(None, None, STRIDE)
+        a_com, a_psi = self.h_com[w, -1], self.h_psi[w, -1]
+        hist = features(self.h_down[w, sl], self.h_hold[w, sl], self.h_com[w, sl], self.h_psi[w, sl],
+                        self.h_quat[w, sl], a_com, a_psi)
+        xz = from_frame(self.g.expand(len(w), -1, -1), a_com[:, [0, 2]], a_psi)
+        p = (t.G(t.clip[w], xz[..., 0], xz[..., 1]) - a_com[:, 1:2]).view(len(w), len(PATCH_F), len(PATCH_L))
+        f = t.frame[w]
+        k = torch.minimum(f + GOAL_FRAMES, t.clip_last[t.clip[w]] + t.taps[-1])
+        goal = to_frame(W.com[k][:, [0, 2]], W.com[f][:, [0, 2]], W.psi[f])
+        fut = self.P.generate(hist, p, goal, self.gen, stride=self.stride)
+        down, hxz, com, _, _ = world(fut, a_com, a_psi)                                # [B, FUT, ...] at 20 Hz
+        down = torch.cat([self.h_down[w, -1:], down], 1)                                # now, then the future
+        hxz = torch.cat([self.h_hold[w, -1:], hxz], 1)
+        com = torch.cat([a_com[:, None], com], 1)
+        L = self.contact.shape[1]
+        j = torch.arange(L, device=dev) // STRIDE
+        frac = (torch.arange(L, device=dev) % STRIDE).float() / STRIDE
+        c40, h40 = down[:, j], hxz[:, j]
+        com40 = com[:, j] + frac[None, :, None] * (com[:, (j + 1).clamp(max=FUT)] - com[:, j])
+        y = t.G(t.clip[w], h40[..., 0].flatten(1), h40[..., 1].flatten(1)).view(len(w), L, 2) + LIFT
+        cap, i = gpdata.PLAN_CAP_S, torch.arange(L, device=dev)[None, :, None]
+        nd, nu = _next(c40), _next(~c40)
+        self.td[w] = torch.where(nd < L, (nd - i).float() / gpdata.HZ, cap).clamp(max=cap)
+        self.lo[w] = torch.where(c40, torch.where(nu < L, (nu - i).float() / gpdata.HZ, cap).clamp(max=cap), 0.0)
+        self.contact[w], self.com[w] = c40, com40
+        self.hold[w] = torch.stack([h40[..., 0], y, h40[..., 1]], -1)
+        self.p[w], self.since[w] = 0, 0
+        self.replans += len(w)
+
+    def __call__(self, s: Any) -> torch.Tensor:
+        fresh = s.episode_step == 0
+        down_before = self.h_down[:, -1].clone()
+        self.p = torch.where(fresh, 0, (self.p + 1).clamp(max=self.contact.shape[1] - 1))
+        self.since += 1
+        if bool(fresh.any()):
+            self._clip_history(fresh.nonzero().squeeze(1))
+        self._measure(s)
+        touchdown = (self.h_down[:, -1] & ~down_before).any(1) & ~fresh
+        due = fresh | (self.since >= self.every) | (touchdown & (self.since >= self.min_gap))
+        if bool(due.any()):
+            self._replan(due.nonzero().squeeze(1))
+        n = self.task.n
+        k = (self.p[:, None] + self.taps).clamp(max=self.contact.shape[1] - 1)
+        i = torch.arange(n, device=self.dev)[:, None]
+        return plan_obs(self.task, s, self.contact[i, k], self.hold[i, k], self.td[i, k], self.lo[i, k], self.com[i, k])

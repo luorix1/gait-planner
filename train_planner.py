@@ -2,6 +2,8 @@
 steps after 5k (copied before), normalisers from 20k windows, half of every batch mirrored left to right. Logs the
 held-out split's loss beside the training loss.
 
+With --dataset ab01: every window of the walk/start-stop/stand modes, every 10th trial held out.
+
 Run (GPU, detached; a fresh --out per run):
   setsid nohup .venv/bin/python train_planner.py --out runs/planner_net_v1 > runs/planner_net_v1.log 2>&1 < /dev/null &
 Out: <out>/planner.pt (latest; overwritten every 2k iterations), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
@@ -19,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from gp import data
 from gp.planner import Planner, Windows
+from train import load_clips
 
 
 def main() -> None:
@@ -30,13 +33,26 @@ def main() -> None:
     ap.add_argument("--layers", type=int, default=4)
     ap.add_argument("--heads", type=int, default=4)
     ap.add_argument("--head-dim", type=int, default=64)
+    ap.add_argument("--dataset", default="", help="train on data/<dataset> (all splits, train.py's load_clips) with "
+                    "every --holdout-th trial held out for the held-out loss; default: data.OUT's train split")
+    ap.add_argument("--modes", default="walk,start_stop,stand")
+    ap.add_argument("--holdout", type=int, default=10)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                      # a fresh folder per run, never overwrite one
     torch.manual_seed(0)
-    W = Windows(data.load("train"), a.device)
-    Wt = Windows(data.load(("test_trial", "test_terrain")), a.device)
+    if a.dataset:
+        D = load_clips(a.dataset, "", a.modes)
+        trial = [str(n).rsplit("_", 1)[0] for n in D["name"]]
+        held = set(sorted(set(trial))[a.holdout - 1::a.holdout])
+        W = Windows(data.take(D, [k for k, t in enumerate(trial) if t not in held]), a.device)
+        Wt = Windows(data.take(D, [k for k, t in enumerate(trial) if t in held]), a.device)
+        (out / "held_out_trials.txt").write_text("\n".join(sorted(held)) + "\n")
+    else:
+        W = Windows(data.load("train"), a.device)
+        Wt = Windows(data.load(("test_trial", "test_terrain")), a.device)
+    print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
     planner = Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim).to(a.device)
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
@@ -65,7 +81,7 @@ def main() -> None:
             tb.add_scalar("loss/held_out", held, it)
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
         if it % 2000 == 0 or it == a.iters:
-            planner.save(out / "planner.pt", iters=it, data=str(data.OUT), mirrored=True)
+            planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True)
     tb.close()
 
 

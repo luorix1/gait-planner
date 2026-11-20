@@ -2,7 +2,7 @@
 recipe's), one episode from the first frame of each window it was distilled on, with the same input noise it was
 trained with. The folder carries the model, so it opens anywhere.
 
-Run: .venv/bin/python export_distill.py runs/distill_mc021 [--per-group 2] [--to-studio]
+Run: .venv/bin/python export_distill.py runs/distill_mc021 [--per-group 2] [--planner PLANNER.pt] [--to-studio]
 Out: runs/<run>/studio_student/ (with --to-studio also copied into SPRINT Studio's results folder)
 """
 
@@ -20,7 +20,7 @@ from sprint.export import format as fmt
 from sprint.export.meshes import bake
 from sprint.recipes.study import default_ppo
 
-from distill import StudentView, student_loc, student_net
+from distill import StudentView, student_inputs, student_loc, student_net
 from export_recipe import pick
 from gp import data
 from gp.pretrain import PretrainConfig
@@ -33,6 +33,8 @@ def main() -> None:
     ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--per-group", type=int, default=0, help="only this many windows per mode and terrain class, spread "
                                                             "over their speeds (export_recipe.pick); 0 = every window")
+    ap.add_argument("--planner", default="", help="a --plan student reads this planner's plans in the loop "
+                    "(gp.planner.Replanner), not the clip's; folder studio_student_planner")
     ap.add_argument("--to-studio", action="store_true")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
@@ -47,26 +49,28 @@ def main() -> None:
                        seed=0, foot_model=args["foot_model"])
     view.bind(env.model)
     view.attach(env, task)
-    obs_dim = sum(b[1] for b in view.blocks)
-    net = student_net(view, env, replace(default_ppo(), rollout_steps=view.c.steps_per_iter), obs_dim).to(view.dev)
+    extra, full = student_inputs(env, task, D, args.get("privileged", False), args.get("plan", False), a.planner)
+    obs_dim = sum(b[1] for b in view.blocks) + extra
+    net = student_net(view, env, replace(default_ppo(), rollout_steps=view.c.steps_per_iter), obs_dim, extra).to(view.dev)
     net.load_state_dict(torch.load(run / "checkpoint.pt", map_location=view.dev, weights_only=False)["net"])
     clips = [f"{c} ({m}, {t}, {v:.2f} m/s)" for c, m, t, v in zip(D["name"], D["mode"], D["terrain_class"], D["speed_mps"], strict=True)]
     net.eval()
+    inputs = f"L1 + the plan of planner {a.planner}" if a.planner else "L1 + the clip's plan" if args.get("plan") else "L1 + the teacher's observation" if args.get("privileged") else "L1 inputs"
 
     @torch.no_grad()
-    def policy(_obs: torch.Tensor) -> torch.Tensor:
+    def policy(obs: torch.Tensor) -> torch.Tensor:
         s = env.state
         view.prev_action = s.excitation.clone()
         view.new_episode(s.episode_step == 0)          # a fresh episode: new drifts, no last action
-        return net._squash(student_loc(net, view.observe(s)[:, :view.n_actor]))
+        return net._squash(student_loc(net, full(view.observe(s), obs)[:, net.actor_cols]))
 
-    out = run / "studio_student"
+    out = run / ("studio_student_planner" if a.planner else "studio_student")
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     shutil.copy2(data.MODEL, out / "model.osim")
     export_rollout(out, env, policy, n_steps=int(round(a.seconds * data.HZ)), episodes=n,
-                   config=dict(run=str(run), policy="distilled student (L1 inputs)", clips=clips),
+                   config=dict(run=str(run), policy=f"distilled student ({inputs})", clips=clips),
                    sim={"model": str((out / "model.osim").resolve())}, src=FrameSource(env, meshes=bake(data.MODEL)))
     print(f"-> {out}  ({n} episodes)")
     if a.to_studio:

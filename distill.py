@@ -40,6 +40,7 @@ from sprint.recipes.study import default_ppo
 from torch.utils.tensorboard import SummaryWriter
 
 from gp import fpm as FPM
+from gp.planner import Planner, Replanner, plan_obs
 from gp.pretrain import Pretrain, PretrainConfig
 from gp.wys import _heading, _wrap
 from train import build as build_recipe
@@ -133,37 +134,29 @@ def student_loc(net: ActorCritic, x_actor: torch.Tensor) -> torch.Tensor:
 
 
 def plan_inputs(task: Any, D: dict[str, Any]) -> Any:
-    """``f(s) -> [N, 15 x taps]``: the clip's plan at the recipe's lookahead taps, as gp.tasks.PlanTracking feeds it
-    (per foot: down, foothold from the pelvis in its heading frame, time to touchdown and to lift-off; the centre of
-    mass from the body's), no pose. --plan: what a footstep + COM planner would supply."""
-    from sprint.recipes.imitation import _heading
-
+    """``f(s) -> [N, 15 x taps]``: the clip's plan at the recipe's lookahead taps (gp.planner.plan_obs: per foot down,
+    foothold from the pelvis in its heading frame, time to touchdown and to lift-off; the centre of mass from the
+    body's), no pose. --plan: what a footstep + COM planner would supply."""
     T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=task.dev)  # noqa: E731
     contact, hold, td, lo, com = (T(D["plan_contact"], torch.bool), T(D["foothold"]), T(D["t_touchdown"]),
                                   T(D["t_liftoff"]), T(D["com"]))
+    taps = torch.as_tensor(task.taps, device=task.dev)
 
     def f(s: Any) -> torch.Tensor:
-        root = s.body_com_pos()[:, task.root]
-        M = _heading(s.body_quat[:, task.root])
-        c = task.com(s)
-        last = task.clip_last[task.clip] + task.taps[-1]
-        parts = []
-        for t in task.taps:
-            k = torch.minimum(task.frame + t, last)
-            fh = torch.einsum("nij,nkj->nki", M, hold[k] - root[:, None])
-            parts += [torch.cat([contact[k].float()[..., None], fh, td[k][..., None], lo[k][..., None]], -1).flatten(1),
-                      torch.einsum("nij,nj->ni", M, com[k] - c)]
-        return torch.nan_to_num(torch.cat(parts, 1), 0.0, 0.0, 0.0)
+        k = torch.minimum(task.frame[:, None] + taps, (task.clip_last[task.clip] + task.taps[-1])[:, None])
+        return plan_obs(task, s, contact[k], hold[k], td[k], lo[k], com[k])
     return f
 
 
-def student_inputs(env: Any, task: Any, D: dict[str, Any], privileged: bool, plan: bool) -> tuple[int, Any]:
+def student_inputs(env: Any, task: Any, D: dict[str, Any], privileged: bool, plan: bool, planner: str = "",
+                   **replanner: Any) -> tuple[int, Any]:
     """(extra actor inputs, ``full(so, teacher_obs) -> the student's whole observation``): L1's, then the teacher's
-    observation (--privileged) or the clip's plan (--plan)."""
+    observation (--privileged) or a plan (--plan): the clip's, or with ``planner`` (a train_planner.py planner.pt) the
+    planner's own in the loop (gp.planner.Replanner; call ``full`` once per control step)."""
     if privileged:
         return env.obs_dim, lambda so, o: torch.cat([so, o], 1)
     if plan:
-        f = plan_inputs(task, D)
+        f = Replanner(Planner.load(planner, task.dev), task, D, **replanner) if planner else plan_inputs(task, D)
         return 15 * len(task.taps), lambda so, o: torch.cat([so, f(env.state)], 1)
     return 0, lambda so, o: so
 
@@ -293,10 +286,11 @@ def main() -> None:
         s_err, t_err, loss_sum = [], [], 0.0
         with torch.no_grad():
             for _ in range(a.rollout):
+                xf = full(so, obs)                                   # once per step (a planner advances)
                 if it < a.norm_iters:
-                    seed_norm.update(full(so, obs))
+                    seed_norm.update(xf)
                 y = T.actor(obs)                                     # the teacher's pre-squash mean: the label
-                x = full(so, obs)[:, S.actor_cols]
+                x = xf[:, S.actor_cols]
                 bi = (head + torch.arange(a.worlds, device=dev)) % a.buffer
                 bx[bi], by[bi] = x.to(bx.dtype), y
                 head, fill = int((head + a.worlds) % a.buffer), min(fill + a.worlds, a.buffer)
