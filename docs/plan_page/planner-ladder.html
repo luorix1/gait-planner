@@ -415,6 +415,58 @@ table.kv td:first-child { width:150px }
 </section>
 
 
+<section aria-labelledby="s-fpm">
+  <div class="sec-head">
+    <h2 id="s-fpm">Phase 1 · fitting the foot placement estimator</h2>
+    <p>Plain supervised learning on the clips, no simulation and no reinforcement learning. For every frame of every AB01 window, the input is what the controller will sense at that moment, and the answer is where each foot really lands next. Done once, before distillation; then frozen.</p>
+  </div>
+  <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k op">fixed computation</span><span class="k train">training only</span></div>
+    <svg class="dia" viewBox="0 0 1200 500" role="img" aria-labelledby="fpm-t" style="min-width:860px">
+      <title id="fpm-t">How the estimator is trained. Along a clip, the contact flags give each foot's stance and swing. At a frame t the label for a foot in the air is its coming landing; for a foot on the ground it is the landing after its next lift-off; both as forward and lateral offsets from the pelvis at frame t. The input at frame t is the body state and command, computed as the simulation computes them. A 128-128 network predicts the four numbers and is fitted with a Huber loss.</title>
+      <defs>
+        <marker id="fw" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="fa" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <!-- the clip: stance bars per foot (contact flags: heel or toe down) -->
+      <text class="lab" x="20" y="76">left foot</text>
+      <text class="lab" x="20" y="126">right foot</text>
+      <g fill="var(--line)" stroke="var(--wire)" stroke-width="1.5">
+        <rect x="110" y="62" width="260" height="20" rx="4"/><rect x="480" y="62" width="260" height="20" rx="4"/><rect x="850" y="62" width="260" height="20" rx="4"/>
+        <rect x="110" y="112" width="75" height="20" rx="4"/><rect x="295" y="112" width="260" height="20" rx="4"/><rect x="665" y="112" width="260" height="20" rx="4"/><rect x="1035" y="112" width="75" height="20" rx="4"/>
+      </g>
+      <text class="axl" x="1110" y="40" text-anchor="end">shaded = on the ground (the clip's heel/toe flags)</text>
+      <line x1="410" y1="40" x2="410" y2="150" stroke="var(--ink)" stroke-width="2"/>
+      <text class="t1" x="410" y="32" text-anchor="middle">frame t</text>
+      <!-- labels: left in the air -> its coming landing; right on the ground -> landing after its next lift-off -->
+      <path d="M410 72 H472.5" fill="none" stroke="var(--amber)" stroke-width="2.5" marker-end="url(#fa)"/>
+      <circle cx="480" cy="72" r="6" fill="var(--amber)"/>
+      <text class="lab" x="490" y="56" fill="var(--amber)">in the air: its coming landing</text>
+      <path d="M410 142 H657.5" fill="none" stroke="var(--amber)" stroke-width="2.5" marker-end="url(#fa)"/>
+      <circle cx="665" cy="122" r="6" fill="var(--amber)"/>
+      <line x1="665" y1="128" x2="665" y2="142" stroke="var(--amber)" stroke-width="2.5"/>
+      <text class="lab" x="420" y="166" fill="var(--amber)">on the ground: the landing after its next lift-off</text>
+      <text class="axl" x="1110" y="166" text-anchor="end">clip frames, 40 a second →</text>
+      <!-- from the clip to inputs and labels -->
+      <path class="w" d="M410 150 V195 H155 V227.5" marker-end="url(#fw)"/><text class="lab" x="167" y="214">the clip at frame t</text>
+      <path d="M1070 178 V227.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#fa)"/>
+      <text class="lab" x="1082" y="208" fill="var(--amber)">those landings</text>
+      <!-- pipeline -->
+      <path class="w" d="M290 280 H372.5" marker-end="url(#fw)"/>
+      <path class="w" d="M590 280 H672.5" marker-end="url(#fw)"/>
+      <path class="w" d="M780 325 V410 H962.5" marker-end="url(#fw)"/><text class="lab" x="870" y="400" text-anchor="middle">prediction</text>
+      <path d="M1070 325 V367.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#fa)"/>
+      <path class="w train" d="M1070 455 V482 H480 V332.5" marker-end="url(#fw)"/><text class="lab" x="775" y="474" text-anchor="middle">update (25 epochs)</text>
+      <g class="fn obs"><rect x="20" y="235" width="270" height="90" rx="12"/><text class="t1" x="155" y="262">Input at frame t (45)</text><text class="t2" x="155" y="286">pelvis speed and turn rate, gravity,</text><text class="t2" x="155" y="306">command, joint angles and speeds</text></g>
+      <g class="fn pol"><rect x="380" y="235" width="210" height="90" rx="12"/><text class="t1" x="485" y="268">Estimator</text><text class="t2" x="485" y="294">network 128-128</text></g>
+      <g class="fn"><rect x="680" y="235" width="200" height="90" rx="12"/><text class="t1" x="780" y="262">Predicted (4)</text><text class="t2" x="780" y="286">forward, sideways</text><text class="t2" x="780" y="306">per foot</text></g>
+      <g class="fn hum"><rect x="960" y="235" width="220" height="90" rx="12"/><text class="t1" x="1070" y="262">Label (4)</text><text class="t2" x="1070" y="286">the real landings, from</text><text class="t2" x="1070" y="306">the pelvis at frame t</text></g>
+      <g class="fn op"><rect x="970" y="375" width="200" height="80" rx="12"/><text class="t1" x="1070" y="405">Huber loss</text><text class="t2" x="1070" y="429">prediction vs label</text></g>
+    </svg>
+    <p class="note">84,582 labelled frames from AB01's 276 windows. The input is computed from the clip exactly as the simulation computes it at that moment (a test checks they agree), with the clip's own speed as the command. On 55 whole windows held out of the fit: 8.4 cm median error (5–7 cm while walking, 43 cm when starting, stopping or standing), against 57 cm for fixed foot spots. The saved estimator is then fitted on every window. Script fit_fpm.py.</p>
+  </div>
+</section>
+
 <section aria-labelledby="s-distill">
   <div class="sec-head">
     <h2 id="s-distill">Phase 2 · distilling into the student (DAgger)</h2>
