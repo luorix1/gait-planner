@@ -549,6 +549,10 @@ def test_planner(D: dict) -> None:
     assert (features(d, h, c, ps, qu, W.com[a], W.psi[a]) - x).abs().max() < 1e-4
     xm, pm = mirror(*mirror(x, p))
     assert torch.equal(xm, x) and torch.equal(pm, p)
+    Wf = Windows(D, pose=True)                                                       # full-pose windows
+    xf = Wf(a)[0]
+    assert torch.equal(xf[..., :x.shape[-1]], x) and xf.shape[-1] == Wf.c
+    assert torch.equal(mirror(*mirror(xf, p, Wf.perm, Wf.sign), Wf.perm, Wf.sign)[0], xf)
     torch.manual_seed(0)
     P = Planner(T=5, layers=1, heads=2, head_dim=16)
     P.set_normaliser(*W.batch(2000))

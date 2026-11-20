@@ -1,0 +1,314 @@
+<title>Full-Pose Planner Baseline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: wide lab-notebook page (same tokens as the planner pages); why in three cards, how in four diagrams. */
+:root {
+  --paper:#F4F6F9; --panel:#FFFFFF; --ink:#1B2633; --muted:#55606D; --line:#D5DDE7; --wire:#7C8895;
+  --blue:#2F6FB0; --blue-soft:#E6EEF8; --teal:#1F8A86; --teal-soft:#DDF1EF; --amber:#C98A1E; --amber-soft:#F7EBD4;
+  --grey-soft:#EEF1F5;
+  --display:"Space Grotesk", "Segoe UI", system-ui, sans-serif; --body:"Inter", system-ui, -apple-system, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
+  --grey-soft:#1C2530; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
+  --grey-soft:#1C2530; color-scheme:dark }
+body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 64px }
+.wrap { max-width:1320px; margin:0 auto; display:grid; gap:56px }
+h1, h2, h3 { font-family:var(--display); margin:0; text-wrap:balance; letter-spacing:-0.01em }
+h1 { font-size:clamp(32px, 4.6vw, 50px); line-height:1.05 }
+h2 { font-size:clamp(23px, 2.8vw, 30px); line-height:1.15 }
+h3 { font-size:18px; line-height:1.25 }
+p { margin:0 }
+input:focus-visible { outline:3px solid var(--blue); outline-offset:3px }
+.eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
+header { display:grid; gap:14px; max-width:900px }
+.lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:62ch }
+section { display:grid; gap:18px }
+.sec-head { display:grid; gap:6px; max-width:860px }
+.sec-head p { color:var(--muted); max-width:70ch }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px; min-width:0 }
+.scroll { overflow-x:auto }
+svg.dia { width:100%; height:auto; display:block }
+.dia-wide { min-width:860px }
+.cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:6px; align-content:start; min-width:0 }
+.card p { color:var(--muted); font-size:15px }
+
+.n { fill:var(--panel); stroke:var(--line); stroke-width:1.5 }
+.n.hl { fill:var(--blue-soft); stroke:var(--blue) }
+.n.tl { fill:var(--teal-soft); stroke:var(--teal) }
+.n.amb { fill:var(--amber-soft); stroke:var(--amber) }
+.t { fill:var(--ink); font:600 15px var(--display) }
+.ts { fill:var(--muted); font:400 12.5px var(--body) }
+.tm { fill:var(--muted); font:500 11.5px var(--mono) }
+.tb { fill:var(--blue); font:600 12.5px var(--body) }
+.tt { fill:var(--teal); font:600 12.5px var(--body) }
+.ar { fill:none; stroke:var(--wire); stroke-width:2 }
+.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) }
+.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) }
+.cell-h { fill:var(--ink) } .cell-f { fill:var(--blue) }
+.grid-line { stroke:var(--line); stroke-width:1 }
+
+.cmd { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr); gap:24px; align-items:center }
+.cmd > * { min-width:0 }
+.controls { display:grid; gap:18px }
+.slider { display:grid; gap:6px }
+.slider label { font:600 15px var(--display) }
+.slider input { width:100% }
+.readout { background:var(--grey-soft); border-radius:10px; padding:12px 14px; display:grid; gap:2px }
+.readout b { font:600 22px var(--display); font-variant-numeric:tabular-nums }
+.readout span { font-size:13.5px; color:var(--muted) }
+
+@media (max-width:980px) { .cmd { grid-template-columns:1fr } }
+@media (max-width:700px) { .cards { grid-template-columns:1fr } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">gait_planner · baseline</span>
+  <h1>A planner that sketches motion, a muscle policy that carries it out</h1>
+  <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only the pelvis, foot and trunk targets from it.</p>
+</header>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Why</span>
+    <h2>Separate where to go from how to move</h2>
+  </div>
+  <div class="cards">
+    <div class="card"><h3>Learn motion from data</h3><p>A diffusion model trained on human motion knows what walking, turning and stepping onto terrain look like.</p></div>
+    <div class="card"><h3>Let the muscles decide the joints</h3><p>Generated poses can contain transitions our muscle model can't make. The policy gets targets, not poses, and finds joint motion it can actually produce.</p></div>
+    <div class="card"><h3>Command it, don't retrain it</h3><p>A new speed, direction or terrain changes the planner's input, not the muscle policy.</p></div>
+  </div>
+</section>
+
+<!-- planner -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · the planner</span>
+    <h2>One window in, 1.2 seconds out</h2>
+    <p>Everything is relative to the body at "now": positions from its centre of mass, directions from where it faces.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia dia-wide" viewBox="0 0 1280 320" role="img" aria-label="Inputs: 0.4 s of history, a ground height patch and a goal point go into the diffusion model, which outputs 1.2 s of whole-body motion.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <text class="t" x="20" y="34">History</text>
+      <text class="ts" x="20" y="54">the last 0.4 s of the body</text>
+      <g id="hist"></g>
+      <text class="t" x="20" y="166">Ground ahead</text>
+      <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m</text>
+      <g id="patch"></g>
+      <text class="t" x="20" y="272">Goal</text>
+      <text class="ts" x="20" y="292">centre of mass in 1.2 s</text>
+      <circle cx="300" cy="282" r="9" fill="none" stroke="var(--teal)" stroke-width="3"/><circle cx="300" cy="282" r="3" fill="var(--teal)"/>
+
+      <path class="ar" d="M372,70 C440,70 440,165 486,165" marker-end="url(#ah)"/>
+      <path class="ar" d="M372,205 C430,205 430,175 486,175" marker-end="url(#ah)"/>
+      <path class="ar" d="M320,282 C440,282 440,185 486,185" marker-end="url(#ah)"/>
+
+      <rect class="n hl" x="490" y="110" width="250" height="130" rx="12"/>
+      <text class="t" x="615" y="166" text-anchor="middle">Diffusion model</text>
+      <text class="ts" x="615" y="190" text-anchor="middle">noise → motion</text>
+
+      <path class="ar" d="M740,175 H786" marker-end="url(#ah)"/>
+
+      <text class="t" x="792" y="34">Next 1.2 s of motion</text>
+      <g id="fut"></g>
+      <text class="tb" x="792" y="270">feet, footholds, COM, pelvis</text>
+      <text class="ts" x="1000" y="270">joint angles</text>
+      <text class="ts" x="792" y="300">blue rows reach the muscle policy; grey rows are generated and dropped</text>
+    </svg>
+  </div>
+</section>
+
+<!-- command -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · commanding it</span>
+    <h2>A command is a goal point</h2>
+    <p>Speed sets how far ahead the point is: speed × 1.2 s. Direction sets where it is, and it doesn't have to be where the body faces.</p>
+  </div>
+  <div class="panel cmd">
+    <div class="scroll">
+      <svg class="dia" viewBox="0 0 620 360" style="min-width:460px" role="img" aria-label="Top view: the body, the direction it faces, and the goal point at the commanded distance and direction.">
+        <defs>
+          <marker id="ahT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ahK" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect x="0" y="0" width="620" height="360" rx="10" fill="var(--grey-soft)"/>
+        <g id="rings"></g>
+        <path class="ar" d="M180,180 L250,180" marker-end="url(#ahK)" style="stroke:var(--ink)"/>
+        <text class="ts" x="196" y="170">facing</text>
+        <ellipse cx="180" cy="180" rx="12" ry="20" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/>
+        <path id="goalLine" class="ar tl" d="M180,180 L410,180" marker-end="url(#ahT)" style="stroke-width:3"/>
+        <circle id="goalDot" cx="410" cy="180" r="10" fill="none" stroke="var(--teal)" stroke-width="3"/>
+        <text id="goalLbl" class="tt" x="410" y="160" text-anchor="middle">goal</text>
+      </svg>
+    </div>
+    <div class="controls">
+      <div class="slider">
+        <label for="speed">Speed: <span id="spdOut">1.6</span> m/s</label>
+        <input id="speed" type="range" min="0" max="3" step="0.1" value="1.6">
+      </div>
+      <div class="slider">
+        <label for="dir">Direction from facing: <span id="dirOut">0</span>°</label>
+        <input id="dir" type="range" min="-180" max="180" step="15" value="0">
+      </div>
+      <div class="readout"><b id="goalM">1.92 m ahead</b><span id="goalNote">straight on</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- loop -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · forward simulation</span>
+    <h2>Two loops at two speeds</h2>
+    <p>The planner always starts from the body's measured state, so a drift or stumble is corrected at the next replan.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia dia-wide" viewBox="0 0 1280 440" role="img" aria-label="Closed loop: command and terrain set the goal and ground; the measured state gives history; the planner generates motion; its slice goes to the muscle policy, which drives the physics; the state feeds both loops.">
+      <defs>
+        <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ahB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk blue" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ahT2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <rect x="10" y="20" width="760" height="230" rx="16" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="3 6"/>
+      <text class="tb" x="28" y="44">PLANNER LOOP · every 0.2 s and at touchdowns</text>
+      <rect x="800" y="20" width="470" height="410" rx="16" fill="none" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="3 6"/>
+      <text class="tt" x="818" y="44">MUSCLE LOOP · 40 times a second</text>
+
+      <rect class="n amb" x="30" y="70" width="160" height="70" rx="12"/>
+      <text class="t" x="110" y="100" text-anchor="middle">Command</text>
+      <text class="ts" x="110" y="122" text-anchor="middle">speed + direction</text>
+      <rect class="n" x="30" y="160" width="160" height="70" rx="12"/>
+      <text class="t" x="110" y="190" text-anchor="middle">Terrain</text>
+      <text class="ts" x="110" y="212" text-anchor="middle">ground ahead</text>
+
+      <rect class="n" x="230" y="70" width="170" height="160" rx="12"/>
+      <text class="t" x="315" y="122" text-anchor="middle">Window</text>
+      <text class="ts" x="315" y="148" text-anchor="middle">goal point</text>
+      <text class="ts" x="315" y="166" text-anchor="middle">height map</text>
+      <text class="ts" x="315" y="184" text-anchor="middle">measured last 0.4 s</text>
+
+      <rect class="n hl" x="440" y="70" width="150" height="160" rx="12"/>
+      <text class="t" x="515" y="146" text-anchor="middle">Planner</text>
+      <text class="ts" x="515" y="168" text-anchor="middle">next 1.2 s</text>
+
+      <rect class="n hl" x="620" y="70" width="140" height="160" rx="12"/>
+      <text class="t" x="690" y="130" text-anchor="middle">Slice</text>
+      <text class="ts" x="690" y="154" text-anchor="middle">pelvis, footholds,</text>
+      <text class="ts" x="690" y="170" text-anchor="middle">trunk</text>
+
+      <rect class="n tl" x="840" y="70" width="190" height="160" rx="12"/>
+      <text class="t" x="935" y="130" text-anchor="middle">Muscle policy</text>
+      <text class="ts" x="935" y="154" text-anchor="middle">senses + targets</text>
+      <text class="ts" x="935" y="172" text-anchor="middle">→ 90 muscles</text>
+
+      <rect class="n" x="1070" y="70" width="180" height="160" rx="12"/>
+      <text class="t" x="1160" y="146" text-anchor="middle">Physics</text>
+      <text class="ts" x="1160" y="168" text-anchor="middle">SPRINT</text>
+
+      <rect class="n" x="1070" y="300" width="180" height="80" rx="12"/>
+      <text class="t" x="1160" y="346" text-anchor="middle">Body state</text>
+
+      <path class="ar" d="M190,105 H226" marker-end="url(#ah2)"/>
+      <path class="ar" d="M190,195 H226" marker-end="url(#ah2)"/>
+      <path class="ar" d="M400,150 H436" marker-end="url(#ah2)"/>
+      <path class="ar" d="M590,150 H616" marker-end="url(#ah2)"/>
+      <path class="ar blue" d="M760,150 H836" marker-end="url(#ahB)" style="stroke-width:2.5"/>
+      <text class="tb" x="770" y="140">targets</text>
+      <path class="ar" d="M1030,150 H1066" marker-end="url(#ah2)"/>
+      <path class="ar" d="M1160,230 V296" marker-end="url(#ah2)"/>
+      <path class="ar tl" d="M1070,340 H935 V236" marker-end="url(#ahT2)"/>
+      <text class="tt" x="944" y="300">senses</text>
+      <path class="ar blue" d="M1160,380 V410 H315 V236" marker-end="url(#ahB)"/>
+      <text class="tb" x="420" y="402">measured history</text>
+    </svg>
+  </div>
+</section>
+
+<!-- horizon -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · over time</span>
+    <h2>Plan far, use a little, plan again</h2>
+    <p>Each plan reaches 1.2 s ahead; the policy follows only its first 0.2 s. The far end keeps the near end sensible.</p>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia dia-wide" viewBox="0 0 1280 250" role="img" aria-label="Timeline: a new plan every 0.2 s, each 1.2 s long; only the first 0.2 s of each is used.">
+      <g id="horizon"></g>
+    </svg>
+  </div>
+</section>
+
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); parent.appendChild(e); return e; };
+
+(function () {
+  const h = document.getElementById("hist");
+  for (let i = 0; i < 8; i++) for (let r = 0; r < 4; r++)
+    el("rect", { x: 20 + i * 42, y: 68 + r * 12, width: 38, height: 9, rx: 2, class: "cell-h", opacity: (0.35 + 0.65 * (i + 1) / 8).toFixed(2) }, h);
+  const p = document.getElementById("patch");
+  for (let i = 0; i < 18; i++) for (let j = 0; j < 4; j++)
+    el("rect", { x: 20 + i * 19, y: 198 + j * 12, width: 17, height: 10, rx: 2, fill: "var(--wire)", opacity: ((i > 10 ? 0.55 : 0.18) + 0.04 * j).toFixed(2) }, p);
+  const f = document.getElementById("fut");
+  for (let i = 0; i < 24; i++) for (let r = 0; r < 12; r++)
+    el("rect", { x: 792 + i * 19.5, y: 56 + r * 15, width: 16.5, height: 11, rx: 2, class: r < 5 ? "cell-f" : "", fill: r < 5 ? null : "var(--wire)", opacity: r < 5 ? "0.9" : "0.3" }, f);
+})();
+
+(function () {
+  const g = document.getElementById("rings");
+  for (const m of [1, 2, 3]) {
+    el("circle", { cx: 180, cy: 180, r: m * 70, fill: "none", stroke: "var(--line)", "stroke-width": 1.2, "stroke-dasharray": "4 5" }, g);
+    const t = el("text", { x: 180 + m * 70 + 4, y: 196, class: "tm" }, g); t.textContent = m + " m";
+  }
+})();
+const PX = 70;
+function update() {
+  const v = parseFloat(document.getElementById("speed").value), deg = parseFloat(document.getElementById("dir").value);
+  const d = v * 1.2, r = deg * Math.PI / 180;
+  const x = 180 + d * PX * Math.cos(r), y = 180 - d * PX * Math.sin(r);
+  const back = d > 0.2 ? 12 / (d * PX) : 0;
+  document.getElementById("goalLine").setAttribute("d", `M180,180 L${x - (x - 180) * back},${y - (y - 180) * back}`);
+  document.getElementById("goalDot").setAttribute("cx", x); document.getElementById("goalDot").setAttribute("cy", y);
+  document.getElementById("goalLbl").setAttribute("x", x); document.getElementById("goalLbl").setAttribute("y", y - 18);
+  document.getElementById("spdOut").textContent = v.toFixed(1);
+  document.getElementById("dirOut").textContent = deg > 0 ? "+" + deg : deg;
+  document.getElementById("goalM").textContent = d.toFixed(2) + " m";
+  const a = Math.abs(deg);
+  document.getElementById("goalNote").textContent = v < 0.2 ? "stay put" : a <= 15 ? "straight on" : a <= 60 ? (deg > 0 ? "veer left" : "veer right") : a <= 120 ? (deg > 0 ? "to the left" : "to the right") : "behind";
+}
+document.getElementById("speed").addEventListener("input", update);
+document.getElementById("dir").addEventListener("input", update);
+update();
+
+(function () {
+  const g = document.getElementById("horizon");
+  const x0 = 70, px = 380;
+  for (let k = 0; k <= 15; k++) {
+    const s = k * 0.2, x = x0 + s * px;
+    el("line", { x1: x, y1: 20, x2: x, y2: 210, class: "grid-line" }, g);
+    if (k % 2 === 0) { const t = el("text", { x: x, y: 236, class: "tm", "text-anchor": "middle" }, g); t.textContent = s.toFixed(1) + " s"; }
+  }
+  for (let i = 0; i < 9; i++) {
+    const s = i * 0.2, x = x0 + s * px, y = 26 + i * 20;
+    el("rect", { x: x, y: y, width: Math.min(1.2 * px, 1260 - x), height: 12, rx: 3, fill: "var(--blue-soft)", stroke: "var(--blue)", "stroke-width": 1 }, g);
+    el("rect", { x: x, y: y, width: 0.2 * px, height: 12, rx: 3, fill: "var(--blue)" }, g);
+    const t = el("text", { x: 10, y: y + 10, class: "tm" }, g); t.textContent = "plan " + (i + 1);
+  }
+})();
+</script>

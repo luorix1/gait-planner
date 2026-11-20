@@ -6,7 +6,10 @@ With --dataset ab01: every window of the walk/start-stop/stand modes, every 10th
 
 Run (GPU, detached; a fresh --out per run):
   setsid nohup .venv/bin/python train_planner.py --out runs/planner_net_v1 > runs/planner_net_v1.log 2>&1 < /dev/null &
-Out: <out>/planner.pt (latest; overwritten every 2k iterations), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
+Full-pose planner (--pose): plan + pelvis + every joint coordinate (gp.planner.POSE_CHANNELS); Bones SEED needs
+--seed-cleared. Licence-clean baseline: GP_DATASET=v3 ... --pose --balance.
+
+Out: <out>/planner.pt (latest; overwritten every 2k iterations), <out>/planner_best.pt (lowest held-out loss), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
 """
 
 from __future__ import annotations
@@ -37,6 +40,10 @@ def main() -> None:
                     "every --holdout-th trial held out for the held-out loss; default: data.OUT's train split")
     ap.add_argument("--modes", default="walk,start_stop,stand")
     ap.add_argument("--holdout", type=int, default=10)
+    ap.add_argument("--pose", action="store_true", help="full-pose planner: plan + pelvis + every joint coordinate")
+    ap.add_argument("--balance", action="store_true", help="batches by gp.data.clip_weights(D, 'sqrt'), not uniform")
+    ap.add_argument("--seed-cleared", action="store_true", help="allow Bones SEED clips in a --pose planner "
+                    "(its licence forbids motion generators unless cleared)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     out = Path(a.out)
@@ -46,21 +53,22 @@ def main() -> None:
         D = load_clips(a.dataset, "", a.modes)
         trial = [str(n).rsplit("_", 1)[0] for n in D["name"]]
         held = set(sorted(set(trial))[a.holdout - 1::a.holdout])
-        W = Windows(data.take(D, [k for k, t in enumerate(trial) if t not in held]), a.device)
-        Wt = Windows(data.take(D, [k for k, t in enumerate(trial) if t in held]), a.device)
+        Dtr, Dte = (data.take(D, [k for k, t in enumerate(trial) if (t in held) == h]) for h in (False, True))
         (out / "held_out_trials.txt").write_text("\n".join(sorted(held)) + "\n")
     else:
-        W = Windows(data.load("train"), a.device)
-        Wt = Windows(data.load(("test_trial", "test_terrain")), a.device)
+        Dtr, Dte = data.load("train"), data.load(("test_trial", "test_terrain"))
+    if a.pose and not a.seed_cleared and "seed_bones" in set(map(str, Dtr["source"])):
+        raise SystemExit("Bones SEED in a motion generator needs --seed-cleared (licence section 6)")
+    W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
-    planner = Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim).to(a.device)
+    planner = Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device)
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
     gen = torch.Generator(device=a.device).manual_seed(1)
     log = csv.writer((out / "progress.csv").open("w", buffering=1))
     log.writerow(["iter", "seconds", "train_loss", "held_out_loss"])
     tb = SummaryWriter(out / "tb", flush_secs=30)
-    t0, run = time.time(), 0.0
+    t0, run, best = time.time(), 0.0, float("inf")
     for it in range(1, a.iters + 1):
         loss = planner.loss(*W.batch(a.batch))
         opt.zero_grad(set_to_none=True)
@@ -80,8 +88,12 @@ def main() -> None:
             log.writerow([it, round(time.time() - t0), round(run, 5), round(held, 5)])
             tb.add_scalar("loss/held_out", held, it)
             print(f"{it:>7d}  {time.time() - t0:7.0f} s  train {run:.4f}  held-out {held:.4f}", flush=True)
+            if held < best:
+                best = held
+                planner.save(out / "planner_best.pt", iters=it, held_out=held, data=a.dataset or str(data.OUT),
+                             mirrored=True, pose=a.pose)
         if it % 2000 == 0 or it == a.iters:
-            planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True)
+            planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose)
     tb.close()
 
 

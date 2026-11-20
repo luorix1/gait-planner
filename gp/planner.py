@@ -50,6 +50,13 @@ MIRROR_PERM = [1, 0, 4, 5, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13]
 MIRROR_SIGN = [1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0]   # tilt: a pseudovector
 T_DIFF = 50
 MIN_STD = 0.05
+#: Full-pose windows (``Windows(pose=True)``) append the pelvis origin (anchor frame, relative to the anchor's centre
+#: of mass) and every non-pelvis coordinate to the plan channels; the plan channels stay first, so a full-pose
+#: window's ``[..., :C]`` is a plan window.
+POSE_COORDS = ("hip_flexion_l", "hip_adduction_l", "hip_rotation_l", "hip_flexion_r", "hip_adduction_r",
+               "hip_rotation_r", "lumbar_extension", "lumbar_bending", "lumbar_rotation", "knee_angle_l", "knee_angle_r",
+               "ankle_angle_l", "ankle_angle_r", "subtalar_angle_l", "subtalar_angle_r", "mtp_angle_l", "mtp_angle_r")
+POSE_CHANNELS = (*CHANNELS, "pelvis_f", "pelvis_y", "pelvis_lat", *POSE_COORDS)
 
 
 # --- plan frames ---------------------------------------------------------------------------------------------------
@@ -95,15 +102,21 @@ def from_frame(fl: torch.Tensor, origin: torch.Tensor, psi: torch.Tensor) -> tor
 
 
 def features(down: torch.Tensor, hold: torch.Tensor, com: torch.Tensor, psi: torch.Tensor, quat: torch.Tensor,
-             a_com: torch.Tensor, a_psi: torch.Tensor) -> torch.Tensor:
+             a_com: torch.Tensor, a_psi: torch.Tensor, pelvis: torch.Tensor | None = None,
+             joints: torch.Tensor | None = None) -> torch.Tensor:
     """World plan frames (down ``[B, K, 2]``, foothold xz ``[B, K, 2, 2]``, com ``[B, K, 3]``, heading ``[B, K]``,
-    pelvis orientation ``[B, K, 4]``) -> ``[B, K, C]`` in the frame of anchor (``a_com`` ``[B, 3]``, ``a_psi`` ``[B]``)."""
+    pelvis orientation ``[B, K, 4]``) -> ``[B, K, C]`` in the frame of anchor (``a_com`` ``[B, 3]``, ``a_psi`` ``[B]``).
+    With the pelvis origin ``[B, K, 3]`` and joint coordinates ``[B, K, len(POSE_COORDS)]``: the full-pose channels."""
     o = a_com[:, [0, 2]]
     cxz = to_frame(com[..., [0, 2]], o, a_psi)
     dpsi = psi - a_psi[:, None]
-    return torch.cat([down.float() * 2 - 1, to_frame(hold, o, a_psi).flatten(2), cxz[..., :1],
-                      (com[..., 1] - a_com[:, 1:2])[..., None], cxz[..., 1:], dpsi.cos()[..., None],
-                      dpsi.sin()[..., None], tilt(quat, psi)], -1)
+    x = torch.cat([down.float() * 2 - 1, to_frame(hold, o, a_psi).flatten(2), cxz[..., :1],
+                   (com[..., 1] - a_com[:, 1:2])[..., None], cxz[..., 1:], dpsi.cos()[..., None],
+                   dpsi.sin()[..., None], tilt(quat, psi)], -1)
+    if pelvis is None:
+        return x
+    pxz = to_frame(pelvis[..., [0, 2]], o, a_psi)
+    return torch.cat([x, pxz[..., :1], (pelvis[..., 1] - a_com[:, 1:2])[..., None], pxz[..., 1:], joints], -1)
 
 
 def world(x: torch.Tensor, a_com: torch.Tensor, a_psi: torch.Tensor) -> tuple[torch.Tensor, ...]:
@@ -124,17 +137,32 @@ def patch(G: Ground, clip: torch.Tensor, a_com: torch.Tensor, a_psi: torch.Tenso
     return (G(clip, xz[..., 0], xz[..., 1]) - a_com[:, 1:2]).view(len(clip), len(PATCH_F), len(PATCH_L))
 
 
-def mirror(x: torch.Tensor, p: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def mirror(x: torch.Tensor, p: torch.Tensor, perm: Any = MIRROR_PERM, sign: Any = MIRROR_SIGN
+           ) -> tuple[torch.Tensor, torch.Tensor]:
     """The same windows reflected left to right: feet swapped, lateral coordinates and heading changes negated, the
-    patch's lateral axis reversed (``PATCH_L`` is symmetric)."""
-    return x[..., MIRROR_PERM] * x.new_tensor(MIRROR_SIGN), p.flip(-1)
+    patch's lateral axis reversed (``PATCH_L`` is symmetric). Full-pose windows pass :func:`pose_mirror`'s."""
+    return x[..., perm] * x.new_tensor(sign), p.flip(-1)
+
+
+def pose_mirror(coord_names: list[str]) -> tuple[list[int], list[float]]:
+    """``mirror``'s permutation and signs for full-pose windows: the plan's, the pelvis's lateral offset negated, and
+    each joint coordinate from its partner with gp.data.coord_mirror_signs' sign (forward kinematics, not the axis
+    rule, which gets Rajagopal's hips and knee wrong)."""
+    from sprint.recipes.imitation import mirrored
+    signs = gpdata.coord_mirror_signs(gpdata.load_model())
+    names = list(coord_names)
+    perm = [*MIRROR_PERM, C, C + 1, C + 2] + [C + 3 + POSE_COORDS.index(mirrored(n)) for n in POSE_COORDS]
+    sign = [*MIRROR_SIGN, 1.0, 1.0, -1.0] + [float(signs[names.index(n)]) for n in POSE_COORDS]
+    return perm, sign
 
 
 class Windows:
     """Plan windows of a loaded dataset (gp.data.load), on ``device``. ``anchors``: every frame with a full window in
-    its clip; ``self(a)`` -> (windows ``[B, HIST + FUT, C]``, patches, goals ``[B, 2]``) at anchor frames ``a``."""
+    its clip; ``self(a)`` -> (windows ``[B, HIST + FUT, C]``, patches, goals ``[B, 2]``) at anchor frames ``a``.
+    ``pose``: full-pose windows (``POSE_CHANNELS``). ``balance``: batches draw anchors by gp.data.clip_weights(D,
+    "sqrt") (each source by the square root of its length, every recording equal within it), not uniformly."""
 
-    def __init__(self, D: dict[str, Any], device: Any = "cpu") -> None:
+    def __init__(self, D: dict[str, Any], device: Any = "cpu", pose: bool = False, balance: bool = False) -> None:
         T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=device)  # noqa: E731
         self.down = T(D["plan_contact"], torch.bool)
         self.hold = T(D["foothold"])[..., [0, 2]]
@@ -147,20 +175,36 @@ class Windows:
         self.anchors = T(np.concatenate([np.arange(s + STRIDE * (HIST - 1), s + n - STRIDE * FUT)
                                          for s, n in zip(D["start"], D["frames"], strict=True)]), torch.long)
         self.k = STRIDE * torch.arange(-HIST + 1, FUT + 1, device=device)
+        self.pose = pose
+        self.perm, self.sign = (MIRROR_PERM, MIRROR_SIGN)
+        if pose:
+            rec = T(D["record"])
+            self.pelvis = rec[:, gpdata.record_layout(len(D["tracked"]))["root_pos"]]
+            self.joints = T(D["qpos"])[:, [list(D["coord_names"]).index(n) for n in POSE_COORDS]]
+            self.perm, self.sign = pose_mirror(D["coord_names"])
+        self.c = len(self.sign)
+        self.w = None
+        if balance:                              # clip weight spread over the clip's anchors
+            n_a = np.maximum(np.asarray(D["frames"]) - STRIDE * (HIST - 1 + FUT), 0)
+            cw = gpdata.clip_weights(D, "sqrt")
+            self.w = T(np.repeat(np.divide(cw, n_a, out=np.zeros_like(cw), where=n_a > 0), n_a))
 
     def __call__(self, a: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         k = a[:, None] + self.k
-        x = features(self.down[k], self.hold[k], self.com[k], self.psi[k], self.quat[k], self.com[a], self.psi[a])
+        extra = (self.pelvis[k], self.joints[k]) if self.pose else ()
+        x = features(self.down[k], self.hold[k], self.com[k], self.psi[k], self.quat[k], self.com[a], self.psi[a], *extra)
         return x, patch(self.G, self.clip[a], self.com[a], self.psi[a]), x[:, -1, GOAL]
 
     def batch(self, n: int, gen: torch.Generator | None = None, mirrored: bool = True
               ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """``n`` random windows; with ``mirrored`` a random half reflected left to right."""
         dev = self.anchors.device
-        x, p, _ = self(self.anchors[torch.randint(len(self.anchors), (n,), device=dev, generator=gen)])
+        i = (torch.randint(len(self.anchors), (n,), device=dev, generator=gen) if self.w is None
+             else torch.multinomial(self.w, n, replacement=True, generator=gen))
+        x, p, _ = self(self.anchors[i])
         if mirrored:
             flip = torch.rand(n, device=dev, generator=gen) < 0.5
-            x[flip], p[flip] = mirror(x[flip], p[flip])
+            x[flip], p[flip] = mirror(x[flip], p[flip], self.perm, self.sign)
         return x, p, x[:, -1, GOAL]
 
 
@@ -169,11 +213,11 @@ class Windows:
 class PlanNet(nn.Module):
     """x0-predicting DiT over [ground tokens, plan tokens]; the diffusion step and the goal condition through adaLN."""
 
-    def __init__(self, layers: int = 4, heads: int = 4, head_dim: int = 64) -> None:
+    def __init__(self, layers: int = 4, heads: int = 4, head_dim: int = 64, c: int = C) -> None:
         super().__init__()
         D = heads * head_dim
         self.D = D
-        self.inp = nn.Linear(C + 1, D)                                # + the "given" flag
+        self.inp = nn.Linear(c + 1, D)                                # + the "given" flag
         self.pe = nn.Parameter(torch.randn(1, HIST + FUT, D) * 0.02)
         self.conv = nn.Sequential(nn.Conv2d(1, 32, 3, 2, 1), nn.SiLU(), nn.Conv2d(32, D, 3, 2, 1))
         n_tok = self.conv(torch.zeros(1, 1, len(PATCH_F), len(PATCH_L))).flatten(2).shape[2]
@@ -183,7 +227,7 @@ class PlanNet(nn.Module):
         self.ada = nn.Sequential(nn.SiLU(), nn.Linear(D, 6 * D))
         self.blocks = nn.ModuleList(_Block(D, heads) for _ in range(layers))
         self.norm = nn.LayerNorm(D)
-        self.out = nn.Linear(D, C)
+        self.out = nn.Linear(D, c)
         given = torch.zeros(1, HIST + FUT, 1)
         given[:, :HIST] = 1.0
         self.register_buffer("given", given)
@@ -202,18 +246,19 @@ class Planner(nn.Module):
     """The denoiser, its EMA copy (what samples), the schedule and the normalisers. Public methods take and return
     unnormalised windows, patches and goals."""
 
-    def __init__(self, T: int = T_DIFF, layers: int = 4, heads: int = 4, head_dim: int = 64) -> None:
+    def __init__(self, T: int = T_DIFF, layers: int = 4, heads: int = 4, head_dim: int = 64, c: int = C) -> None:
         super().__init__()
-        self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim)
-        self.net = PlanNet(layers, heads, head_dim)
+        self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, c=c)
+        self.c = c
+        self.net = PlanNet(layers, heads, head_dim, c)
         self.ema = torch.optim.swa_utils.AveragedModel(self.net, multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.995))
         self.register_buffer("ab", _alphas_cumprod(T))
-        for k, n in (("x", C), ("p", 1), ("g", 2)):
+        for k, n in (("x", c), ("p", 1), ("g", 2)):
             self.register_buffer(f"{k}_mean", torch.zeros(n))
             self.register_buffer(f"{k}_std", torch.ones(n))
 
     def set_normaliser(self, x: torch.Tensor, p: torch.Tensor, g: torch.Tensor) -> None:
-        for k, v in (("x", x.reshape(-1, C)), ("p", p.reshape(-1, 1)), ("g", g)):
+        for k, v in (("x", x.reshape(-1, self.c)), ("p", p.reshape(-1, 1)), ("g", g)):
             getattr(self, f"{k}_mean").copy_(v.mean(0))
             getattr(self, f"{k}_std").copy_(v.std(0).clamp_min(MIN_STD))
 
@@ -233,11 +278,11 @@ class Planner(nn.Module):
                  ema: bool = True, stride: int = 1) -> torch.Tensor:
         """The future ``[B, FUT, C]`` after ``hist`` ``[B, HIST, C]``: deterministic DDIM over every ``stride``-th
         diffusion step (1 = all)."""
-        pad = hist.new_zeros(len(hist), FUT, C)
+        pad = hist.new_zeros(len(hist), FUT, self.c)
         h, p, g = self._n(torch.cat([hist, pad], 1), p, g)
         h = h[:, :HIST]
         net = self.ema if ema else self.net
-        x = torch.randn(len(h), FUT, C, device=h.device, generator=gen)
+        x = torch.randn(len(h), FUT, self.c, device=h.device, generator=gen)
         ts = list(range(self.cfg["T"] - 1, -1, -stride))
         for t, t_prev in zip(ts, [*ts[1:], -1], strict=True):
             x0 = net(torch.cat([h, x], 1), torch.full((len(h),), t, device=h.device), p, g)[:, HIST:]
