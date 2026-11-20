@@ -933,6 +933,94 @@ table.kv td:first-child { width:150px }
   </div>
 </section>
 
+<section aria-labelledby="s-gap">
+  <div class="sec-head">
+    <h2 id="s-gap">All of AB01: why the student failed, and the test now running</h2>
+    <p>On all 276 AB01 windows the student copied the teacher badly (6.5°, 35 % falls, against 4.9° and 2 %). The teacher acts on the clip it follows; the student never sees the clip, so it learns the average of the teacher's actions over the clips, and the average falls. The test running now gives the student only the part of the clip a footstep planner could supply.</p>
+  </div>
+  <div class="panel scroll">
+    <div class="dkey"><span class="k obs">observation (network input)</span><span class="k learn">learned network</span><span class="k frozen">frozen here (learned earlier)</span><span class="k sim">simulation</span><span class="k train">training only</span></div>
+    <svg class="dia" viewBox="0 0 1200 330" role="img" aria-labelledby="gap-t" style="min-width:880px">
+      <title id="gap-t">Before: the clip goes only to the teacher; the student gets L1's inputs from the body and must copy actions that depend on the clip. Now: the clip's plan, footholds with timing and the centre-of-mass path, also goes to the student; at run time a planner would produce it from the command and the terrain.</title>
+      <defs>
+        <marker id="gw2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-wire" d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="ga2" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-amber" d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <text x="300" y="22" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--muted)">BEFORE · L1'S INPUTS ONLY</text>
+      <text x="900" y="22" text-anchor="middle" style="font:600 13px var(--body); letter-spacing:.12em; fill:var(--blue)">NOW · L1'S INPUTS + THE CLIP'S PLAN</text>
+      <line x1="600" y1="10" x2="600" y2="320" stroke="var(--line)" stroke-width="2"/>
+      <!-- BEFORE (x 20..580) -->
+      <path d="M200 70 H302.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga2)"/>
+      <text class="lab" x="250" y="60" text-anchor="middle" fill="var(--amber)">all of it</text>
+      <path class="w" d="M200 255 H302.5" marker-end="url(#gw2)"/><text class="lab" x="250" y="245" text-anchor="middle">L1 inputs</text>
+      <path d="M410 110 V207.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga2)"/>
+      <text class="lab" x="422" y="150" fill="var(--amber)">copy its action</text>
+      <text class="lab" x="422" y="170" fill="var(--amber)">(depends on the clip)</text>
+      <g stroke="var(--bad)" stroke-width="3" stroke-linecap="round"><line x1="98" y1="140" x2="122" y2="164"/><line x1="122" y1="140" x2="98" y2="164"/></g>
+      <text class="lab" x="135" y="150" fill="var(--bad)">the student never</text>
+      <text class="lab" x="135" y="168" fill="var(--bad)">sees the clip</text>
+      <g class="fn hum"><rect x="20" y="30" width="180" height="80" rx="12"/><text class="t1" x="110" y="64">AB01 clip</text><text class="t2" x="110" y="88">pose + footsteps, 1 s</text></g>
+      <g class="fn sim"><rect x="20" y="215" width="180" height="80" rx="12"/><text class="t1" x="110" y="249">Body</text><text class="t2" x="110" y="273">simulated</text></g>
+      <g class="fn frozen"><rect x="310" y="30" width="200" height="80" rx="12"/><text class="t1" x="410" y="64">Teacher</text><text class="t2" x="410" y="88">acts on the clip</text></g>
+      <g class="fn pol"><rect x="310" y="215" width="200" height="80" rx="12"/><text class="t1" x="410" y="249">Student</text><text class="t2" x="410" y="273">learns the average</text></g>
+      <!-- NOW (x 620..1180) -->
+      <path d="M800 70 H902.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga2)"/>
+      <text class="lab" x="850" y="60" text-anchor="middle" fill="var(--amber)">all of it</text>
+      <path d="M710 110 V127.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga2)"/>
+      <path class="w" d="M800 162 H860 V230 H902.5" marker-end="url(#gw2)"/><text class="lab" x="872" y="196">plan (135)</text>
+      <path class="w" d="M800 270 H902.5" marker-end="url(#gw2)"/><text class="lab" x="850" y="292" text-anchor="middle">L1 inputs</text>
+      <path d="M1010 110 V207.5" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ga2)"/>
+      <text class="lab" x="1022" y="160" fill="var(--amber)">copy its action</text>
+      <g class="fn hum"><rect x="620" y="30" width="180" height="80" rx="12"/><text class="t1" x="710" y="64">AB01 clip</text><text class="t2" x="710" y="88">pose + footsteps, 1 s</text></g>
+      <g class="fn obs"><rect x="620" y="135" width="180" height="56" rx="12"/><text class="t1" x="710" y="158" style="font-size:16px">Its plan only</text><text class="t2" x="710" y="178">footholds, timing, COM</text></g>
+      <g class="fn sim"><rect x="620" y="230" width="180" height="70" rx="12"/><text class="t1" x="710" y="260">Body</text><text class="t2" x="710" y="282">simulated</text></g>
+      <g class="fn frozen"><rect x="910" y="30" width="200" height="80" rx="12"/><text class="t1" x="1010" y="64">Teacher</text><text class="t2" x="1010" y="88">same as before</text></g>
+      <g class="fn pol"><rect x="910" y="215" width="200" height="80" rx="12"/><text class="t1" x="1010" y="249">Student</text><text class="t2" x="1010" y="273">sees where feet go</text></g>
+      <text class="axl" x="1180" y="318" text-anchor="end">at run time a planner makes the plan from the command and the terrain</text>
+    </svg>
+  </div>
+  <div class="panel scroll">
+    <svg class="dia" viewBox="0 0 1200 316" role="img" aria-labelledby="mat-t" style="min-width:880px">
+      <title id="mat-t">What each network sees, of three kinds of information, and the result. Teacher: all three, 4.9 degrees and 2 percent falls. Earlier student: body only, 6.5 degrees and 35 percent. Test A: all three, 4.87 degrees and 1.9 percent, the teacher's level. Plan test, running: body and the plan, without the future pose.</title>
+      <text class="lab" x="20" y="40" style="font-weight:600">network</text>
+      <g text-anchor="middle" style="font:600 14px var(--body); fill:var(--ink)">
+        <text x="430" y="32">own body, muscles,</text><text x="430" y="50">terrain near the feet</text>
+        <text x="650" y="32">the clip's plan: footholds,</text><text x="650" y="50">step timing, COM path</text>
+        <text x="870" y="32">the clip's future pose:</text><text x="870" y="50">joint angles and speeds</text>
+      </g>
+      <text class="lab" x="1050" y="40" text-anchor="middle" style="font-weight:600">driving alone</text>
+      <g class="rowlab" style="font:600 16px var(--body); fill:var(--ink)">
+        <text x="20" y="100">Teacher</text><text x="20" y="160">Earlier student</text><text x="20" y="220">Test A (privileged)</text><text x="20" y="280">Plan test (now)</text>
+      </g>
+      <g class="axl"><text x="20" y="118">phase 1, frozen</text><text x="20" y="178">L1's inputs only</text><text x="20" y="238">L1 + the whole clip</text><text x="20" y="298">L1 + the plan</text></g>
+      <!-- yes cells -->
+      <g fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="2">
+        <rect x="330" y="76" width="200" height="40" rx="8"/><rect x="550" y="76" width="200" height="40" rx="8"/><rect x="770" y="76" width="200" height="40" rx="8"/>
+        <rect x="330" y="136" width="200" height="40" rx="8"/>
+        <rect x="330" y="196" width="200" height="40" rx="8"/><rect x="550" y="196" width="200" height="40" rx="8"/><rect x="770" y="196" width="200" height="40" rx="8"/>
+        <rect x="330" y="256" width="200" height="40" rx="8"/><rect x="550" y="256" width="200" height="40" rx="8"/>
+      </g>
+      <!-- no cells -->
+      <g fill="none" stroke="var(--wire)" stroke-width="1.5" stroke-dasharray="5 5">
+        <rect x="550" y="136" width="200" height="40" rx="8"/><rect x="770" y="136" width="200" height="40" rx="8"/><rect x="770" y="256" width="200" height="40" rx="8"/>
+      </g>
+      <g text-anchor="middle" style="font:500 14px var(--body)">
+        <text x="430" y="101" fill="var(--blue)">sees</text><text x="650" y="101" fill="var(--blue)">sees</text><text x="870" y="101" fill="var(--blue)">sees</text>
+        <text x="430" y="161" fill="var(--blue)">sees</text><text x="650" y="161" fill="var(--muted)">—</text><text x="870" y="161" fill="var(--muted)">—</text>
+        <text x="430" y="221" fill="var(--blue)">sees</text><text x="650" y="221" fill="var(--blue)">sees</text><text x="870" y="221" fill="var(--blue)">sees</text>
+        <text x="430" y="281" fill="var(--blue)">sees</text><text x="650" y="281" fill="var(--blue)">sees</text><text x="870" y="281" fill="var(--muted)">—</text>
+      </g>
+      <g text-anchor="middle" style="font:600 15px var(--body)">
+        <text x="1050" y="101" fill="var(--ink)">4.9° · 2 % fall</text>
+        <text x="1050" y="161" fill="var(--bad)">6.5° · 35 % fall</text>
+        <text x="1050" y="221" fill="var(--good)">4.87° · 1.9 % fall</text>
+        <text x="1050" y="281" fill="var(--amber)">running</text>
+      </g>
+    </svg>
+    <p class="note">Same distillation in every student row (DAgger, the same teacher, network and budget); only the student's inputs differ. Test A reached the teacher's level in about 15 minutes, so training is not the limit. If the plan test also gets there, a footstep + COM plan carries what the student was missing, and the controller should take a plan from a planner. Runs distill_ab01, distill_ab01_privileged, distill_ab01_plan.</p>
+  </div>
+</section>
+
 <section aria-labelledby="s-status">
   <div class="sec-head">
     <h2 id="s-status">Next</h2>
