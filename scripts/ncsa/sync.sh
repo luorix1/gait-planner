@@ -7,6 +7,7 @@
 #   scripts/ncsa/sync.sh pull NAME... [--all]  # runs/NAME <- $GP_REMOTE: logs, record, progress, predictor models,
 #                                              # policy and the Studio folders (--all: checkpoint.pt too)
 #   scripts/ncsa/sync.sh pull-hard             # runs/hard <- $GP_REMOTE (no checkpoints), then hard_report.py
+#                                              # and export_hard.py --to-studio for each newly pulled policy
 #
 # GP_REMOTE is the checkout on the cluster as rsync writes it, e.g.
 #   export GP_REMOTE=<user>@login.delta.ncsa.illinois.edu:/u/<user>/gait_planner
@@ -65,6 +66,8 @@ case $1 in
   pull-hard)
     rsync -az --exclude 'checkpoint.pt' "$GP_REMOTE/runs/hard" runs/
     env -u PYTHONPATH .venv/bin/python hard_report.py runs/hard | head -5
+    new=(); for r in runs/hard/*/; do [[ -f $r/policy.pt && ! -d $r/studio ]] && new+=("${r%/}"); done
+    [[ ${#new[@]} == 0 ]] || env -u PYTHONPATH .venv/bin/python export_hard.py "${new[@]}" --to-studio
     echo "table: runs/hard/summary.md"
     ;;
   *) usage ;;
