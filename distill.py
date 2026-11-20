@@ -132,6 +132,31 @@ def student_loc(net: ActorCritic, x_actor: torch.Tensor) -> torch.Tensor:
     return net.loc_limit * torch.tanh(net.pi(z) / net.loc_limit)
 
 
+def plan_inputs(task: Any, D: dict[str, Any]) -> Any:
+    """``f(s) -> [N, 15 x taps]``: the clip's plan at the recipe's lookahead taps, as gp.tasks.PlanTracking feeds it
+    (per foot: down, foothold from the pelvis in its heading frame, time to touchdown and to lift-off; the centre of
+    mass from the body's), no pose. --plan: what a footstep + COM planner would supply."""
+    from sprint.recipes.imitation import _heading
+
+    T = lambda a, dt=torch.float32: torch.as_tensor(np.asarray(a), dtype=dt, device=task.dev)  # noqa: E731
+    contact, hold, td, lo, com = (T(D["plan_contact"], torch.bool), T(D["foothold"]), T(D["t_touchdown"]),
+                                  T(D["t_liftoff"]), T(D["com"]))
+
+    def f(s: Any) -> torch.Tensor:
+        root = s.body_com_pos()[:, task.root]
+        M = _heading(s.body_quat[:, task.root])
+        c = task.com(s)
+        last = task.clip_last[task.clip] + task.taps[-1]
+        parts = []
+        for t in task.taps:
+            k = torch.minimum(task.frame + t, last)
+            fh = torch.einsum("nij,nkj->nki", M, hold[k] - root[:, None])
+            parts += [torch.cat([contact[k].float()[..., None], fh, td[k][..., None], lo[k][..., None]], -1).flatten(1),
+                      torch.einsum("nij,nj->ni", M, com[k] - c)]
+        return torch.nan_to_num(torch.cat(parts, 1), 0.0, 0.0, 0.0)
+    return f
+
+
 def evaluate(env: Any, task: Any, view: StudentView, act: Any, steps: int) -> dict[str, float]:
     """Every world driven by ``act(teacher_obs, student_obs) -> excitation`` for ``steps`` control steps from fresh
     recipe starts: ended episodes' length and fall share, joint error over all steps."""
@@ -188,6 +213,9 @@ def main() -> None:
     ap.add_argument("--privileged", action="store_true",
                     help="a diagnostic upper bound: the student also reads the teacher's whole observation (the clip "
                          "included); its labels are kept in float16. Not loadable by stage 1")
+    ap.add_argument("--plan", action="store_true",
+                    help="the student also reads the clip's plan (plan_inputs: footholds with timing and the centre of "
+                         "mass at the lookahead taps, no pose): is a footstep + COM plan enough? Not loadable by stage 1")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True)                       # a fresh folder per run, never overwrite one
@@ -206,11 +234,17 @@ def main() -> None:
                        seed=a.seed, foot_model=a.foot_model)
     view.bind(env.model)
     view.attach(env, task)
-    extra = env.obs_dim if a.privileged else 0
+    plan = plan_inputs(task, D) if a.plan else None
+    extra = env.obs_dim if a.privileged else 15 * len(task.taps) if a.plan else 0
     obs_dim = sum(b[1] for b in view.blocks) + extra
     scfg = replace(default_ppo(), rollout_steps=view.c.steps_per_iter)
     S = student_net(view, env, scfg, obs_dim, extra).to(view.dev)
-    full = (lambda so, o: torch.cat([so, o], 1)) if a.privileged else (lambda so, o: so)  # noqa: E731
+
+    def full(so: torch.Tensor, o: torch.Tensor) -> torch.Tensor:
+        """The student's whole observation: L1's, then any --privileged / --plan extra."""
+        if a.privileged:
+            return torch.cat([so, o], 1)
+        return torch.cat([so, plan(env.state)], 1) if plan is not None else so
     with torch.no_grad():
         S.raw_std.copy_(T.raw_std)
     opt = torch.optim.Adam(S.pi.parameters(), lr=a.lr)
