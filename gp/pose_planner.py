@@ -2,9 +2,11 @@
 Kimodo (Rempe et al. 2026) and MotionBricks (2026), after the first full-pose planner slid its stance feet 3-5x real
 and floated when chained:
 
-1. **Absolute heights.** Every height is above the ground directly under that point (pelvis, each foot point), and
-   the ground patch is relative to the ground under the anchor. The pelvis centre of mass replaces the whole-body
-   centre of mass everywhere (anchor origin, goal, channels; user 2026-11-20).
+1. **Heights tied to the terrain.** Every height (pelvis, each foot point) and the ground patch are relative to the
+   ground under the anchor's pelvis, so nothing drifts when plans chain: the old planner measured heights from the
+   anchor's centre of mass, a body quantity, and floated. (Not from the ground directly under each point: that jumps
+   at every step or box edge, and decoding it teleported the pelvis 55 cm onto a box.) The pelvis centre of mass
+   replaces the whole-body centre of mass everywhere (anchor origin, goal, channels; user 2026-11-20).
 2. **Foot points as outputs** (heel and ball of each foot, with their own contact flags), tied to the joint angles by a
    forward-kinematics consistency loss through gp.footfk.FootFK, and contact losses: a point the data has on the
    ground keeps the data's height and moves as the data's does.
@@ -14,8 +16,8 @@ and floated when chained:
    pelvis yaw at one frame, which swings with every step.
 
 A frame (20 Hz, ``CHANNELS``): 4 contact flags (heel/ball, l/r, +-1), 2 footholds (forward, lateral), the pelvis
-centre of mass (forward, lateral, height above ground), the pelvis heading (cos, sin of its change from the anchor's)
-and tilt (rotation vector), 17 joint coordinates, and 4 foot points (forward, lateral, height above ground). Windows,
+centre of mass (forward, lateral, height), the pelvis heading (cos, sin of its change from the anchor's)
+and tilt (rotation vector), 17 joint coordinates, and 4 foot points (forward, lateral, height). Windows,
 network, schedule and sampling otherwise as gp.planner.
 """
 
@@ -124,8 +126,7 @@ class Frames:
             pts = torch.cat([foot_points(fk, q[i:i + 200_000][:, [names.index(n) for n in LEG]])
                              for i in range(0, len(q), 200_000)])
         self.points = rec[:, None, lay["root_pos"]] + _rot(self.quat[:, None], pts)      # [N, 4, 3] world
-        self.g_pcom = self.ground(self.clip, self.pcom)
-        self.g_points = self.ground(self.clip[:, None].expand(-1, 4).reshape(-1), self.points.reshape(-1, 3)).view(-1, 4)
+        self.g_pcom = self.ground(self.clip, self.pcom)                 # the anchor's ground, when it anchors
 
     def ground(self, clip: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
         """Terrain height under points ``p`` ``[N, 3]`` of clips ``clip`` ``[N]``."""
@@ -146,16 +147,16 @@ def foot_points(fk: FootFK, q_leg: torch.Tensor) -> torch.Tensor:
                         s[..., h_r, :], (s[..., l_r, :] + s[..., m_r, :]) / 2], -2)
 
 
-def features(fr: Frames, k: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor) -> torch.Tensor:
+def features(fr: Frames, k: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tensor) -> torch.Tensor:
     """Frames ``k`` ``[B, K]`` -> ``[B, K, C]`` in the frame of the anchor (pelvis com xz ``o`` ``[B, 2]``, smoothed
-    heading ``a_psi`` ``[B]``)."""
+    heading ``a_psi`` ``[B]``, heights over the ground under it ``g0`` ``[B]``)."""
     pc = fr.pcom[k]
     pxz = to_frame(pc[..., [0, 2]], o, a_psi)
     dpsi = fr.psi[k] - a_psi[:, None]
     pts = fr.points[k]
-    pt = torch.cat([to_frame(pts[..., [0, 2]], o, a_psi), (pts[..., 1] - fr.g_points[k])[..., None]], -1).flatten(-2)
+    pt = torch.cat([to_frame(pts[..., [0, 2]], o, a_psi), (pts[..., 1] - g0[:, None, None])[..., None]], -1).flatten(-2)
     return torch.cat([fr.contact[k].float() * 2 - 1, to_frame(fr.hold[k], o, a_psi).flatten(-2), pxz,
-                      (pc[..., 1] - fr.g_pcom[k])[..., None], dpsi.cos()[..., None], dpsi.sin()[..., None],
+                      (pc[..., 1] - g0[:, None])[..., None], dpsi.cos()[..., None], dpsi.sin()[..., None],
                       tilt(fr.quat[k], fr.psi[k]), fr.joints[k], pt], -1)
 
 
@@ -166,20 +167,11 @@ def patch(G: Ground, clip: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g
     return (G(clip, xz[..., 0], xz[..., 1]) - g0[:, None]).view(len(clip), len(PATCH_F), len(PATCH_L))
 
 
-def patch_at(p: torch.Tensor, f: torch.Tensor, lat: torch.Tensor) -> torch.Tensor:
-    """Bilinear patch heights at anchor-frame points (``f``, ``lat`` ``[B, ...]``), clamped at the patch's edge."""
-    xn = (lat - PATCH_L[0]) / (PATCH_L[-1] - PATCH_L[0]) * 2 - 1
-    yn = (f - PATCH_F[0]) / (PATCH_F[-1] - PATCH_F[0]) * 2 - 1
-    grid = torch.stack([xn, yn], -1).reshape(len(p), -1, 1, 2)
-    out = F.grid_sample(p[:, None], grid, mode="bilinear", padding_mode="border", align_corners=True)
-    return out.view(f.shape)
-
-
 class Windows:
     """gp.planner.Windows for the version-2 frames: ``batch(n)`` -> (windows ``[n, HIST + FUT, C]``, patches,
     goals ``[n, 2]``)."""
 
-    def __init__(self, D: dict[str, Any], device: Any, fk: FootFK, balance: bool = False) -> None:
+    def __init__(self, D: dict[str, Any], device: Any, fk: FootFK, balance: bool = False, terrain: bool = False) -> None:
         self.fr = Frames(D, device, fk)
         self.anchors = torch.as_tensor(np.concatenate([np.arange(s + STRIDE * (HIST - 1), s + n - STRIDE * FUT)
                                                        for s, n in zip(D["start"], D["frames"], strict=True)]),
@@ -189,7 +181,7 @@ class Windows:
         self.w = None
         if balance:
             n_a = np.maximum(np.asarray(D["frames"]) - STRIDE * (HIST - 1 + FUT), 0)
-            cw = gpdata.clip_weights(D, "sqrt")
+            cw = gpdata.clip_weights(D, "sqrt", terrain=terrain)
             self.w = torch.as_tensor(np.repeat(np.divide(cw, n_a, out=np.zeros_like(cw), where=n_a > 0), n_a),
                                      dtype=torch.float32, device=device)
 
@@ -199,7 +191,7 @@ class Windows:
 
     def __call__(self, a: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         o, psi, g0 = self.anchor(a)
-        x = features(self.fr, a[:, None] + self.k, o, psi)
+        x = features(self.fr, a[:, None] + self.k, o, psi, g0)
         return x, patch(self.fr.G, self.fr.clip[a], o, psi, g0), x[:, -1, GOAL]
 
     def batch(self, n: int, gen: torch.Generator | None = None, mirrored: bool = True
@@ -250,31 +242,26 @@ class Net(nn.Module):
         return self.out(self.norm(z[:, g.shape[1]:]))
 
 
-def geometry(fk: FootFK, x: torch.Tensor, p: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def geometry(fk: FootFK, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """(foot points from the channels, foot points from the joints) ``[B, K, 4, 3]``, both in the anchor frame with
-    heights over the anchor's ground (x forward, y up, z lateral). ``x`` unnormalised, ``p`` the unnormalised patch."""
-    pf, pl = x[..., P0::3][..., :4], x[..., P0 + 1::3][..., :4]
-    ph = x[..., P0 + 2::3][..., :4]
-    ch = torch.stack([pf, ph + patch_at(p, pf, pl), pl], -1)
+    heights over the anchor's ground (x forward, y up, z lateral). ``x`` unnormalised."""
+    ch = x[..., P0:P0 + 12].unflatten(-1, (4, 3))[..., [0, 2, 1]]       # (f, lat, h) -> (f, h, lat)
     psi = torch.atan2(x[..., 12], x[..., 11])
     quat = _qmul(yaw_quat(psi), qexp(x[..., 13:16]))
-    pc = torch.stack([x[..., 8], x[..., 10] + patch_at(p, x[..., 8], x[..., 9]), x[..., 9]], -1)
+    pc = x[..., [8, 10, 9]]
     origin = pc - _rot(quat, fk.bcom.expand_as(pc))
     kin = origin[..., None, :] + _rot(quat[..., None, :], foot_points(fk, x[..., LEG_COLS]))
     return ch, kin
-
-
-def _on_patch(f: torch.Tensor, lat: torch.Tensor, margin: float = 0.1) -> torch.Tensor:
-    return (f > PATCH_F[0] + margin) & (f < PATCH_F[-1] - margin) & (lat.abs() < PATCH_L[-1] - margin)
 
 
 class PosePlanner(nn.Module):
     """Denoiser, EMA copy, schedule, normalisers and the frozen foot stand-in; methods take unnormalised tensors."""
 
     def __init__(self, T: int = T_DIFF, layers: int = 6, heads: int = 8, head_dim: int = 64,
-                 contact_w: float = CONTACT_W, goal_drop: float = GOAL_DROP) -> None:
+                 contact_w: float = CONTACT_W, goal_drop: float = GOAL_DROP, hist_noise: float = 0.0) -> None:
         super().__init__()
-        self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, contact_w=contact_w, goal_drop=goal_drop)
+        self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, contact_w=contact_w, goal_drop=goal_drop,
+                        hist_noise=hist_noise)
         self.c = C
         self.net = Net(layers, heads, head_dim)
         self.ema = torch.optim.swa_utils.AveragedModel(self.net, multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.995))
@@ -306,7 +293,11 @@ class PosePlanner(nn.Module):
         B, dev = len(x), x.device
         t = torch.randint(0, self.cfg["T"], (B,), device=dev)
         a = self.ab[t][:, None, None]
-        xt = torch.cat([xn[:, :HIST], a.sqrt() * xn[:, HIST:] + (1 - a).sqrt() * torch.randn_like(xn[:, HIST:])], 1)
+        given = xn[:, :HIST]
+        if self.cfg.get("hist_noise"):        # a history that is not quite the data's (the simulated body's, later)
+            sd = torch.rand(B, 1, 1, device=dev) * self.cfg["hist_noise"]
+            given = given + sd * torch.randn_like(given)
+        xt = torch.cat([given, a.sqrt() * xn[:, HIST:] + (1 - a).sqrt() * torch.randn_like(xn[:, HIST:])], 1)
         keep = torch.rand(B, device=dev) >= self.cfg["goal_drop"]
         pred = self.net(xt, t, pn, gn, keep)[:, HIST:]
         mse = F.mse_loss(pred, xn[:, HIST:])
@@ -317,12 +308,9 @@ class PosePlanner(nn.Module):
         ru = x[:, HIST - 1:].float()                                      # the last given frame + the future
         pu = torch.cat([ru[:, :1], pu], 1)                                # so the first step is scored too
         with torch.autocast(x.device.type, enabled=False):                # millimetres need fp32, not bf16
-            ch_p, kin_p = geometry(self.fk, pu, p.float())
-            ch_r, _ = geometry(self.fk, ru, p.float())
-        # where a point or the pelvis lies off the patch, its ground is the patch's edge (and a step's edge is 10 cm
-        # wide): the real data itself disagrees there (0.5 % of points, up to 9 cm), so the consistency skips them
-        inside = _on_patch(ru[..., P0::3][..., :4], ru[..., P0 + 1::3][..., :4]) & _on_patch(ru[..., 8:9], ru[..., 9:10])
-        fk_l = (((ch_p - kin_p) / GEO_SCALE).square().sum(-1) * inside)[:, 1:].sum() / inside[:, 1:].sum().clamp_min(1)
+            ch_p, kin_p = geometry(self.fk, pu)
+            ch_r, _ = geometry(self.fk, ru)
+        fk_l = ((ch_p - kin_p)[:, 1:] / GEO_SCALE).square().sum(-1).mean()
         on = ru[..., :4] > 0                                              # [B, K, 4]
         h_l = (((ch_p - ch_r)[..., 1] / GEO_SCALE).square() * on)[:, 1:].sum() / on[:, 1:].sum().clamp_min(1)
         both = on[:, 1:] & on[:, :-1]

@@ -45,31 +45,26 @@ def circmean(psi: torch.Tensor) -> torch.Tensor:
     return torch.atan2(psi.sin().sum(-1), psi.cos().sum(-1))
 
 
-def frame_features(W: Windows, s: dict, clip: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor) -> torch.Tensor:
-    """World frames ``s`` (each ``[B, K, ...]``) -> ``[B, K, C]`` in the anchor frame, heights over the terrain."""
-    G = W.fr.G
-    B, K = s["pcom"].shape[:2]
-    gp_ = G(clip, s["pcom"][..., 0], s["pcom"][..., 2])
+def frame_features(s: dict, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tensor) -> torch.Tensor:
+    """World frames ``s`` (each ``[B, K, ...]``) -> ``[B, K, C]`` in the anchor frame, heights over ``g0``."""
     pts = s["points"]
-    gpt = G(clip, pts[..., 0].reshape(B, -1), pts[..., 2].reshape(B, -1)).view(B, K, 4)
-    pt = torch.cat([to_frame(pts[..., [0, 2]], o, a_psi), (pts[..., 1] - gpt)[..., None]], -1).flatten(-2)
+    pt = torch.cat([to_frame(pts[..., [0, 2]], o, a_psi), (pts[..., 1] - g0[:, None, None])[..., None]], -1).flatten(-2)
     dpsi = s["psi"] - a_psi[:, None]
     return torch.cat([s["contact"].float() * 2 - 1, to_frame(s["hold"], o, a_psi).flatten(-2),
-                      to_frame(s["pcom"][..., [0, 2]], o, a_psi), (s["pcom"][..., 1] - gp_)[..., None],
+                      to_frame(s["pcom"][..., [0, 2]], o, a_psi), (s["pcom"][..., 1] - g0[:, None])[..., None],
                       dpsi.cos()[..., None], dpsi.sin()[..., None], tilt(s["quat"], s["psi"]), s["joints"], pt], -1)
 
 
-def decode(W: Windows, x: torch.Tensor, clip: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor) -> dict:
+def decode(x: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tensor) -> dict:
     """Generated frames ``[B, K, C]`` -> world frames (the inverse of :func:`frame_features`)."""
-    G = W.fr.G
     B, K = x.shape[:2]
     pxz = from_frame(x[..., 8:10], o, a_psi)
-    pcom = torch.stack([pxz[..., 0], x[..., 10] + G(clip, pxz[..., 0], pxz[..., 1]), pxz[..., 1]], -1)
+    pcom = torch.stack([pxz[..., 0], x[..., 10] + g0[:, None], pxz[..., 1]], -1)
     psi = a_psi[:, None] + torch.atan2(x[..., 12], x[..., 11])
     quat = _qmul(yaw_quat(psi), qexp(x[..., 13:16]))
     pf = x[..., P0:].view(B, K, 4, 3)
     ptxz = from_frame(pf[..., :2], o, a_psi)
-    pty = pf[..., 2] + G(clip, ptxz[..., 0].reshape(B, -1), ptxz[..., 1].reshape(B, -1)).view(B, K, 4)
+    pty = pf[..., 2] + g0[:, None, None]
     return dict(pcom=pcom, quat=quat, psi=psi, contact=x[..., :4] > 0,
                 hold=from_frame(x[..., 4:8].view(B, K, 2, 2), o, a_psi), joints=x[..., J0:J0 + 17],
                 points=torch.stack([ptxz[..., 0], pty, ptxz[..., 1]], -1))
@@ -90,9 +85,9 @@ def rollout(P: PosePlanner, W: Windows, a0: torch.Tensor, goal_of, n_plans: int,
         last = {key: torch.cat(v, 1)[:, -HIST:] for key, v in seq.items()}
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
         g0 = fr.G(clip, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
-        hist = frame_features(W, last, clip, o, a_psi)
+        hist = frame_features(last, o, a_psi, g0)
         fut = P.generate(hist, patch(fr.G, clip, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
-        new = decode(W, fut, clip, o, a_psi)
+        new = decode(fut, o, a_psi, g0)
         for key in seq:
             seq[key].append(new[key])
         psi_hist = torch.cat([psi_hist, new["psi"]], 1)
@@ -127,7 +122,8 @@ class Scorer:
         stance = low[1:] < 0.02
         either = low.min(1)
         p = xp[::20, 0][:, [0, 2]]
-        return dict(min_foot_gap_cm=np.round(100 * np.percentile(either, [5, 50, 95]), 1).tolist(),
+        vz = np.abs(np.diff(xp[:, 0, 1])) * data.HZ             # pelvis vertical speed: a 55 cm teleport reads 22 m/s
+        return dict(pelvis_vz_max_mps=round(float(vz.max()), 2), deep_frac=round(float((gap.min(1) < -0.05).mean()), 3),min_foot_gap_cm=np.round(100 * np.percentile(either, [5, 50, 95]), 1).tolist(),
                     floating=round(float((either > 0.03).mean()), 3), sinking=round(float((either < -0.02).mean()), 3),
                     stance_slip_cms=round(float(100 * np.median(vf[stance])), 1) if stance.any() else None,
                     path_speed_mps=round(float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum() / max(len(p) - 1, 1) / 0.5), 2))
@@ -139,7 +135,7 @@ def main() -> None:
     ap.add_argument("--checkpoint", default="planner_best.pt")
     ap.add_argument("--seconds", type=float, default=8.0)
     ap.add_argument("--keep", type=int, default=4)
-    ap.add_argument("--guidance", type=float, default=2.0)
+    ap.add_argument("--guidance", type=float, default=1.0, help="1 = no guidance (11-21: w=2 worsened feet, speed already held)")
     ap.add_argument("--replays", type=int, default=8)
     ap.add_argument("--speeds", default="0.8,1.2,1.6,2.0")
     ap.add_argument("--turn-deg", type=float, default=30.0)

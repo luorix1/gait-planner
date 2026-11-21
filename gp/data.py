@@ -100,11 +100,14 @@ def split_v2(r: dict[str, Any]) -> str:
     return "test_trial" if zlib.crc32(tag.encode()) % 10 == 0 else "train"
 
 
-def clip_weights(D: dict[str, Any], sources: str = "recordings", lengths: Any = None) -> np.ndarray:
+def clip_weights(D: dict[str, Any], sources: str = "recordings", lengths: Any = None, terrain: bool = False) -> np.ndarray:
     """A sampling weight per clip, summing to 1: every recording (:func:`motion_group`) gets the same total, split among
     its clips by length (``lengths``, default the clips' frames); with ``sources="sqrt"`` each source (dataset) first
     gets a share by the square root of its total length, split equally among its recordings (Bones SEED's 13,000
-    takes would otherwise drown AB01 and PARC). The style prior's batches and the tasks' episode starts both use it."""
+    takes would otherwise drown AB01 and PARC). With ``terrain``, each terrain class (level, obstacles, ramp_up, ...)
+    then gets a share by the square root of its total length, its clips keeping their relative weights (stairs were
+    0.2 % of the full-pose planner's batches; user 2026-11-21). The style prior's batches and the tasks' episode starts
+    use it."""
     ln = np.asarray(D["frames"] if lengths is None else lengths, float)
     _, inv = np.unique([motion_group(str(n)) for n in D["name"]], return_inverse=True)
     tot = np.bincount(inv, ln)[inv]
@@ -115,6 +118,12 @@ def clip_weights(D: dict[str, Any], sources: str = "recordings", lengths: Any = 
             m = src == name
             if w[m].sum() > 0:
                 w[m] *= np.sqrt(ln[m].sum()) / w[m].sum()
+    if terrain:
+        cls = np.asarray(D["terrain_class"]).astype(str)
+        for name in np.unique(cls):
+            m = cls == name
+            if w[m].sum() > 0:
+                w[m] *= np.sqrt(ln[m].sum()) / w[m].sum()
     return w / w.sum()
 
 
@@ -123,6 +132,14 @@ def split_v4(r: dict[str, Any]) -> str:
     if r["source"] == "seed_bones":
         return "test_trial" if zlib.crc32(r["subject"].encode()) % 10 == 0 else "train"
     return split_v2(r)
+
+
+def split_v5(r: dict[str, Any]) -> str:
+    """As v4, plus Bones SEED's stair takes (one staircase, two actors, so the actor rule would hold out none or all):
+    every take ``*_R_001__A300`` (one per direction and gait) is held out."""
+    if r["terrain_class"].startswith("stairs"):
+        return "test_terrain" if r["name"].rsplit("_w", 1)[0].endswith("_R_001__A300") else "train"
+    return split_v4(r)
 
 
 def motion_group(name: str) -> str:
@@ -154,6 +171,9 @@ SPECIFIC_TENSION = 0.6e6
 
 
 DATASETS: dict[str, dict[str, Any]] = {
+    "v5": dict(sources=("ab01", "parc_seed", "seed_bones"), split=split_v5, splits=("train", "test_trial", "test_terrain"),
+               no_replays=True, held_out="as v4; Bones SEED stairs (added to the library 11-16, after v4 was built): "
+                                         "takes *_R_001__A300 in test_terrain"),
     "v4": dict(sources=("ab01", "parc_seed", "seed_bones"), split=split_v4, splits=("train", "test_trial", "test_terrain"),
                no_replays=True, held_out="as v3; Bones SEED: actors with crc32(subject) % 10 == 0 (unseen people)"),
     "v3": dict(sources=("ab01", "parc_seed"), split=split_v2, splits=("train", "test_trial", "test_terrain"), no_replays=True,

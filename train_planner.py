@@ -44,7 +44,11 @@ def main() -> None:
     ap.add_argument("--pose2", action="store_true", help="full-pose planner v2 (gp.pose_planner): absolute heights, "
                     "foot points + contact losses, goal guidance, smoothed heading")
     ap.add_argument("--contact-w", type=float, default=0.1, help="--pose2: weight of each geometric loss")
+    ap.add_argument("--hist-noise", type=float, default=0.0, help="--pose2: history noise, per window uniform in "
+                    "[0, this] normalised units (0 = off)")
     ap.add_argument("--goal-drop", type=float, default=0.1, help="--pose2: share of training windows without the goal")
+    ap.add_argument("--balance-terrain", action="store_true", help="--pose2 with --balance: each terrain class by the "
+                    "square root of its length too")
     ap.add_argument("--balance", action="store_true", help="batches by gp.data.clip_weights(D, 'sqrt'), not uniform")
     ap.add_argument("--seed-cleared", action="store_true", help="allow Bones SEED clips in a --pose planner "
                     "(its licence forbids motion generators unless cleared)")
@@ -72,12 +76,12 @@ def main() -> None:
         from gp.pose_planner import PosePlanner
         from gp.pose_planner import Windows as Windows2
         fk = footfk.fit(Dtr, a.device, data.ROOT / "data" / "foot_fk.pt")
-        W, Wt = Windows2(Dtr, a.device, fk, a.balance), Windows2(Dte, a.device, fk)
+        W, Wt = Windows2(Dtr, a.device, fk, a.balance, a.balance_terrain), Windows2(Dte, a.device, fk)
     else:
         W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
     planner = (PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
-                           goal_drop=a.goal_drop).to(a.device).attach(fk) if a.pose2
+                           goal_drop=a.goal_drop, hist_noise=a.hist_noise).to(a.device).attach(fk) if a.pose2
                else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
