@@ -138,13 +138,14 @@ def _timestep_embedding(t: torch.Tensor, dim: int = 256) -> torch.Tensor:
 class _Block(nn.Module):
     """StableMotionDiTBlock: adaLN-modulated self-attention and a SwiGLU feed-forward, each gated."""
 
-    def __init__(self, dim: int, heads: int, qk_norm: bool = False) -> None:
+    def __init__(self, dim: int, heads: int, qk_norm: bool = False, qk_gain: bool = True) -> None:
         super().__init__()
         self.heads = heads
         # RMS-normalised queries and keys bound the attention logits: without it the full-pose planner's adaLN shift
-        # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22)
-        self.qn = nn.RMSNorm(dim // heads) if qk_norm else None
-        self.kn = nn.RMSNorm(dim // heads) if qk_norm else None
+        # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22). With a
+        # learnable gain (qk_gain) they still crept up (147 -> 170 over 8.5k-11k); without it they stay <= sqrt(head_dim)
+        self.qn = nn.RMSNorm(dim // heads, elementwise_affine=qk_gain) if qk_norm else None
+        self.kn = nn.RMSNorm(dim // heads, elementwise_affine=qk_gain) if qk_norm else None
         self.n1 = nn.LayerNorm(dim, eps=1e-5, elementwise_affine=False)
         self.qkv = nn.Linear(dim, 3 * dim, bias=False)
         self.out = nn.Linear(dim, dim)

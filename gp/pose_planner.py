@@ -220,7 +220,7 @@ class Windows:
 class Net(nn.Module):
     """gp.planner.PlanNet with a learned "no goal" embedding for classifier-free guidance."""
 
-    def __init__(self, layers: int, heads: int, head_dim: int, qk_norm: bool = False) -> None:
+    def __init__(self, layers: int, heads: int, head_dim: int, qk_norm: bool = False, qk_gain: bool = True) -> None:
         super().__init__()
         D = heads * head_dim
         self.D = D
@@ -233,7 +233,7 @@ class Net(nn.Module):
         self.goal = nn.Sequential(nn.Linear(2, D), nn.SiLU(), nn.Linear(D, D))
         self.null = nn.Parameter(torch.zeros(1, D))
         self.ada = nn.Sequential(nn.SiLU(), nn.Linear(D, 6 * D))
-        self.blocks = nn.ModuleList(_Block(D, heads, qk_norm) for _ in range(layers))
+        self.blocks = nn.ModuleList(_Block(D, heads, qk_norm, qk_gain) for _ in range(layers))
         self.norm = nn.LayerNorm(D)
         self.out = nn.Linear(D, C)
         given = torch.zeros(1, HIST + FUT, 1)
@@ -290,12 +290,13 @@ class PosePlanner(nn.Module):
 
     def __init__(self, T: int = T_DIFF, layers: int = 6, heads: int = 8, head_dim: int = 64,
                  contact_w: float = CONTACT_W, goal_drop: float = GOAL_DROP, hist_noise: float = 0.0,
-                 fk_w: float | None = None, pen_w: float = 0.0, qk_norm: bool = False) -> None:
+                 fk_w: float | None = None, pen_w: float = 0.0, qk_norm: bool = False, qk_gain: bool = True) -> None:
         super().__init__()
         self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, contact_w=contact_w, goal_drop=goal_drop,
-                        hist_noise=hist_noise, fk_w=contact_w if fk_w is None else fk_w, pen_w=pen_w, qk_norm=qk_norm)
+                        hist_noise=hist_noise, fk_w=contact_w if fk_w is None else fk_w, pen_w=pen_w, qk_norm=qk_norm,
+                        qk_gain=qk_gain)
         self.c = C
-        self.net = Net(layers, heads, head_dim, qk_norm)
+        self.net = Net(layers, heads, head_dim, qk_norm, qk_gain)
         self.ema = torch.optim.swa_utils.AveragedModel(self.net, multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.995))
         self.register_buffer("ab", _alphas_cumprod(T))
         for k, n in (("x", C), ("p", 1), ("g", 2)):

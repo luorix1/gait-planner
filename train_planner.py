@@ -47,8 +47,8 @@ def main() -> None:
     ap.add_argument("--fk-w", type=float, default=None, help="--pose2: weight of the FK-consistency loss "
                     "(default: --contact-w; it is ~200x stiffer than the denoising loss, 0.3 destabilised v5)")
     ap.add_argument("--pen-w", type=float, default=0.0, help="--pose2: weight of the terrain penetration loss")
-    ap.add_argument("--qk-norm", action="store_true", help="--pose2: RMS-normalised attention queries/keys (bounds "
-                    "the logits; v5-v7 broke on attention logit growth)")
+    ap.add_argument("--qk-norm", action="store_true", help="--pose2: RMS-normalised attention queries/keys with no "
+                    "learnable gain (bounds the logits; v5-v7 broke on attention logit growth, v8's gain let them creep)")
     ap.add_argument("--cosine", action="store_true", help="cosine learning-rate decay to 0 over --iters")
     ap.add_argument("--hist-noise", type=float, default=0.0, help="--pose2: history noise, per window uniform in "
                     "[0, this] normalised units (0 = off)")
@@ -87,7 +87,7 @@ def main() -> None:
         W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
     planner = (PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
-                           goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w, qk_norm=a.qk_norm).to(a.device).attach(fk) if a.pose2
+                           goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w, qk_norm=a.qk_norm, qk_gain=False).to(a.device).attach(fk) if a.pose2
                else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
