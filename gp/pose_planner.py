@@ -13,6 +13,8 @@ and floated when chained:
    it is ~200x stiffer than the denoising loss, and at 0.3 it destabilised training (v5, 2026-11-21).
    A **terrain penetration** loss (``pen_w``) keeps every contact sphere, from the joints, out of the ground patch:
    v5 crept into a 50 cm box without jumping, then snapped the pelvis up once the history put its feet inside.
+   Every geometric loss is Huber past 2 cm and weighted by the window's signal share (alpha-bar of its noise level):
+   squared, at every noise level, a few platform/box windows at high noise carried ~40 % of it and v6 diverged.
 3. **Classifier-free guidance on the goal**: the goal is dropped (a learned "no goal" token) ``GOAL_DROP`` of the time
    in training; sampling mixes the two predictions, ``x = x_none + w (x_goal - x_none)``.
 4. **A smoothed anchor heading**: the circular mean of the pelvis heading over the last ``SMOOTH_S`` (causal), not the
@@ -263,6 +265,11 @@ def geometry(fk: FootFK, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, t
     return ch, pick_points(fk, sph), sph
 
 
+def robust(sq: torch.Tensor) -> torch.Tensor:
+    """A squared error in ``GEO_SCALE`` units, linear past 1 (Huber): a few far-off points cannot take the gradient."""
+    return torch.where(sq < 1, sq, 2 * sq.clamp_min(1).sqrt() - 1)
+
+
 def ground_under(p: torch.Tensor, f: torch.Tensor, lat: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """The lowest of the four patch heights around each anchor-frame point (``f``, ``lat`` ``[B, ...]``; patch ``p``
     ``[B, len(PATCH_F), len(PATCH_L)]``) and whether it is on the patch. The lowest, not interpolated: interpolation
@@ -336,14 +343,17 @@ class PosePlanner(nn.Module):
             ch_p, kin_p, sph_p = geometry(self.fk, pu)
             ch_r, _, _ = geometry(self.fk, ru)
             ground, on_p = ground_under(p.float(), sph_p[..., 0], sph_p[..., 2])
-        fk_l = ((ch_p - kin_p)[:, 1:] / GEO_SCALE).square().sum(-1).mean()
+        # each window's geometry counts by its signal share: at high noise x0 is a blur over modes (on the platform
+        # yet or not), the data's one geometry is not its target, and those few windows dominated the gradient (v6)
+        sig = self.ab[t][:, None, None]
+        fk_l = (robust(((ch_p - kin_p)[:, 1:] / GEO_SCALE).square().sum(-1)) * sig).mean()
         on = ru[..., :4] > 0                                              # [B, K, 4]
-        h_l = (((ch_p - ch_r)[..., 1] / GEO_SCALE).square() * on)[:, 1:].sum() / on[:, 1:].sum().clamp_min(1)
+        h_l = (robust(((ch_p - ch_r)[..., 1] / GEO_SCALE).square()) * on * sig)[:, 1:].sum() / on[:, 1:].sum().clamp_min(1)
         both = on[:, 1:] & on[:, :-1]
         step = ((ch_p[:, 1:] - ch_p[:, :-1]) - (ch_r[:, 1:] - ch_r[:, :-1])) / GEO_SCALE
-        v_l = (step.square().sum(-1) * both).sum() / both.sum().clamp_min(1)
-        under = (torch.relu(ground - (sph_p[..., 1] - self.fk.radius) - PEN_TOL) / GEO_SCALE).square() * on_p
-        pen_l = under[:, 1:].sum() / on_p[:, 1:].sum().clamp_min(1)
+        v_l = (robust(step.square().sum(-1)) * both * sig).sum() / both.sum().clamp_min(1)
+        under = robust((torch.relu(ground - (sph_p[..., 1] - self.fk.radius) - PEN_TOL) / GEO_SCALE).square())
+        pen_l = (under * on_p * sig)[:, 1:].sum() / on_p[:, 1:].sum().clamp_min(1)
         self.parts.update(fk=float(fk_l.detach()), contact_h=float(h_l.detach()), contact_v=float(v_l.detach()),
                           pen=float(pen_l.detach()))
         return mse + self.cfg["contact_w"] * (h_l + v_l) + self.cfg["fk_w"] * fk_l + self.cfg["pen_w"] * pen_l
