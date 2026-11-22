@@ -44,6 +44,10 @@ def main() -> None:
     ap.add_argument("--pose2", action="store_true", help="full-pose planner v2 (gp.pose_planner): absolute heights, "
                     "foot points + contact losses, goal guidance, smoothed heading")
     ap.add_argument("--contact-w", type=float, default=0.1, help="--pose2: weight of each geometric loss")
+    ap.add_argument("--fk-w", type=float, default=None, help="--pose2: weight of the FK-consistency loss "
+                    "(default: --contact-w; it is ~200x stiffer than the denoising loss, 0.3 destabilised v5)")
+    ap.add_argument("--pen-w", type=float, default=0.0, help="--pose2: weight of the terrain penetration loss")
+    ap.add_argument("--cosine", action="store_true", help="cosine learning-rate decay to 0 over --iters")
     ap.add_argument("--hist-noise", type=float, default=0.0, help="--pose2: history noise, per window uniform in "
                     "[0, this] normalised units (0 = off)")
     ap.add_argument("--goal-drop", type=float, default=0.1, help="--pose2: share of training windows without the goal")
@@ -81,10 +85,11 @@ def main() -> None:
         W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
     planner = (PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
-                           goal_drop=a.goal_drop, hist_noise=a.hist_noise).to(a.device).attach(fk) if a.pose2
+                           goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w).to(a.device).attach(fk) if a.pose2
                else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
     planner.set_normaliser(*W.batch(20_000))
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.iters) if a.cosine else None
     gen = torch.Generator(device=a.device).manual_seed(1)
     log = csv.writer((out / "progress.csv").open("w", buffering=1))
     log.writerow(["iter", "seconds", "train_loss", "held_out_loss"])
@@ -97,6 +102,8 @@ def main() -> None:
         loss.backward()
         torch.nn.utils.clip_grad_norm_(planner.net.parameters(), 1.0)
         opt.step()
+        if sched:
+            sched.step()
         if it <= 5_000:
             planner.ema.module.load_state_dict(planner.net.state_dict())
         elif it % 10 == 0:

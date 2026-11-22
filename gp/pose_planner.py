@@ -9,7 +9,10 @@ and floated when chained:
    replaces the whole-body centre of mass everywhere (anchor origin, goal, channels; user 2026-11-20).
 2. **Foot points as outputs** (heel and ball of each foot, with their own contact flags), tied to the joint angles by a
    forward-kinematics consistency loss through gp.footfk.FootFK, and contact losses: a point the data has on the
-   ground keeps the data's height and moves as the data's does.
+   ground keeps the data's height and moves as the data's does. The consistency loss has its own weight (``fk_w``):
+   it is ~200x stiffer than the denoising loss, and at 0.3 it destabilised training (v5, 2026-11-21).
+   A **terrain penetration** loss (``pen_w``) keeps every contact sphere, from the joints, out of the ground patch:
+   v5 crept into a 50 cm box without jumping, then snapped the pelvis up once the history put its feet inside.
 3. **Classifier-free guidance on the goal**: the goal is dropped (a learned "no goal" token) ``GOAL_DROP`` of the time
    in training; sampling mixes the two predictions, ``x = x_none + w (x_goal - x_none)``.
 4. **A smoothed anchor heading**: the circular mean of the pelvis heading over the last ``SMOOTH_S`` (causal), not the
@@ -58,6 +61,7 @@ GOAL_DROP = 0.1
 GUIDANCE = 2.0
 CONTACT_W = 0.1             # weight of each geometric loss
 GEO_SCALE = 0.02            # m: a 2 cm miss costs 1 (before the weight)
+PEN_TOL = 0.01              # m of a sphere under the patch's ground that costs nothing (the data sinks too)
 POINTS = ("heel_l", "ball_l", "heel_r", "ball_r")          # the data's contact flag order
 CHANNELS = ("c_heel_l", "c_ball_l", "c_heel_r", "c_ball_r", "hold_l_f", "hold_l_lat", "hold_r_f", "hold_r_lat",
             "pel_f", "pel_lat", "pel_h", "cos_dpsi", "sin_dpsi", "tilt_x", "tilt_y", "tilt_z", *POSE_COORDS,
@@ -140,7 +144,11 @@ class Frames:
 def foot_points(fk: FootFK, q_leg: torch.Tensor) -> torch.Tensor:
     """Leg coordinates ``[..., 14]`` -> heel and ball centres ``[..., 4, 3]`` in the pelvis frame (``POINTS``: the
     heel sphere; the ball = the mean of the two forefoot spheres on the calcaneus)."""
-    s = fk(q_leg)
+    return pick_points(fk, fk(q_leg))
+
+
+def pick_points(fk: FootFK, s: torch.Tensor) -> torch.Tensor:
+    """All contact spheres ``[..., S, 3]`` -> the ``POINTS`` ``[..., 4, 3]``."""
     h_l, l_l, m_l, h_r, l_r, m_r = (fk.index[k] for k in ("heel_l", "toe_lat_l", "toe_med_l", "heel_r", "toe_lat_r",
                                                           "toe_med_r"))
     return torch.stack([s[..., h_l, :], (s[..., l_l, :] + s[..., m_l, :]) / 2,
@@ -242,26 +250,43 @@ class Net(nn.Module):
         return self.out(self.norm(z[:, g.shape[1]:]))
 
 
-def geometry(fk: FootFK, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """(foot points from the channels, foot points from the joints) ``[B, K, 4, 3]``, both in the anchor frame with
-    heights over the anchor's ground (x forward, y up, z lateral). ``x`` unnormalised."""
+def geometry(fk: FootFK, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """(foot points from the channels, foot points from the joints) ``[B, K, 4, 3]`` and every contact sphere from the
+    joints ``[B, K, S, 3]``, all in the anchor frame with heights over the anchor's ground (x forward, y up, z
+    lateral). ``x`` unnormalised."""
     ch = x[..., P0:P0 + 12].unflatten(-1, (4, 3))[..., [0, 2, 1]]       # (f, lat, h) -> (f, h, lat)
     psi = torch.atan2(x[..., 12], x[..., 11])
     quat = _qmul(yaw_quat(psi), qexp(x[..., 13:16]))
     pc = x[..., [8, 10, 9]]
     origin = pc - _rot(quat, fk.bcom.expand_as(pc))
-    kin = origin[..., None, :] + _rot(quat[..., None, :], foot_points(fk, x[..., LEG_COLS]))
-    return ch, kin
+    sph = origin[..., None, :] + _rot(quat[..., None, :], fk(x[..., LEG_COLS]))
+    return ch, pick_points(fk, sph), sph
+
+
+def ground_under(p: torch.Tensor, f: torch.Tensor, lat: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """The lowest of the four patch heights around each anchor-frame point (``f``, ``lat`` ``[B, ...]``; patch ``p``
+    ``[B, len(PATCH_F), len(PATCH_L)]``) and whether it is on the patch. The lowest, not interpolated: interpolation
+    smears a box edge over a cell and would put a real foot on the floor beside the box "inside" it."""
+    nf, nl = len(PATCH_F), len(PATCH_L)
+    fi, li = (f - PATCH_F[0]) / (PATCH_F[1] - PATCH_F[0]), (lat - PATCH_L[0]) / (PATCH_L[1] - PATCH_L[0])
+    on = (fi >= 0) & (fi <= nf - 1) & (li >= 0) & (li <= nl - 1)
+    i, j = fi.floor().clamp(0, nf - 2).long(), li.floor().clamp(0, nl - 2).long()
+    flat = p.flatten(1)
+
+    def at(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        return torch.gather(flat, 1, (a * nl + b).flatten(1)).view_as(f)
+    return torch.minimum(torch.minimum(at(i, j), at(i + 1, j)), torch.minimum(at(i, j + 1), at(i + 1, j + 1))), on
 
 
 class PosePlanner(nn.Module):
     """Denoiser, EMA copy, schedule, normalisers and the frozen foot stand-in; methods take unnormalised tensors."""
 
     def __init__(self, T: int = T_DIFF, layers: int = 6, heads: int = 8, head_dim: int = 64,
-                 contact_w: float = CONTACT_W, goal_drop: float = GOAL_DROP, hist_noise: float = 0.0) -> None:
+                 contact_w: float = CONTACT_W, goal_drop: float = GOAL_DROP, hist_noise: float = 0.0,
+                 fk_w: float | None = None, pen_w: float = 0.0) -> None:
         super().__init__()
         self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, contact_w=contact_w, goal_drop=goal_drop,
-                        hist_noise=hist_noise)
+                        hist_noise=hist_noise, fk_w=contact_w if fk_w is None else fk_w, pen_w=pen_w)
         self.c = C
         self.net = Net(layers, heads, head_dim)
         self.ema = torch.optim.swa_utils.AveragedModel(self.net, multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.995))
@@ -302,22 +327,26 @@ class PosePlanner(nn.Module):
         pred = self.net(xt, t, pn, gn, keep)[:, HIST:]
         mse = F.mse_loss(pred, xn[:, HIST:])
         self.parts = {"mse": float(mse.detach())}
-        if not self.cfg["contact_w"] or self.fk is None:
+        if not (self.cfg["contact_w"] or self.cfg["fk_w"] or self.cfg["pen_w"]) or self.fk is None:
             return mse
         pu = (pred * self.x_std + self.x_mean).float()
         ru = x[:, HIST - 1:].float()                                      # the last given frame + the future
         pu = torch.cat([ru[:, :1], pu], 1)                                # so the first step is scored too
         with torch.autocast(x.device.type, enabled=False):                # millimetres need fp32, not bf16
-            ch_p, kin_p = geometry(self.fk, pu)
-            ch_r, _ = geometry(self.fk, ru)
+            ch_p, kin_p, sph_p = geometry(self.fk, pu)
+            ch_r, _, _ = geometry(self.fk, ru)
+            ground, on_p = ground_under(p.float(), sph_p[..., 0], sph_p[..., 2])
         fk_l = ((ch_p - kin_p)[:, 1:] / GEO_SCALE).square().sum(-1).mean()
         on = ru[..., :4] > 0                                              # [B, K, 4]
         h_l = (((ch_p - ch_r)[..., 1] / GEO_SCALE).square() * on)[:, 1:].sum() / on[:, 1:].sum().clamp_min(1)
         both = on[:, 1:] & on[:, :-1]
         step = ((ch_p[:, 1:] - ch_p[:, :-1]) - (ch_r[:, 1:] - ch_r[:, :-1])) / GEO_SCALE
         v_l = (step.square().sum(-1) * both).sum() / both.sum().clamp_min(1)
-        self.parts.update(fk=float(fk_l.detach()), contact_h=float(h_l.detach()), contact_v=float(v_l.detach()))
-        return mse + self.cfg["contact_w"] * (fk_l + h_l + v_l)
+        under = (torch.relu(ground - (sph_p[..., 1] - self.fk.radius) - PEN_TOL) / GEO_SCALE).square() * on_p
+        pen_l = under[:, 1:].sum() / on_p[:, 1:].sum().clamp_min(1)
+        self.parts.update(fk=float(fk_l.detach()), contact_h=float(h_l.detach()), contact_v=float(v_l.detach()),
+                          pen=float(pen_l.detach()))
+        return mse + self.cfg["contact_w"] * (h_l + v_l) + self.cfg["fk_w"] * fk_l + self.cfg["pen_w"] * pen_l
 
     @torch.no_grad()
     def generate(self, hist: torch.Tensor, p: torch.Tensor, g: torch.Tensor, gen: torch.Generator | None = None,
