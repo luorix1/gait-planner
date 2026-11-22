@@ -99,23 +99,28 @@ def hold_feet(P: PosePlanner, hist: torch.Tensor, fut: torch.Tensor, iters: int,
     return (x * P.x_std + P.x_mean).detach()
 
 
-def rollout(P: PosePlanner, W: Windows, a0: torch.Tensor, goal_of, n_plans: int, keep: int, w: float,
-            gen: torch.Generator, hold: int = 0) -> dict[str, np.ndarray]:
+def start(W: Windows, a0: torch.Tensor) -> tuple[dict, torch.Tensor]:
+    """World frames of the 0.4 s before anchors ``a0`` (the rollout's first history) and the last ``SMOOTH_S`` of
+    headings."""
     fr = W.fr
-    clip = fr.clip[a0]
     k = a0[:, None] + W.k[:HIST]
     s = dict(pcom=fr.pcom[k], quat=fr.quat[k], psi=fr.psi[k], contact=fr.contact[k], hold=fr.hold[k],
              joints=fr.joints[k], points=fr.points[k])
     starts = torch.as_tensor(np.repeat(np.asarray(W.starts), np.asarray(W.lengths)), device=a0.device)[a0]
     past = torch.maximum(a0[:, None] - STRIDE * torch.arange(NS - 1, -1, -1, device=a0.device), starts[:, None])
-    psi_hist = fr.psi[past]                                          # the last SMOOTH_S of headings (20 Hz)
+    return s, fr.psi[past]
+
+
+def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tensor, goal_of, n_plans: int, keep: int,
+            w: float, gen: torch.Generator, hold: int = 0) -> dict[str, np.ndarray]:
+    """``n_plans`` plans from world start frames ``s`` (:func:`start`) on terrain ``G`` (row ``gid`` per episode)."""
     seq = {key: [v] for key, v in s.items()}
     for i in range(n_plans):
         last = {key: torch.cat(v, 1)[:, -HIST:] for key, v in seq.items()}
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
-        g0 = fr.G(clip, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
+        g0 = G(gid, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
         hist = frame_features(last, o, a_psi, g0)
-        fut = P.generate(hist, patch(fr.G, clip, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
+        fut = P.generate(hist, patch(G, gid, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
         if hold:
             fut = hold_feet(P, hist, fut, hold)
         new = decode(fut, o, a_psi, g0)
@@ -129,18 +134,18 @@ def rollout(P: PosePlanner, W: Windows, a0: torch.Tensor, goal_of, n_plans: int,
 
 
 class Scorer:
-    """Foot contact numbers from exact forward kinematics of poses on a clip's terrain."""
+    """Foot contact numbers from exact forward kinematics of poses on a terrain (``G``: gp.terrain.Ground)."""
 
-    def __init__(self, W: Windows) -> None:
+    def __init__(self, G) -> None:
         self.model = data.load_model()
         L, h = model_layout(self.model), self.model.host
         sph = L.contact_spheres
         self.body, self.pos, self.rad = h["geom_body"][sph].astype(int), h["geom_pos"][sph], np.asarray(h["geom_size"][sph][:, 0])
         self.side = np.array([self.model.body_names[b][-1] for b in self.body])
-        self.G = W.fr.G
+        self.G = G
 
-    def __call__(self, q: np.ndarray, clip: int) -> dict:
-        xp, xq = forward_kinematics_np(self.model, q.astype(np.float32))
+    def __call__(self, q: np.ndarray, clip: int, fk: tuple | None = None) -> dict:
+        xp, xq = forward_kinematics_np(self.model, q.astype(np.float32)) if fk is None else fk
         c = xp[:, self.body] + _rotate(xq[:, self.body], np.broadcast_to(self.pos, xp[:, self.body].shape))
         b = c - np.stack([0 * self.rad, self.rad, 0 * self.rad], -1)
         dev = self.G.X.device
@@ -213,13 +218,13 @@ def main() -> None:
     def command_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
         ahead = o + reach[:, None] * torch.stack([th.cos(), -th.sin()], -1)       # to_frame's forward convention
         return to_frame(ahead[:, None], o, psi)[:, 0]
-    r_rep = rollout(P, W, a_rep, replay_goal, n_plans, a.keep, a.guidance, gen, a.hold)
-    r_cmd = rollout(P, W, a_cmd, command_goal, n_plans, a.keep, a.guidance, gen, a.hold)
+    r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, n_plans, a.keep, a.guidance, gen, a.hold)
+    r_cmd = rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), command_goal, n_plans, a.keep, a.guidance, gen, a.hold)
     episodes = [("replay", k, to_qpos(r_rep, b, names)) for b, k in enumerate(picked)]
     episodes += [(f"command {v:.1f} m/s" + (f" at {d:+.0f} deg" if d else ""), k_cmd, to_qpos(r_cmd, b, names))
                  for b, (v, d) in enumerate(cmds)]
 
-    score = Scorer(W)
+    score = Scorer(W.fr.G)
     env, task = build("baseline", D, 1, 0, "cpu", starts=[(k, STRIDE * (HIST - 1)) for _, k, _ in episodes])
     task.export_frame = None
     task.reference_pose = None

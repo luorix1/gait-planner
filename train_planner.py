@@ -10,12 +10,16 @@ Full-pose planner (--pose): plan + pelvis + every joint coordinate (gp.planner.P
 --seed-cleared. Licence-clean baseline: GP_DATASET=v3 ... --pose --balance.
 
 Out: <out>/planner.pt (latest; overwritten every 2k iterations), <out>/planner_best.pt (lowest held-out loss), <out>/progress.csv, <out>/tb (TensorBoard: tensorboard --logdir runs)
+With --score-every N (--pose2): every N iterations <out>/ckpt_<it>.pt + a scoreboard.py row in <out>/scores.jsonl; at the end
+<out>/planner_score_best.pt = the checkpoint with the best mean rank over the scoreboard's balanced metrics.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import json
+import shutil
 import time
 from pathlib import Path
 
@@ -60,6 +64,8 @@ def main() -> None:
                     "(its licence forbids motion generators unless cleared)")
     ap.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True,
                     help="bfloat16 autocast for the network (2x faster on a 4090; the weights and EMA stay fp32)")
+    ap.add_argument("--score-every", type=int, default=0, help="--pose2: roll out the P0 scoreboard every N iterations "
+                    "(keeps ckpt_<it>.pt; 0 = off)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     out = Path(a.out)
@@ -90,6 +96,10 @@ def main() -> None:
                            goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w, qk_norm=a.qk_norm, qk_gain=False).to(a.device).attach(fk) if a.pose2
                else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
     planner.set_normaliser(*W.batch(20_000))
+    board = None
+    if a.score_every and a.pose2:
+        from scoreboard import Scoreboard
+        board, rows = Scoreboard(Dte, fk, a.device), []
     opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.iters) if a.cosine else None
     gen = torch.Generator(device=a.device).manual_seed(1)
@@ -126,8 +136,23 @@ def main() -> None:
                 best = held
                 planner.save(out / "planner_best.pt", iters=it, held_out=held, data=a.dataset or str(data.OUT),
                              mirrored=True, pose=a.pose, pose2=a.pose2)
+        if board is not None and (it % a.score_every == 0 or it == a.iters):
+            name = f"ckpt_{it:06d}.pt"
+            planner.save(out / name, iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
+            r = dict(board(planner), checkpoint=name, iters=it)
+            rows.append(r)
+            with (out / "scores.jsonl").open("a") as f:
+                f.write(json.dumps(r) + "\n")
+            for k, v in r["balanced"].items():
+                tb.add_scalar(f"score/{k}", v, it)
+            print(f"{it:>7d}  scoreboard {r['balanced']}  ({r['rollout_s']} s)", flush=True)
         if it % 2000 == 0 or it == a.iters:
             planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
+    if board is not None and rows:
+        from scoreboard import select
+        best = select(rows)
+        shutil.copy2(out / best["checkpoint"], out / "planner_score_best.pt")
+        print(f"scoreboard best by mean rank: {best['checkpoint']} -> planner_score_best.pt", flush=True)
     tb.close()
 
 
