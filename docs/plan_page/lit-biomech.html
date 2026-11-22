@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Biomechanics Literature Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="lit.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="tabs" aria-label="Pages">
+  <a href="./">Planner</a>
+  <a href="lit-graphics.html">Literature · graphics</a>
+  <a href="lit-biomech.html" aria-current="page">Literature · biomechanics &amp; robotics</a>
+</nav>
+
+<header>
+  <span class="eyebrow">Literature check · 22 Nov 2026</span>
+  <h1>Generative locomotion in biomechanics and robotics</h1>
+  <p class="lede">No published work pairs a diffusion planner with a muscle-driven tracker on terrain. The closest pieces are TERRA (muscle tracking on terrain, no generator) and PARC / Zhang–Hutter (terrain diffusion planner, torque tracker).</p>
+  <div class="chips">
+    <span class="chip"><i></i>15 works compared</span>
+    <span class="chip"><i></i>4 new stair / ramp datasets</span>
+    <span class="chip warn"><i></i>Licences and Camargo lumbar unverified</span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Comparison</span>
+    <h2>What each system generates and how it is used</h2>
+  </div>
+  <div class="panel scroll">
+    <table class="kv wide">
+      <thead><tr><th>Work</th><th>Generates</th><th>Window</th><th>Conditioning</th><th>Model · losses</th><th>Data</th><th>Downstream use · feasibility · evaluation</th></tr></thead>
+      <tbody>
+        <tr><th><a href="https://github.com/stanfordnmbl/GaitDynamics">GaitDynamics</a> <small>Nat BME 2026</small></th><td>75 channels: pelvis velocity (heading-normalised), 6D joint rotations + angular velocities, 3D GRF and COP per foot</td><td>1.5 s at 100 Hz, fixed window</td><td>inpainting masks; regularised inpainting at test time</td><td>4-block transformer, noise prediction, 1000-step cosine, DDIM. <b>Plain MSE, no physics loss.</b> Separate transformer maps kinematics → GRF.</td><td>8 AddBiomechanics studies, 34.8 h after ~25 % pruning; walk / run + misc; stairs not mentioned</td><td>No controller. Vertical GRF error 3.2 %BW on held-out subjects and <b>7 unseen studies</b>. Treadmill belt-speed correction.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2406.18537">AddBiomechanics</a> <small>ECCV 2024</small></th><td>Dataset, <b>CC BY 4.0</b></td><td>—</td><td>—</td><td>Residual-minimising fit of kinematics, masses, scales; Rajagopal model, 37 DoF, spine included</td><td>273 subjects, 71.5 h (57.6 h with GRF), 15 studies. Includes <b>Camargo 2021 (19.9 h)</b> and Lencioni stairs (0.5 h). No Reznick.</td><td>Benchmark: motion → GRF and torques</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2503.14637">KINESIS</a> <small>2503.14637</small></th><td>Muscle policy only (80–290 muscles, MyoSuite)</td><td>policy sees the next frame</td><td>—</td><td>PPO + Lattice, mixture of experts, hard-negative mining</td><td>KIT, 1.8 h, flat ground</td><td>Tracked MDM text-to-motion zero-shot, <b>qualitative only</b>. Muscle activity correlates with EMG.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2609.38653">TERRA</a> <small>2609.38653 · Sep 2026</small></th><td>Terrain recovered from kinematics, retargeting, muscle tracking; <b>no generator</b></td><td>targets at t+1 and +0.2 / 0.4 / 0.6 / 0.8 s; 11×11 heightmap at 0.1 m</td><td>—</td><td>SQP retargeting with penetration constraints; MyoFullBody, 354 muscles</td><td>9.4 h: AMASS terrain, Gait120, Darmstadt stairs, Vielemeyer ramps, PRISM</td><td>Held-out subjects: stairs 81.9 %, ramps 99.5 %, boxes 46 %. Penetration 33 % → 0.16 % with their residuals.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2505.04002">PARC</a> <small>SIGGRAPH 2025</small></th><td>Root, joint rotations + positions, contact labels</td><td>2 past + 13 future (~0.5 s), autoregressive</td><td>31×31 heightmap → CNN → 64 tokens; 2-D target direction</td><td>MDM-like, x0; reconstruction + velocity + FK + <b>penetration</b>; 10 % of steps on random terrain, penetration only</td><td>14 min seed, grown iteratively</td><td>Best of 32–64 by penetration + contact → kinematic optimisation → <b>physics tracker re-records</b>. Tracker success 27 → 68 %.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2604.17335">Zhang … Peng, Hutter</a> <small>RA-L 2026</small></th><td>Root pose, joints, link positions</td><td>2 past + 25 future (0.5 s)</td><td>heading; height scan (noise-augmented)</td><td>MDM; reconstruction + velocity + FK + penetration; 2 DDIM steps after fine-tuning</td><td>5 min video / AMASS → <b>1 h</b> by rescaling stairs / boxes, re-optimising, physics refinement</td><td>Tracker sees full reference + 17×11 scan. Success 0.99 vs 0.81–0.86 tracker alone; held-out 80 cm boxes; Unitree G1 hardware.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2410.03441">CLoSD / DiP</a> <small>ICLR 2025</small></th><td>HumanML3D features incl. 4 contact flags</td><td>20-frame prefix + 40 generated (~2 s), replan every 40</td><td>text + target joint</td><td>8-layer transformer, x0, <b>10 steps</b></td><td>HumanML3D</td><td>PHC tracks the full pose. <b>Simulated state as prefix: success 0.19 → 0.88</b> (sit task). Tracker fine-tuned with the planner in the loop.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2304.01893">Trace &amp; Pace</a> <small>CVPR 2023</small></th><td>2-D root actions (unicycle)</td><td>3 s past + 5 s future at 10 Hz</td><td>rasterised map, neighbours</td><td>1D U-Net, 100 steps; guidance includes <b>PACER's value function</b></td><td>pedestrian data</td><td>PACER sees 10 2-D waypoints + heightmap and makes the body itself. Value guidance: fail rate 0.22 → 0.18 (obstacles).</td></tr>
+        <tr><th>RobotMDM <small>SIGGRAPH Asia 2024</small></th><td>Full pose (robot)</td><td>—</td><td>text</td><td>Critic v(m), 3 × 256 MLP on rollouts of the frozen tracker; <b>fine-tune with L = L_MDM − βΣv</b></td><td>55 h retargeted HumanML3D</td><td>Lower-body DoF error 16.1 → 11.4°, root rotation error 4.1 → 2.3°.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2503.11801">Diffuse-CLoC</a> <small>SIGGRAPH 2025</small></th><td>States (165) + PD actions (69) jointly</td><td>4 history + 32 states (~1 s), 16 actions</td><td>guidance: SDF obstacles, waypoints</td><td>GPT-style 6 × 512, 20 steps, per-token noise level</td><td>3.5 h of tracker rollouts</td><td>Actions run directly. <b>Kinematic planner + PHC baseline: jumps 0–22 % vs 71 %</b>; failures = floating, sliding, penetration.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2508.08241">BeyondMimic</a> <small>2508.08241</small></th><td>Latent state–action (body positions / velocities in each step's root frame)</td><td>0.64 s</td><td>costs: joystick, waypoint, SDF</td><td>Latent diffusion; VAE decoder outputs PD targets</td><td>~2.5 h human motion</td><td>G1 hardware. Tracking uses a yaw-aligned anchor body, so global drift is tolerated.</td></tr>
+        <tr><th>DiffuseLoco <small>CoRL 2024</small> / Diffusion Policy <small>RSS 2023</small></th><td>Action chunks, receding horizon</td><td>Diffusion Policy: 8-step execution best</td><td>velocity command / observations</td><td>Transformer DDPM (DiffuseLoco: DDIM worse); Diffusion Policy 100 train / 10 DDIM</td><td>simulated experts / demos</td><td>Receding horizon and position control mattered. Actions, not plans.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2403.03639">Contact-plan diffusion</a> <small>2403.03639</small></th><td>Next contact patches</td><td>—</td><td>stepping stones</td><td>diffusion on MCTS solutions</td><td>simulation (quadruped)</td><td>Nonlinear MPC executes the contacts.</td></tr>
+        <tr><th>Exo gait diffusion <small>2607.07533, 2609.14642</small></th><td>Sagittal joint angles</td><td>gait cycle</td><td>speed via FiLM / step length via CFG</td><td>transformer</td><td>lab data</td><td>3.4° MAE on unseen subjects. No stairs.</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2503.06151">BioMoDiffuse</a> <small>2503.06151</small></th><td>SMPL text-to-motion</td><td>—</td><td>text</td><td>Euler–Lagrange-structured network, acceleration loss</td><td>HumanML3D</td><td><b>Not validated against GRF or EMG.</b> Little use for us.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Data</span>
+    <h2>Real stair and ramp data beyond our 2 minutes</h2>
+    <p>Verify each licence before use.</p>
+  </div>
+  <div class="panel scroll">
+    <table class="kv" style="min-width:760px">
+      <thead><tr><th>Dataset</th><th>What</th><th>Terrain</th><th>Licence</th><th>Watch for</th></tr></thead>
+      <tbody>
+        <tr><th><a href="https://addbiomechanics.org/download_data.html">AddBiomechanics</a></th><td>Camargo 2021 re-solved on Rajagopal with spine DoFs (19.9 h, 10.1 h with GRF); Lencioni 2019 stairs (0.5 h)</td><td>stairs, ramps, level</td><td>CC BY 4.0</td><td>whether Camargo's lumbar actually moves depends on its torso markers</td></tr>
+        <tr><th><a href="https://doi.org/10.1038/s41597-025-05391-0">Gait120</a></th><td>120 subjects, full-body OpenSim IK; GRF only for level walking and sit–stand</td><td>stairs up / down, incline / decline</td><td>unverified</td><td>no GRF on stairs</td></tr>
+        <tr><th><a href="https://doi.org/10.48328/tudatalib-1182">Darmstadt stairs</a></th><td>12 subjects</td><td>3 stair heights</td><td>CC BY 4.0</td><td>—</td></tr>
+        <tr><th><a href="https://doi.org/10.1038/s41597-025-06535-y">Vielemeyer ramps</a></th><td>13 subjects</td><td>0 / 7.5 / 10°</td><td>unverified</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Ranked</span>
+    <h2>Ideas for our planner</h2>
+  </div>
+  <div class="ideas">
+    <div class="idea"><span class="rank">1</span><h3>Physics-correct and augment rare terrain in our own simulator</h3>
+      <ul><li>Roll a tracker (the muscle policy, or a cheaper torque tracker) over planner outputs on stairs and boxes; keep the runs that finish; re-record kinematics and contacts; retrain.</li>
+        <li><b>PARC ablation:</b> penetration 547 → 180, high-jerk frames 18.7 → 2.7 %. High jerk is what a teleport looks like.</li>
+        <li><b>Zhang–Hutter:</b> 5 min → 1 h by rescaling stairs and boxes, re-optimising, then physics refinement.</li></ul></div>
+    <div class="idea"><span class="rank">2</span><h3>More real stair and ramp data before synthetic</h3>
+      <ul><li>AddBiomechanics re-solves Camargo on a model with spine DoFs, dynamics-consistent.</li>
+        <li>Gait120, Darmstadt stairs, Vielemeyer ramps (table above).</li>
+        <li><b>TERRA</b> rebuilds stair heights from where the feet rest, then retargets with penetration constraints. This targets our Camargo heel and sinking problems directly.</li></ul></div>
+    <div class="idea"><span class="rank">3</span><h3>Terrain-relative contact loss, random-terrain steps</h3>
+      <ul><li><b>PARC:</b> contact feet's signed distance to the real heightmap pushed to 0, stricter than a height loss.</li>
+        <li>10 % of steps on random terrain with penetration loss only.</li>
+        <li>Best of N by penetration + contact at sampling; 10 DDIM steps make it affordable (CLoSD: 10 is enough; Zhang–Hutter: 2).</li></ul></div>
+    <div class="idea"><span class="rank">4</span><h3>Close the loop</h3>
+      <ul><li>Build the history from the simulated state, not the previous plan (<b>CLoSD: 0.19 → 0.88</b>).</li>
+        <li>Noise on history and heightmap in training (Zhang–Hutter).</li>
+        <li>PARC's blend with / without previous frames (s = 0.65); their failure was ignoring terrain by leaning on history.</li>
+        <li>Fine-tune the policy against the frozen planner (CLoSD, Zhang–Hutter).</li></ul></div>
+    <div class="idea"><span class="rank">5</span><h3>Align the planner with a critic</h3>
+      <ul><li>Train v(plan slice, heightmap) on muscle-policy rollouts.</li>
+        <li>Use it as a fine-tuning loss (RobotMDM) or as sampling guidance (Trace &amp; Pace).</li>
+        <li>With effort or metabolic cost in the critic's reward, plans drift toward ones the body runs cheaply.</li></ul></div>
+    <div class="idea"><span class="rank">6</span><h3>GRF / COP output channels</h3>
+      <ul><li>GaitDynamics' representation; train only where force was measured (AddBiomechanics 57.6 h), mask the loss elsewhere.</li>
+        <li>Ties contact flags to force; gives the policy reward a GRF target.</li>
+        <li>Centroidal loss m(a_COM − g) = ΣGRF is the agent's own proposal; no paper uses it.</li></ul></div>
+    <div class="idea"><span class="rank">7</span><h3>Box jumps</h3>
+      <ul><li>Planner + tracker is structurally weak at jumps (Diffuse-CLoC 0–22 % vs 71 %; PARC without correction changes direction mid-jump).</li>
+        <li>Cheap first: physics-corrected jump clips (idea 1). Joint state–action diffusion is stronger but costly with muscle actions.</li></ul></div>
+    <div class="idea"><span class="rank">8</span><h3>The slice the policy sees</h3>
+      <ul><li>Published slices range from 2-D waypoints (PACER) to targets at +0.2–0.8 s (TERRA) to the full reference (Zhang–Hutter). Ours sits in between.</li>
+        <li>Give the policy its own heightmap: Zhang–Hutter's tracker sometimes overrode the reference to clear obstacles.</li></ul></div>
+    <div class="idea"><span class="rank">9</span><h3>Evaluation protocol</h3>
+      <ul><li>Hold out whole studies as well as subjects (GaitDynamics: 7 unseen studies, 92 people).</li>
+        <li>Test terrain beyond the training range (Zhang–Hutter: 80 cm boxes).</li>
+        <li>PARC metrics: penetration, contact, high-jerk frames (threshold = dataset maximum, the teleport detector); plus GRF error in %BW.</li></ul></div>
+  </div>
+</section>
+
+<details class="more">
+  <summary>Not verified from a primary source</summary>
+  <ul>
+    <li>Whether Camargo's lumbar angles vary in the AddBiomechanics files.</li>
+    <li>Carter 2023's activities (AddBiomechanics lists walking / stairs / ramps / running / jumping; the Bath record shows treadmill walking and running at gradients only).</li>
+    <li>Gait120 licence.</li>
+    <li>DiP and PARC frame rates (~20 and ~30 fps, inferred).</li>
+    <li>DiffuseLoco horizons and step counts; BeyondMimic rates and step count.</li>
+    <li>Whether T-GMP (2606.06944) is diffusion-based. Diff-Muscle (2603.08617): abstract not viewed.</li>
+    <li>RobotMDM's velocity-error units.</li>
+  </ul>
+</details>
+
+</div>
+</body>
+</html>

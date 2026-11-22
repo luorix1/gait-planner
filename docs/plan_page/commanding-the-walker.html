@@ -96,18 +96,30 @@ details.more[open] summary { margin-bottom:10px }
 .kv th { font-weight:600; white-space:nowrap; color:var(--ink) }
 .kv td { color:var(--muted) }
 
+.tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--line) }
+.tabs a { padding:9px 14px; font:600 14.5px var(--display); color:var(--muted); text-decoration:none; border-bottom:3px solid transparent; margin-bottom:-1px }
+.tabs a:hover { color:var(--ink) }
+.tabs a[aria-current="page"] { color:var(--ink); border-bottom-color:var(--blue) }
+.tabs a:focus-visible { outline:3px solid var(--blue); outline-offset:3px; border-radius:4px }
+
 @media (max-width:980px) { .cmd { grid-template-columns:1fr } }
 @media (max-width:760px) { .cards, .grid2 { grid-template-columns:1fr } }
 </style>
 
 <div class="wrap">
 
+<nav class="tabs" aria-label="Pages">
+  <a href="./" aria-current="page">Planner</a>
+  <a href="lit-graphics.html">Literature · graphics</a>
+  <a href="lit-biomech.html">Literature · biomechanics &amp; robotics</a>
+</nav>
+
 <header>
   <span class="eyebrow">gait_planner · full-pose planner</span>
   <h1>A planner that sketches motion, a muscle policy that carries it out</h1>
   <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only its pelvis, foot and trunk targets.</p>
   <div class="chips">
-    <span class="chip live"><i></i>v9 training · started 12:17 pm · 120,000 iterations at ~7 it/s · done ~5 pm</span>
+    <span class="chip"><i></i>v9 done · 120,000 iterations · best checkpoint at 36,000</span>
     <span class="chip"><i></i>Sampling: no goal guidance (w = 1) · foot hold on</span>
   </div>
 </header>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Graphics Literature Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="lit.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="tabs" aria-label="Pages">
+  <a href="./">Planner</a>
+  <a href="lit-graphics.html" aria-current="page">Literature · graphics</a>
+  <a href="lit-biomech.html">Literature · biomechanics &amp; robotics</a>
+</nav>
+
+<header>
+  <span class="eyebrow">Literature check · 22 Nov 2026</span>
+  <h1>Kinematic locomotion diffusion in character animation</h1>
+  <p class="lede">How published motion diffusion models differ from our planner, and what is worth trying. Each paper checked against its arXiv text; PARC settings also from its public code.</p>
+  <div class="chips">
+    <span class="chip"><i></i>17 systems compared</span>
+    <span class="chip warn"><i></i>~ = inferred, not stated</span>
+    <span class="chip warn"><i></i>PARC numbers are its code defaults</span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Comparison</span>
+    <h2>Seventeen systems side by side</h2>
+    <p>Rate · history → future · executed = frame rate, history frames → predicted frames, frames run before replanning.</p>
+  </div>
+  <div class="panel scroll">
+    <table class="kv wide">
+      <thead><tr><th>Paper</th><th>Rate · hist → fut · exec</th><th>Conditioning / terrain</th><th>Network</th><th>Target · steps</th><th>Losses beyond MSE</th><th>Artifact handling</th><th>Data</th></tr></thead>
+      <tbody>
+        <tr class="ours"><th>Ours <small>v9</small></th><td>20 Hz · 8 → 24 · 4</td><td>2-D goal at 1.2 s (adaLN, 10 % drop, w = 1); 37×17 heightmap at 10 cm → 50 tokens</td><td>6 layers × 512 DiT</td><td>x0 · 50, DDIM</td><td>contact, slip, FK, penetration (Huber, ᾱ-weighted)</td><td>foot-hold IK after sampling</td><td>2.5 M frames</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2209.14916">MDM</a> <small>2209.14916</small></th><td>~20 · full sequence (≤ 196)</td><td>text, CFG 10 %, s = 2.5</td><td>8 × 512 encoder</td><td>x0 · 1000, cosine</td><td>position, velocity, foot (not used for text-to-motion)</td><td>none; checkpoint = lowest FID</td><td>HumanML3D, 14.6k clips</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2212.02500">PhysDiff</a> <small>2212.02500</small></th><td>as MDM</td><td>—</td><td>MDM / MotionDiffuse</td><td>50 DDIM</td><td>—</td><td>physics projection; best in the last 4 steps; projecting afterwards does not help</td><td>HumanML3D</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2305.12577">GMD</a> <small>2305.12577</small></th><td>as MDM</td><td>keyframes; "emphasis projection" scales root channels ×10</td><td>1D U-Net</td><td>x0 (motion), eps (trajectory) · 1000</td><td>—</td><td>guidance + imputation, stopped at t = 20</td><td>HumanML3D</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2310.08580">OmniControl</a> <small>2310.08580</small></th><td>as MDM</td><td>any joint at any time; ControlNet copy</td><td>MDM</td><td>x0 · 1000</td><td>—</td><td>gradient guidance on global joints, K = 10 / 500 iterations</td><td>HumanML3D</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2405.05691">StableMoFusion</a> <small>2405.05691</small></th><td>as MDM</td><td>text</td><td>Conv1D U-Net</td><td>x0 · 1000 train / 10 DPM-Solver++</td><td>—</td><td>foot-skate fix from predicted vertical force inside denoising; <b>no metric reported</b></td><td>HumanML3D</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2404.15121">CAMDM</a> <small>2404.15121</small></th><td>30 · 10 → 45 · 15</td><td>one token per condition; past motion dropped 15 %, γ = 0.7</td><td>MDM-like</td><td>x0 · <b>8 train / 8 sample</b> (1000 steps "did not work well")</td><td>FK position, foot, velocity (all λ = 1)</td><td>heuristic future-trajectory blend at seams</td><td>100STYLE, 4 M frames</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2306.00416">A-MDM</a> <small>2306.00416</small></th><td>30 · 1 → 1 · 1</td><td>inpainting, RL residuals</td><td>10 × 1024 MLP</td><td>eps · 40 sample</td><td>—</td><td>scheduled sampling ("crucial"); best of 100 candidates</td><td>100STYLE, AMASS, LaFAN1</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2410.05260">DART</a> <small>2410.05260</small></th><td>30 · 2 → 8 · 8</td><td>text, CFG w = 5</td><td>VAE (7 × 256) + latent denoiser</td><td>x0 latent · 10 / 10 (DDIM skipping gives artifacts)</td><td>reconstruction + auxiliary (w 1e4)</td><td><b>rollout training</b> (100K / 100K / 100K iterations, ≤ 4 rollouts); latent-noise optimisation or RL with skate / floor penalties</td><td>BABEL</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2410.03441">CLoSD / DiP</a> <small>2410.03441</small></th><td>~20 · 20 → 40 · all 40</td><td>text + target joints (cross-attention)</td><td>8 × 512 decoder</td><td>x0 · 10 DDPM</td><td>target loss</td><td>physics tracker; prefix taken from simulation; <b>checkpoint 200K of 600K</b></td><td>HumanML3D</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2505.04002">PARC</a> <small>2505.04002</small></th><td>30 (code) · 2 → 13 (0.5 s) · autoregressive</td><td>31×31 heightmap (0.2 m in code, 2 m back / 4 m ahead, relative to root) → CNN → 64 tokens; 2-D direction from a random 0.4–1.5 s ahead; history masked 15 %; sampling blend s = 0.65</td><td>code: 4 × 256, 8 heads</td><td>x0 · 21 (code), DDIM stride 5</td><td>velocity, FK, penetration; <b>10 % of steps on random terrain, penetration loss only</b></td><td>heightmap augmentation (max-pool + up to 4 boxes); keep best of 32–128; kinematic optimisation; physics tracker → new data</td><td><b>14 min</b> → 4 iterations</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2503.11801">Diffuse-CLoC</a> <small>2503.11801</small></th><td>~30 · 4 → 32 · 1</td><td>cost guidance (SDF, waypoints), inpainting</td><td>6 × 512 GPT, 20 M params</td><td>x0 · 20</td><td>—</td><td>physics; attention dropout 0.3, weight decay 1e-3</td><td>54 clips × 40 rollouts</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2504.12540">UniPhys</a> <small>2504.12540</small></th><td>~30 · 4 → 8 / 28 · 8</td><td>text CFG; goals by guidance only</td><td>12 × 768 causal</td><td>x0 · 50 train / 5 DDIM</td><td>—</td><td>diffusion forcing; history held at noise level 3</td><td>BABEL, 15.7 h</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2403.08629">TRUMANS</a> <small>2403.08629</small></th><td>10 · overlap → 16</td><td>local occupancy voxels via ViT; 2-D subgoal by inpainting</td><td>6 × 512</td><td>eps · not stated</td><td>—</td><td>object augmentation lowers penetration (max 15.5 → 11.7)</td><td>15 h, 100 scenes</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2412.15664">SCENIC</a> <small>2412.15664</small></th><td>30 · 10 → 40 (seed frames fixed)</td><td>12×12 distance field (1.2 m) around the root, plus goal height</td><td>DiT</td><td>x0 · 100</td><td>FK position, λ = 4</td><td><b>guidance at the final step</b>: contact when label = 1, otherwise penetration (α = 3)</td><td>15k clips fitted to 20k terrain patches; mirroring</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2503.17544">PRIMAL</a> <small>2503.17544</small></th><td>30 · 1 → 15</td><td>—</td><td>10 blocks × 256</td><td>x0 · 50</td><td>FK, FK velocity</td><td>re-projection, ground snap, inertialization blend; 0.01 history noise gave no gain</td><td>AMASS</td></tr>
+        <tr><th><a href="https://arxiv.org/abs/2604.17335">Zhang et al.</a> <small>2604.17335 · G1 robot</small></th><td>~50 · 2 → 25 · 0.25 s</td><td>height scan + heading</td><td>MDM-like</td><td><b>2 sampling steps</b></td><td>velocity, consistency, penetration</td><td>terrain augmentation + optimisation; noise on scan and history</td><td><b>5 min → 1 h</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Ranked</span>
+    <h2>Differences worth trying</h2>
+    <p>Ordered by how directly each targets our open problems: memorised stairs and boxes, the box snap, feet in treads.</p>
+  </div>
+  <div class="ideas">
+    <div class="idea"><span class="rank">1</span><h3>Make new motion–terrain pairs, don't oversample</h3>
+      <ul><li>Every terrain paper starts small and augments before training.</li>
+        <li><b>PARC:</b> 50 spatial variants per clip; heightmap max-pool and boxes away from the body; 10 % of steps on random terrain, penetration loss only.</li>
+        <li><b>2604.17335:</b> 5 min → ~1 h by rescaling boxes (35–75 cm) and steps (15–20 cm), adding small boxes, then optimising out penetration.</li>
+        <li><b>SCENIC:</b> fits each clip to many patches, keeps the best 3, refines footholds, mirrors.</li>
+        <li><b>For us:</b> vary riser and tread on our staircase, re-solve legs by IK, add random-terrain steps.</li></ul></div>
+    <div class="idea"><span class="rank">2</span><h3>Lean less on history</h3>
+      <ul><li><b>PARC:</b> terrain-ignoring motion on small data came from overfitting the previous frames. Fix: 15 % history masking + blended sampling (s = 0.65).</li>
+        <li><b>CAMDM:</b> drops past motion 15 %, samples at γ = 0.7.</li>
+        <li><b>Ours:</b> only the goal is dropped and w = 1, so guidance does nothing.</li>
+        <li>Most use 1–2 history frames (PRIMAL, PARC, DART, 2604.17335) or 0.33 s (CAMDM, SCENIC); ours is 0.4 s.</li></ul></div>
+    <div class="idea"><span class="rank">3</span><h3>Train on the seam</h3>
+      <ul><li><b>DART:</b> rollout training feeds the model its own history, like our replan.</li>
+        <li><b>UniPhys:</b> per-frame noise, history kept slightly noisy at sampling; episode length 2320 vs 148 (with physics in the loop).</li>
+        <li><b>Cheap:</b> PRIMAL's inertialization blend + ground snap at seams.</li>
+        <li>Counterpoint: PRIMAL found 0.01 history noise useless.</li></ul></div>
+    <div class="idea"><span class="rank">4</span><h3>Heightmap guidance in the last denoising steps</h3>
+      <ul><li><b>SCENIC:</b> at the final step, contact feet pulled onto the surface, everything else pushed out.</li>
+        <li><b>PhysDiff:</b> corrections inside the last 4 steps beat correcting afterwards; post-hoc projection did not help.</li>
+        <li>Our heightmap allows an analytic lookup.</li>
+        <li>Also add a terrain-height target for contact feet to the foot hold, as PARC's optimisation does (penetration / contact weights 1000, 3000 Adam steps).</li></ul></div>
+    <div class="idea"><span class="rank">5</span><h3>Sample a batch, keep the best</h3>
+      <ul><li><b>PARC:</b> top 2 of 128 by target, contact and penetration.</li>
+        <li><b>A-MDM:</b> 100 candidates. TRACE filters by guidance loss.</li>
+        <li>Nearly free on GPU. Add a seam-jump term to catch the snap.</li></ul></div>
+    <div class="idea"><span class="rank">6</span><h3>Pick checkpoints by rollouts, not held-out loss</h3>
+      <ul><li><b>PARC:</b> 3,200 motions on 100 test terrains; waypoint error, penetration, contact, share of high-jerk frames.</li>
+        <li><b>MDM</b> keeps the lowest FID; <b>CLoSD</b> kept 200K of 600K; UniPhys notes the loss barely moves.</li>
+        <li><b>For us:</b> rollouts on held-out stairs and boxes, scored on penetration, slip, goal error, jerk, seam jump.</li></ul></div>
+    <div class="idea"><span class="rank">7</span><h3>Regularise, and loosen the goal</h3>
+      <ul><li><b>PARC defaults:</b> 4 × 256 (far smaller than ours), dropout 0.1, history attention dropout 0.15, heightmap / target dropout 0.025, weight decay 0.01, history noise 0.01, goal noise 0.05.</li>
+        <li>PARC's goal is a direction from a random 0.4–1.5 s ahead. Our exact pelvis target at 1.2 s is nearly a unique key to a memorised clip.</li>
+        <li><b>Diffuse-CLoC:</b> attention dropout 0.3.</li></ul></div>
+    <div class="idea"><span class="rank">8</span><h3>Close the loop with physics, later</h3>
+      <ul><li><b>PARC:</b> tracker success 27 → 68 % over its iterations.</li>
+        <li><b>CLoSD, 2604.17335:</b> planner conditioned on simulated history; 2604.17335 fine-tunes the tracker against the frozen planner.</li>
+        <li><b>ReinDiffuse</b> (2410.07296): PPO on skate / float / penetration rewards; penetration 0.048 → 0.000, FID 0.544 → 0.385.</li></ul></div>
+    <div class="idea low"><span class="rank">9</span><h3>Fewer diffusion steps, trained at that count</h3>
+      <ul><li>8–21 steps in CAMDM, DART, PARC, Diffuse-CLoC.</li>
+        <li>Gain is speed for the RL loop; no evidence it helps quality.</li></ul></div>
+    <div class="idea low"><span class="rank">10</span><h3>Architecture: low priority</h3>
+      <ul><li><b>ACMDM</b> (2505.19377) uses QK-norm, SwiGLU, adaLN too; adaLN beats concatenation. Our choices are mainstream.</li>
+        <li>With adaLN, x0 vs v prediction differ little (FID 0.133 vs 0.121).</li>
+        <li><b>GMD</b> root emphasis (×10) halved foot skating under trajectory conditioning (0.284 → 0.128); only if goal adherence is weak.</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Representation</span>
+    <h2>Segment positions and orientations</h2>
+    <p>How papers carry body segments, and which output they trust.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="tag">Positions primary</span><h3>Fit rotations after</h3>
+      <ul><li>HumanML3D family: MDM, GMD, OmniControl, StableMoFusion, PhysDiff, CLoSD.</li>
+        <li>263-d frame: root velocity + height, root-relative joint positions, velocities, 6D rotations, 4 contacts.</li>
+        <li>Meshes from SMPL fitting to joints. TRUMANS: positions only, SMPL-X fitted after.</li></ul></div>
+    <div class="card us"><span class="tag">Rotations primary + loss</span><h3>Positions kept consistent by FK</h3>
+      <ul><li><b>PARC:</b> all body positions + rotations + contacts, FK loss; code trusts rotations.</li>
+        <li><b>DART:</b> 22 joint positions + 6D rotations.</li>
+        <li><b>2604.17335:</b> 23 link positions + joint angles.</li>
+        <li>SCENIC, CAMDM: no positions, FK loss only.</li>
+        <li><b>Ours</b> sits here, with foot points only.</li></ul></div>
+    <div class="card"><span class="tag">Rotations primary + recompute</span><h3>Rebuild positions each step</h3>
+      <ul><li><b>PRIMAL</b> rebuilds joint positions from rotations at every autoregressive step, because predicted joints drift from the body.</li></ul></div>
+    <div class="card"><span class="tag">Physics resolves it</span><h3>The simulator decides</h3>
+      <ul><li>Diffuse-CLoC (positions, velocities + PD actions), UniPhys, CLoSD.</li></ul></div>
+  </div>
+  <div class="note">
+    <p><b>No ablation shows redundant segment positions help foot contact or penetration.</b></p>
+    <ul><li>DART claims joint positions reduce skating but does not test it.</li>
+      <li>MARDM (2411.16575): redundancy helps VQ models (FID 0.335 vs 0.418); removing it was crucial for their diffusion model (2.196 → 0.116), confounded by a new autoencoder.</li>
+      <li>ACMDM: redundancy helped x0 prediction slightly (0.969 → 0.771); plain absolute positions with v prediction did best (0.208); no contact metrics.</li>
+      <li>MDM: removing the foot loss scored slightly better but looked shakier.</li>
+      <li><b>Cheap step for us:</b> PRIMAL-style re-projection, i.e. overwrite foot points with FK(angles) before feeding the history back.</li></ul>
+  </div>
+</section>
+
+<details class="more">
+  <summary>Not verified from a primary source</summary>
+  <ul>
+    <li>PARC frame rate, network size, step count and dropouts are code defaults, not the paper's. Its default config also disables the collision loss (<code>use_hf_collision_loss: False</code>) though the paper lists one.</li>
+    <li>Inferred frame rates: CLoSD ~20, Diffuse-CLoC and UniPhys ~30, 2604.17335 ~50.</li>
+    <li>TRUMANS step count is not stated.</li>
+    <li>2609.31577 (flow matching + advantage-weighted regression) and NaP-Control (2605.20209): abstracts only.</li>
+    <li>StableMoFusion's clean-up has no foot-skating metric. A-MDM does not state its training step count or which features drive the displayed pose.</li>
+  </ul>
+</details>
+
+</div>
+</body>
+</html>

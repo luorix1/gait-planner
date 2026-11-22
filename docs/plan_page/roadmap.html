@@ -1,0 +1,1160 @@
+<title>Planner–Policy Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: wide lab-notebook page, same tokens as the planner pages; per phase: problem line, diagram with numbered choices, why-cards keyed to the numbers. */
+:root {
+  --paper:#F4F6F9; --panel:#FFFFFF; --ink:#1B2633; --muted:#55606D; --line:#D5DDE7; --wire:#7C8895;
+  --blue:#2F6FB0; --blue-soft:#E6EEF8; --teal:#1F8A86; --teal-soft:#DDF1EF; --amber:#C98A1E; --amber-soft:#F7EBD4;
+  --bad:#C0463A; --bad-soft:#F8E3E0; --grey-soft:#EEF1F5; --terrain:#DFE5EC; --ghost:#B9C3CF;
+  --display:"Space Grotesk", "Segoe UI", system-ui, sans-serif; --body:"Inter", system-ui, -apple-system, sans-serif; --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
+  --bad:#EC7F72; --bad-soft:#3A1F1C; --grey-soft:#1C2530; --terrain:#243040; --ghost:#3E4C5B; color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F151C; --panel:#17202A; --ink:#E5EAF1; --muted:#A3AEBB; --line:#2C3946; --wire:#8593A2;
+  --blue:#6FA6E0; --blue-soft:#1C2C40; --teal:#4CC2BC; --teal-soft:#14302E; --amber:#F0B65A; --amber-soft:#3A2E17;
+  --bad:#EC7F72; --bad-soft:#3A1F1C; --grey-soft:#1C2530; --terrain:#243040; --ghost:#3E4C5B; color-scheme:dark }
+body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 64px }
+.wrap { max-width:1320px; margin:0 auto; display:grid; gap:56px }
+h1, h2, h3 { font-family:var(--display); margin:0; text-wrap:balance; letter-spacing:-0.01em }
+h1 { font-size:clamp(32px, 4.6vw, 50px); line-height:1.05 }
+h2 { font-size:clamp(23px, 2.8vw, 30px); line-height:1.15 }
+h3 { font-size:17px; line-height:1.3 }
+p { margin:0 }
+.eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
+header { display:grid; gap:14px; max-width:900px }
+.lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:62ch }
+.chips { display:flex; flex-wrap:wrap; gap:8px }
+.chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; font-size:14px; font-weight:500; border:1px solid var(--line); background:var(--panel) }
+.chip i { width:9px; height:9px; border-radius:50%; background:var(--blue); flex:none }
+.chip.warn i { background:var(--amber) }
+section { display:grid; gap:18px }
+.sec-head { display:grid; gap:6px; max-width:860px }
+.sec-head p { color:var(--muted); max-width:70ch }
+.phase { display:inline-flex; align-items:center; gap:10px }
+.phase b { font:700 13px var(--mono); color:var(--blue); background:var(--blue-soft); border-radius:6px; padding:2px 8px }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px; min-width:0 }
+figure { margin:0; display:grid; gap:12px; min-width:0 }
+figcaption { font-size:14px; color:var(--muted); max-width:95ch }
+.credit { font:500 12.5px var(--mono); color:var(--muted) }
+.scroll { overflow-x:auto }
+svg.dia { width:100%; height:auto; display:block }
+.dia-mid { min-width:600px }
+.dia-wide { min-width:860px }
+.dia-xl { min-width:1040px }
+.grid2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px }
+.split { display:grid; grid-template-columns:minmax(0, 1.65fr) minmax(0, 1fr); gap:16px; align-items:start }
+.cards { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:8px; align-content:start; min-width:0 }
+.card p, .card li { color:var(--muted); font-size:15px }
+.card ul { margin:0; padding-left:18px; display:grid; gap:4px }
+.card .tag { font:600 12px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--blue) }
+.card.open .tag { color:var(--amber) }
+.card.open { border-color:var(--amber) }
+.gates { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.gates .lbl { font:600 13px var(--mono); color:var(--amber); margin-right:4px }
+.gate { display:inline-flex; gap:6px; align-items:baseline; padding:5px 12px; border-radius:8px; background:var(--amber-soft); border:1px solid var(--amber); font-size:14px }
+.reads { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px }
+.read { background:var(--grey-soft); border-radius:10px; padding:12px 14px; display:grid; gap:2px; min-width:0 }
+.read b { font:600 22px var(--display); font-variant-numeric:tabular-nums }
+.read span { font-size:13.5px; color:var(--muted) }
+.read.target { background:var(--amber-soft) }
+.kv { width:100%; border-collapse:collapse; font-size:14.5px; font-variant-numeric:tabular-nums }
+.kv th, .kv td { padding:8px 10px; border-top:1px solid var(--line); text-align:left; vertical-align:top }
+.kv th { font-weight:600; color:var(--ink) }
+.kv td { color:var(--muted) }
+.mini h3 { font-size:15px }
+.risk { background:var(--bad-soft); border:1px solid var(--bad); border-radius:12px; padding:12px 16px; font-size:15px }
+.risk b { color:var(--bad) }
+
+/* what / why furniture */
+.problem { display:flex; gap:12px; align-items:baseline; font-size:16px; max-width:120ch }
+.problem > b { flex:none; font:700 11px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--bad); background:var(--bad-soft); padding:3px 8px; border-radius:5px }
+.problem > span { min-width:0 }
+.subhead { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline }
+.subhead span { color:var(--muted); font-size:15px }
+.whys { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px }
+.whys.stack { grid-template-columns:1fr }
+.why { display:grid; grid-template-columns:22px minmax(0, 1fr); gap:3px 10px; align-content:start; padding:12px 14px; border-radius:10px; background:var(--grey-soft); min-width:0 }
+.why .num { grid-row:1 / span 2 }
+.why b { font-size:14.5px; font-weight:600; line-height:1.35 }
+.why > span:last-child { font-size:14px; color:var(--muted); line-height:1.45 }
+.why.cost { background:var(--bad-soft) }
+.why.cost .num { background:var(--bad) }
+.num { display:inline-block; width:22px; height:22px; border-radius:50%; background:var(--ink); color:var(--panel); font:700 11.5px/22px var(--mono); text-align:center; flex:none }
+.legend { display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center; font-size:14px; color:var(--muted) }
+.legend > span { display:inline-flex; align-items:center; gap:8px }
+.bdg { font:700 10.5px/16px var(--mono); letter-spacing:.06em; padding:0 8px; border-radius:999px; flex:none }
+.bdg.new { background:var(--ink); color:var(--panel); border:1.2px solid var(--ink) }
+.bdg.up { border:1.2px solid var(--ink); color:var(--ink); background:var(--panel) }
+.bdg.today { border:1px dashed var(--wire); color:var(--muted); background:var(--panel) }
+.sw { width:18px; height:13px; border-radius:3px; border:1.5px solid; flex:none }
+.sw.b { background:var(--blue-soft); border-color:var(--blue) } .sw.t { background:var(--teal-soft); border-color:var(--teal) }
+.sw.a { background:var(--amber-soft); border-color:var(--amber) } .sw.g { background:var(--grey-soft); border-color:var(--wire) }
+.gdot { width:24px; height:24px; border-radius:50%; background:var(--amber-soft); border:1.5px solid var(--amber); color:var(--amber); font:700 9.5px/21px var(--mono); text-align:center; flex:none }
+.dashln { width:30px; border-top:2px dashed var(--teal); flex:none }
+.gloss { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px 22px; margin:0; font-size:14px }
+.gloss div { min-width:0 }
+.gloss dt { font-weight:600 }
+.gloss dd { margin:0; color:var(--muted) }
+
+/* svg */
+.n { fill:var(--panel); stroke:var(--line); stroke-width:1.5 }
+.n.hl { fill:var(--blue-soft); stroke:var(--blue) }
+.n.tl { fill:var(--teal-soft); stroke:var(--teal) }
+.n.amb { fill:var(--amber-soft); stroke:var(--amber) }
+.n.gs { fill:var(--grey-soft); stroke:var(--wire) }
+.n.dash { stroke-dasharray:6 5 }
+.t { fill:var(--ink); font:600 15px var(--display) }
+.tl2 { fill:var(--ink); font:700 22px var(--display) }
+.tn { fill:var(--ink); font:600 13px var(--body) }
+.ts { fill:var(--muted); font:400 12.5px var(--body) }
+.tm { fill:var(--muted); font:500 11.5px var(--mono) }
+.tf { fill:var(--muted); font:500 11px var(--mono) }
+.tp { fill:var(--blue); font:700 11px var(--mono) }
+.tb { fill:var(--blue); font:600 12.5px var(--body) }
+.tt { fill:var(--teal); font:600 12.5px var(--body) }
+.ta { fill:var(--amber); font:600 12.5px var(--body) }
+.tr { fill:var(--bad); font:600 12.5px var(--body) }
+.c { text-anchor:middle }
+.e { text-anchor:end }
+.ar { fill:none; stroke:var(--wire); stroke-width:2 }
+.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) } .ar.amb { stroke:var(--amber) } .ar.bad { stroke:var(--bad) }
+.ar.dash { stroke-dasharray:6 5 }
+.ar.thin { stroke-width:1.4 }
+.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) } .mk.amb { fill:var(--amber) } .mk.bad { fill:var(--bad) }
+.gb { fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.5 }
+.gt { fill:var(--amber); font:700 11px var(--mono); text-anchor:middle }
+.grid-line { stroke:var(--line); stroke-width:1 }
+.gfill { fill:var(--terrain); stroke:var(--wire); stroke-width:2; stroke-linejoin:round }
+.cellh { fill:var(--grey-soft); stroke:var(--wire); stroke-width:1 }
+.cellf { fill:var(--blue-soft); stroke:var(--blue); stroke-width:1 }
+.cellx { fill:var(--panel); stroke:var(--ghost); stroke-width:1; stroke-dasharray:3 2 }
+.sph { fill:var(--teal-soft); stroke:var(--teal); stroke-width:2 }
+.sph.bad { fill:var(--bad-soft); stroke:var(--bad) }
+.bar { fill:var(--blue) } .bar.lt { fill:var(--blue-soft); stroke:var(--blue); stroke-width:1 }
+.bar.p3 { fill:var(--teal) } .bar.badf { fill:var(--bad) }
+.barlbl { fill:var(--panel); font:700 11px var(--mono); text-anchor:middle }
+.xmark { stroke:var(--bad); stroke-width:3; stroke-linecap:round }
+.nb rect { fill:var(--ink); stroke:var(--ink); stroke-width:1 } .nb text { fill:var(--panel) }
+.ub rect { fill:var(--panel); stroke:var(--ink); stroke-width:1.2 } .ub text { fill:var(--ink) }
+.db rect { fill:var(--panel); stroke:var(--wire); stroke-width:1; stroke-dasharray:3 2 } .db text { fill:var(--muted) }
+.nb text, .ub text, .db text { font:700 9.5px var(--mono); letter-spacing:.06em; text-anchor:middle }
+.nm circle { fill:var(--ink) } .nm text { fill:var(--panel); font:700 11px var(--mono); text-anchor:middle }
+.ghl { fill:none; stroke:var(--wire); stroke-width:1.5; stroke-dasharray:4 3 }
+.noise { fill:none; stroke:var(--amber); stroke-width:1.2; stroke-dasharray:3 2 }
+.tile { fill:var(--grey-soft); stroke:var(--ghost); stroke-width:1 }
+.tile.on { fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.5 }
+.tile.ok { fill:var(--teal-soft); stroke:var(--teal); stroke-width:1.5 }
+.leg { fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round }
+.leg.bad { stroke:var(--bad) } .leg.ok { stroke:var(--teal) } .leg.ghost { stroke:var(--ghost); stroke-width:2; stroke-dasharray:4 3 }
+.dot { fill:var(--ink) } .dot.bad { fill:var(--bad) } .dot.ok { fill:var(--teal) }
+.pw { fill:none; stroke:var(--blue); stroke-width:2.5; stroke-dasharray:7 5 }
+.pwo { fill:none; stroke:var(--amber); stroke-width:2.5; stroke-dasharray:7 5 }
+.pmix { fill:none; stroke:var(--ink); stroke-width:3.5; stroke-linecap:round }
+.stance { fill:var(--teal-soft); stroke:var(--teal); stroke-width:1.2 }
+.dim { stroke:var(--wire); stroke-width:1.2 }
+
+@media (max-width:1100px) { .cards, .reads, .gloss { grid-template-columns:repeat(2, minmax(0, 1fr)) } .split { grid-template-columns:1fr } }
+@media (max-width:760px) { .cards, .reads, .grid2, .gloss { grid-template-columns:1fr } .problem { flex-direction:column; gap:6px } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">gait_planner · roadmap</span>
+  <h1>From human clips to plans the muscles can carry out</h1>
+  <p class="lede">The planner learns human motion, the muscle body tries it in simulation, and what works goes back into training. Then a policy follows the planner live.</p>
+  <div class="chips">
+    <span class="chip"><i></i>Data: AB01 · PARC · Bones SEED, no new recordings</span>
+    <span class="chip"><i></i>5 phases · 3 gates · ~3 weeks</span>
+    <span class="chip warn"><i></i>4 decisions open</span>
+  </div>
+</header>
+
+<!-- ============ HOW TO READ ============ -->
+<section class="panel" style="gap:16px">
+  <div class="legend">
+    <span><span class="bdg new">NEW</span>new in this roadmap</span>
+    <span><span class="bdg up">UPGRADE</span>exists today, changed</span>
+    <span><span class="bdg today">TODAY</span>exists today as is</span>
+    <span><span class="gdot">G1</span>gate: must pass before the next phase</span>
+    <span><span class="dashln"></span>training only</span>
+    <span><span class="num">1</span>design choice, explained in the card with that number</span>
+  </div>
+  <div class="legend">
+    <span><span class="sw b"></span>planner</span>
+    <span><span class="sw t"></span>muscle-body policies</span>
+    <span><span class="sw a"></span>filters and checks</span>
+    <span><span class="sw g"></span>data and the simulated body</span>
+  </div>
+  <dl class="gloss">
+    <div><dt>Window</dt><dd>0.4 s of history (8 frames) + 1.2 s of planned future (24 frames), 20 Hz.</dd></div>
+    <div><dt>Seam</dt><dd>Where one replanned stretch joins the next.</dd></div>
+    <div><dt>FK</dt><dd>Forward kinematics: joint angles → segment poses.</dd></div>
+    <div><dt>Foot hold</dt><dd>After sampling: pins stance feet, puts contact feet on the surface.</dd></div>
+    <div><dt>Teacher / student</dt><dd>Teacher tracks a plan's full pose; the student sees only a slice.</dd></div>
+    <div><dt>Slice</dt><dd>Footholds, contact timing, centre of mass (COM), pelvis, own heightmap.</dd></div>
+    <div><dt>DAgger</dt><dd>The student learns the teacher's actions on the student's own states.</dd></div>
+    <div><dt>Stance sphere</dt><dd>A foot contact sphere while that foot is planted.</dd></div>
+  </dl>
+</section>
+
+<!-- ============ OVERVIEW ============ -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">The whole flow</span>
+    <h2>One loop to ground the planner, one to run it</h2>
+  </div>
+  <p class="problem"><b>Problem</b><span>Human clips show what looks human, but not what the 90-muscle body can carry out.</span></p>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 546" role="img" aria-label="Overview. Loop 1: human clips feed a training mix that trains the planner; its samples become a plan library; the teacher tracks the plans in simulation; a keep filter sends completed, human-looking episodes back into the training mix for three rounds. Loop 2: the frozen planner hands a slice of each plan to the slice student, which drives the muscle body; the body's last 0.4 s goes back to the planner to replan. A scoreboard judges gates G1, G2 and G4.">
+        <defs>
+          <marker id="o1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="o2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker>
+          <marker id="o3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker>
+          <marker id="o4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk blue"/></marker>
+        </defs>
+        <text class="t" x="20" y="34">Loop 1 · ground the planner</text>
+        <text class="tf" x="20" y="54">P1–P3 · learn, try in sim, keep</text>
+        <path class="ar amb" d="M1115 136 V72 H263 V134" marker-end="url(#o3)"/>
+        <text class="ta c" x="689" y="62">kept episodes go back into training · 3 rounds (P3)</text>
+
+        <rect x="20" y="136" width="154" height="104" rx="12" class="n gs"/>
+        <text class="tp" x="32" y="158">input</text>
+        <text class="t c" x="97" y="184">Human clips</text>
+        <text class="ts c" x="97" y="206">AB01 · PARC · SEED</text>
+        <text class="tm c" x="97" y="224">2.46 M frames</text>
+        <g class="db"><rect x="118" y="128" width="44" height="16" rx="8"/><text x="140" y="139.5">TODAY</text></g>
+
+        <rect x="233" y="136" width="154" height="104" rx="12" class="n"/>
+        <text class="tp" x="245" y="158">P3</text>
+        <text class="t c" x="310" y="184">Training mix</text>
+        <text class="ts c" x="310" y="206">real ≥ 2/3</text>
+        <text class="ts c" x="310" y="224">kept ≤ 1/3</text>
+        <g class="nb"><rect x="339" y="128" width="36" height="16" rx="8"/><text x="357" y="139.5">NEW</text></g>
+
+        <rect x="446" y="136" width="154" height="104" rx="12" class="n hl"/>
+        <text class="tp" x="458" y="158">P1</text>
+        <text class="t c" x="523" y="184">Planner</text>
+        <text class="ts c" x="523" y="206">full-body diffusion</text>
+        <text class="ts c" x="523" y="224">retrained each round</text>
+        <g class="ub"><rect x="532" y="128" width="56" height="16" rx="8"/><text x="560" y="139.5">UPGRADE</text></g>
+
+        <rect x="659" y="136" width="154" height="104" rx="12" class="n"/>
+        <text class="tp" x="671" y="158">P2</text>
+        <text class="t c" x="736" y="184">Plan library</text>
+        <text class="ts c" x="736" y="206">best of 16 · cleaned</text>
+        <text class="ts c" x="736" y="224">physics-checked</text>
+        <g class="nb"><rect x="765" y="128" width="36" height="16" rx="8"/><text x="783" y="139.5">NEW</text></g>
+
+        <rect x="872" y="136" width="154" height="104" rx="12" class="n tl"/>
+        <text class="tp" x="884" y="158">P2</text>
+        <text class="t c" x="949" y="184">Teacher in sim</text>
+        <text class="ts c" x="949" y="206">tracks the full pose</text>
+        <text class="ts c" x="949" y="224">90-muscle body</text>
+        <g class="ub"><rect x="958" y="128" width="56" height="16" rx="8"/><text x="986" y="139.5">UPGRADE</text></g>
+
+        <rect x="1085" y="136" width="154" height="104" rx="12" class="n amb"/>
+        <text class="tp" x="1097" y="158">P3</text>
+        <text class="t c" x="1162" y="184">Keep filter</text>
+        <text class="ts c" x="1162" y="206">no fall · ≤ 8° · ≤ 5 cm</text>
+        <text class="ts c" x="1162" y="224">human-like style</text>
+        <g class="nb"><rect x="1191" y="128" width="36" height="16" rx="8"/><text x="1209" y="139.5">NEW</text></g>
+
+        <line class="ar" x1="174" y1="188" x2="231" y2="188" marker-end="url(#o1)"/>
+        <text class="tf c" x="203" y="170">windows</text>
+        <line class="ar" x1="387" y1="188" x2="444" y2="188" marker-end="url(#o1)"/>
+        <text class="tf c" x="416" y="170">batches</text>
+        <line class="ar" x1="600" y1="188" x2="657" y2="188" marker-end="url(#o1)"/>
+        <text class="tf c" x="629" y="170">samples</text>
+        <circle cx="629" cy="188" r="12" class="gb"/><text class="gt" x="629" y="192">G1</text>
+        <line class="ar" x1="813" y1="188" x2="870" y2="188" marker-end="url(#o1)"/>
+        <text class="tf c" x="842" y="170">plans</text>
+        <circle cx="842" cy="188" r="12" class="gb"/><text class="gt" x="842" y="192">G2</text>
+        <line class="ar tl" x1="1026" y1="188" x2="1083" y2="188" marker-end="url(#o2)"/>
+        <text class="tf c" x="1055" y="170">episodes</text>
+
+        <text class="t" x="20" y="372">Loop 2 · run it live</text>
+        <text class="tf" x="20" y="392">P4 · replan every 0.2 s</text>
+        <path class="ar blue" d="M523 240 V328" marker-end="url(#o4)"/>
+        <text class="tb" x="533" y="290">final weights</text>
+        <path class="ar tl dash" d="M949 240 V290 H720 V328" marker-end="url(#o2)"/>
+        <text class="tt" x="959" y="278">teacher's actions as targets</text>
+        <text class="tf" x="959" y="296">DAgger · training only</text>
+
+        <rect x="446" y="330" width="154" height="104" rx="12" class="n hl"/>
+        <text class="tp" x="458" y="352">P4</text>
+        <text class="t c" x="523" y="378">Frozen planner</text>
+        <text class="ts c" x="523" y="400">frozen after P3</text>
+        <text class="ts c" x="523" y="418">replans live</text>
+        <g class="nb"><rect x="552" y="322" width="36" height="16" rx="8"/><text x="570" y="333.5">NEW</text></g>
+
+        <line class="ar" x1="600" y1="382" x2="657" y2="382" marker-end="url(#o1)"/>
+        <text class="tf c" x="629" y="370">slice</text>
+
+        <rect x="659" y="330" width="154" height="104" rx="12" class="n tl"/>
+        <text class="tp" x="671" y="352">P4</text>
+        <text class="t c" x="736" y="378">Slice student</text>
+        <text class="ts c" x="736" y="400">footholds · timing</text>
+        <text class="ts c" x="736" y="418">COM · pelvis</text>
+        <g class="ub"><rect x="745" y="322" width="56" height="16" rx="8"/><text x="773" y="333.5">UPGRADE</text></g>
+
+        <line class="ar tl" x1="813" y1="382" x2="1083" y2="382" marker-end="url(#o2)"/>
+        <text class="tf c" x="948" y="362">muscle commands</text>
+        <circle cx="948" cy="382" r="12" class="gb"/><text class="gt" x="948" y="386">G4</text>
+
+        <rect x="1085" y="330" width="154" height="104" rx="12" class="n gs"/>
+        <text class="tp" x="1097" y="352">sim</text>
+        <text class="t c" x="1162" y="378">Muscle body</text>
+        <text class="ts c" x="1162" y="400">90 muscles</text>
+        <text class="ts c" x="1162" y="418">walks on terrain</text>
+        <g class="db"><rect x="1183" y="322" width="44" height="16" rx="8"/><text x="1205" y="333.5">TODAY</text></g>
+
+        <path class="ar blue" d="M1162 434 V464 H523 V436" marker-end="url(#o4)"/>
+        <text class="tb c" x="842" y="456">body's last 0.4 s, rebuilt from joints → replan</text>
+
+        <rect x="20" y="486" width="1220" height="40" rx="10" class="n gs"/>
+        <text class="tm c" x="630" y="511">P0 scoreboard · held-out windows + fixed courses · picks every checkpoint · judges gates G1, G2, G4</text>
+        <g class="nb"><rect x="1192" y="478" width="36" height="16" rx="8"/><text x="1210" y="489.5">NEW</text></g>
+      </svg>
+    </div>
+    <figcaption>The amber loop is the physics relabeling: only episodes the muscle body actually completed, and that still look human, go back into the planner's data. After three rounds the planner is frozen and drives a student that sees only a slice of each plan.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Loop 1 · ground the planner</b><span>The muscle body tries the planner's plans; only completed, human-looking episodes go back into training.</span></div>
+    <div class="why"><span class="num">2</span><b>Loop 2 · run it live</b><span>The frozen planner replans from the simulated body, so an infeasible stretch is corrected 0.2 s later instead of piling up.</span></div>
+    <div class="why"><span class="num">3</span><b>Scoreboard first</b><span>One fixed benchmark picks every checkpoint and judges every gate, so the phases stay comparable.</span></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><span class="tag">Plausible</span><h3>Looks human, breaks no physics</h3>
+      <ul><li>Matches held-out human motion on the same terrain: joint angles, step length, contact timing.</li>
+        <li>No sinking, sliding, floating or teleports; accelerations the feet can produce.</li></ul></div>
+    <div class="card"><span class="tag">Executable</span><h3>The muscle body carries it out</h3>
+      <ul><li>The teacher tracks the plans in simulation.</li>
+        <li>The student follows the planner's slice live without falling, at human-like effort.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ P0 ============ -->
+<section>
+  <div class="sec-head">
+    <span class="phase"><b>P0</b><span class="eyebrow">~1 day</span></span>
+    <h2>A scoreboard before any new run</h2>
+    <p>Held-out loss is noisy and ignores terrain. Every checkpoint and gate is judged by rollouts instead.</p>
+  </div>
+  <p class="problem"><b>Problem</b><span>Loss cannot tell a checkpoint that plants feet on a tread from one that sinks them into it.</span></p>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1260 360" role="img" aria-label="Scoreboard, before and after. Today each checkpoint is picked by the lowest held-out loss. New: held-out windows and fixed courses are rolled out every 5,000 iterations with fixed seeds, scored on eight metrics, and the scores pick the best checkpoint and decide gates G1, G2 and G4.">
+        <defs><marker id="s1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
+        <g class="db"><rect x="20" y="28" width="44" height="16" rx="8"/><text x="42" y="39.5">TODAY</text></g>
+        <rect class="n gs" x="80" y="20" width="150" height="32" rx="8"/><text class="ts c" x="155" y="41">each checkpoint</text>
+        <line class="ar" x1="230" y1="36" x2="278" y2="36" marker-end="url(#s1)"/>
+        <rect class="n gs" x="280" y="20" width="150" height="32" rx="8"/><text class="ts c" x="355" y="41">held-out loss</text>
+        <line class="ar" x1="430" y1="36" x2="478" y2="36" marker-end="url(#s1)"/>
+        <rect class="n gs" x="480" y="20" width="150" height="32" rx="8"/><text class="ts c" x="555" y="41">pick the lowest</text>
+        <text class="tr" x="650" y="41">noisy · blind to terrain</text>
+        <line class="grid-line" x1="20" y1="72" x2="1240" y2="72"/>
+        <g class="nb"><rect x="20" y="86" width="36" height="16" rx="8"/><text x="38" y="97.5">NEW</text></g>
+        <text class="tf" x="66" y="98">every checkpoint and gate judged by rollouts</text>
+
+        <rect x="20" y="116" width="250" height="96" rx="12" class="n gs"/>
+        <text class="t c" x="145" y="150">Held-out windows</text>
+        <text class="ts c" x="145" y="172">unseen SEED actors · A300 stairs</text>
+        <text class="ts c" x="145" y="192">AB01 ±15° ramps · trial 4</text>
+        <rect x="20" y="228" width="250" height="96" rx="12" class="n gs"/>
+        <text class="t c" x="145" y="262">Fixed courses</text>
+        <text class="ts c" x="145" y="284">stairs 12–20 cm · boxes 20–60 cm</text>
+        <text class="ts c" x="145" y="304">ramps 3–15° · turns</text>
+        <g class="nm"><circle cx="34" cy="116" r="10"/><text x="34" y="120">2</text></g>
+        <path class="ar" d="M270 164 H320 V276 H270"/>
+        <line class="ar" x1="320" y1="220" x2="398" y2="220" marker-end="url(#s1)"/>
+        <text class="tf c" x="359" y="210">test cases</text>
+
+        <rect x="400" y="170" width="200" height="100" rx="12" class="n hl"/>
+        <text class="t c" x="500" y="204">Rollouts</text>
+        <text class="ts c" x="500" y="226">every 5k iterations</text>
+        <text class="ts c" x="500" y="246">fixed seeds, 8 s each</text>
+        <g class="nm"><circle cx="414" cy="170" r="10"/><text x="414" y="174">1</text></g>
+        <line class="ar" x1="600" y1="220" x2="658" y2="220" marker-end="url(#s1)"/>
+        <text class="tf c" x="629" y="210">plans</text>
+
+        <rect x="660" y="116" width="380" height="236" rx="12" class="n"/>
+        <text class="t" x="680" y="142">Scores</text>
+        <text class="tn" x="680" y="172">goal error</text><text class="tf" x="680" y="188">miss distance at the goal</text>
+        <text class="tn" x="680" y="214">stance slip</text><text class="tf" x="680" y="230">planted foot sliding</text>
+        <text class="tn" x="680" y="256">penetration</text><text class="tf" x="680" y="272">body inside the ground</text>
+        <text class="tn" x="680" y="298">floating</text><text class="tf" x="680" y="314">contact foot in the air</text>
+        <text class="tn" x="870" y="172">seam jump</text><text class="tf" x="870" y="188">jump where replans join</text>
+        <text class="tn" x="870" y="214">high-jerk frames</text><text class="tf" x="870" y="230">teleports</text>
+        <text class="tn" x="870" y="256">style-prior score</text><text class="tf" x="870" y="272">how human it looks</text>
+        <text class="tn" x="870" y="298">step length + timing</text><text class="tf" x="870" y="314">vs human, same terrain</text>
+        <text class="tm" x="680" y="340">jerk threshold = dataset maximum</text>
+
+        <line class="ar" x1="1040" y1="220" x2="1088" y2="220" marker-end="url(#s1)"/>
+        <text class="tf c" x="1064" y="210">scores</text>
+        <rect x="1090" y="160" width="150" height="120" rx="12" class="n amb"/>
+        <text class="t c" x="1165" y="200">Best checkpoint</text>
+        <text class="ts c" x="1165" y="224">+ gate verdicts</text>
+        <text class="ts c" x="1165" y="244">G1 · G2 · G4</text>
+        <g class="nm"><circle cx="1104" cy="160" r="10"/><text x="1104" y="164">3</text></g>
+      </svg>
+    </div>
+    <figcaption>The same benchmark scores the planner alone (P1), the library (P2), each loop round (P3) and the closed loop (P4), so improvements stay comparable.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Rollouts, not loss</b><span>A rollout shows where the feet meet the ground; held-out loss does not.</span></div>
+    <div class="why"><span class="num">2</span><b>Fixed seeds, fixed courses</b><span>Every checkpoint faces the same test, every 5k iterations.</span></div>
+    <div class="why"><span class="num">3</span><b>One benchmark for every phase</b><span>Planner, library, loop rounds and closed loop on one scale.</span></div>
+  </div>
+</section>
+
+<!-- ============ P1 ============ -->
+<section>
+  <div class="sec-head">
+    <span class="phase"><b>P1</b><span class="eyebrow">2–3 days · 2–3 runs of ~2 h</span></span>
+    <h2>Human prior v10: lean on terrain, not on memory</h2>
+    <p>v9 memorised its two minutes of stairs and leaned on its history. These changes come from PARC, CAMDM, SCENIC and PRIMAL.</p>
+  </div>
+  <p class="problem"><b>Problem</b><span>v9 recognises which training clip it is in, so it replays a memorised continuation instead of reading the terrain.</span></p>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 280" role="img" aria-label="Why v9 fails: 0.4 s of history plus a goal at exactly 1.2 s pinpoints one of 33 stair takes; the model replays what came next, so on stairs of a different shape the feet land inside the treads. Stair loss is about 0.002 in training and about 0.05 held out, drawn to scale.">
+        <defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
+        <text class="tn" x="20" y="30">What v9 sees</text>
+        <rect class="cellh" x="20" y="50" width="16" height="30"/><rect class="cellh" x="36" y="50" width="16" height="30"/><rect class="cellh" x="52" y="50" width="16" height="30"/><rect class="cellh" x="68" y="50" width="16" height="30"/>
+        <rect class="cellh" x="84" y="50" width="16" height="30"/><rect class="cellh" x="100" y="50" width="16" height="30"/><rect class="cellh" x="116" y="50" width="16" height="30"/><rect class="cellh" x="132" y="50" width="16" height="30"/>
+        <rect class="cellf" x="148" y="50" width="144" height="30"/>
+        <line class="ar amb" x1="292" y1="46" x2="292" y2="86"/>
+        <circle class="gb" cx="292" cy="40" r="6"/>
+        <text class="tf" x="20" y="100">history 0.4 s</text>
+        <text class="tf" x="152" y="100">future 1.2 s</text>
+        <text class="ta" x="20" y="128">goal: pelvis at exactly 1.2 s</text>
+        <text class="ts" x="20" y="160">history + exact goal</text>
+        <text class="tr" x="20" y="180">≈ a fingerprint of one clip</text>
+
+        <line class="ar" x1="306" y1="65" x2="392" y2="65" marker-end="url(#m1)"/>
+        <text class="tf c" x="349" y="56">fingerprint</text>
+
+        <text class="tn" x="400" y="30">Recognises the clip</text>
+        <g>
+          <rect class="tile" x="400" y="50" width="20" height="14"/><rect class="tile" x="424" y="50" width="20" height="14"/><rect class="tile" x="448" y="50" width="20" height="14"/><rect class="tile" x="472" y="50" width="20" height="14"/><rect class="tile" x="496" y="50" width="20" height="14"/><rect class="tile" x="520" y="50" width="20" height="14"/><rect class="tile" x="544" y="50" width="20" height="14"/><rect class="tile" x="568" y="50" width="20" height="14"/><rect class="tile" x="592" y="50" width="20" height="14"/><rect class="tile" x="616" y="50" width="20" height="14"/><rect class="tile" x="640" y="50" width="20" height="14"/>
+          <rect class="tile" x="400" y="68" width="20" height="14"/><rect class="tile" x="424" y="68" width="20" height="14"/><rect class="tile" x="448" y="68" width="20" height="14"/><rect class="tile" x="472" y="68" width="20" height="14"/><rect class="tile" x="496" y="68" width="20" height="14"/><rect class="tile" x="520" y="68" width="20" height="14"/><rect class="tile" x="544" y="68" width="20" height="14"/><rect class="tile" x="568" y="68" width="20" height="14"/><rect class="tile" x="592" y="68" width="20" height="14"/><rect class="tile" x="616" y="68" width="20" height="14"/><rect class="tile" x="640" y="68" width="20" height="14"/>
+          <rect class="tile" x="400" y="86" width="20" height="14"/><rect class="tile" x="424" y="86" width="20" height="14"/><rect class="tile" x="448" y="86" width="20" height="14"/><rect class="tile" x="472" y="86" width="20" height="14"/><rect class="tile" x="496" y="86" width="20" height="14"/><rect class="tile on" x="520" y="86" width="20" height="14"/><rect class="tile" x="544" y="86" width="20" height="14"/><rect class="tile" x="568" y="86" width="20" height="14"/><rect class="tile" x="592" y="86" width="20" height="14"/><rect class="tile" x="616" y="86" width="20" height="14"/><rect class="tile" x="640" y="86" width="20" height="14"/>
+        </g>
+        <line class="ar amb thin" x1="530" y1="101" x2="530" y2="109"/>
+        <text class="tf" x="400" y="122">33 stair takes</text>
+        <text class="ta c" x="530" y="122">this take</text>
+        <text class="ts" x="400" y="160">two minutes of stairs in all</text>
+        <text class="tr" x="400" y="180">replays what came next</text>
+
+        <line class="ar" x1="664" y1="75" x2="732" y2="75" marker-end="url(#m1)"/>
+        <text class="tf c" x="698" y="66">replays</text>
+
+        <text class="tn" x="740" y="30">Feet inside new treads</text>
+        <path class="gfill" d="M740 250 V230 H800 V190 H844 V150 H888 V110 H1000 V250 Z"/>
+        <polyline class="ghl" points="800,230 800,198 844,198 844,166 888,166 888,134 1000,134"/>
+        <circle class="sph bad" cx="822" cy="192" r="6"/><circle class="sph bad" cx="866" cy="160" r="6"/><circle class="sph bad" cx="910" cy="128" r="6"/>
+        <text class="tr" x="740" y="70">feet go to the memorised heights</text>
+        <text class="tf" x="740" y="88">dashed: the stairs it memorised</text>
+
+        <text class="tn" x="1040" y="30">Loss agrees</text>
+        <text class="tf" x="1040" y="62">stair loss, training ≈ 0.002</text>
+        <rect class="bar" x="1040" y="70" width="8" height="12"/>
+        <text class="tf" x="1040" y="112">stair loss, held out ≈ 0.05</text>
+        <rect class="bar badf" x="1040" y="120" width="200" height="12"/>
+        <text class="tf" x="1040" y="152">bars to scale</text>
+        <text class="tr" x="1040" y="180">memorised, not learned</text>
+      </svg>
+    </div>
+    <figcaption>0.4 s of history plus an exact goal (pelvis position at exactly 1.2 s) is nearly a fingerprint for a rare clip, such as one of the 33 stair takes. Stair training loss is about 0.002 vs about 0.05 held out, and feet end up inside unfamiliar treads.</figcaption>
+  </figure>
+
+  <div class="subhead"><h3>Fix 1 · training windows</h3><span>make history and goal weaker clues</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Training windows before and after. v9: history always visible and the goal is the pelvis at exactly 1.2 s. v10: in 85 percent of windows the history carries smooth noise and the goal sits at a random 0.4 to 1.2 s horizon with 5 cm noise; in 15 percent the history is hidden. History noise: v9 perturbed each channel so joints and feet disagreed; v10 offsets the whole body and re-runs forward kinematics. Outputs per future frame now add nine segment poses.">
+        <text class="tf" x="150" y="22">history 0.4 s</text>
+        <text class="tf" x="150" y="36">8 frames</text>
+        <text class="tf" x="266" y="22">future 1.2 s</text>
+        <text class="tf" x="266" y="36">24 frames</text>
+
+        <text class="tn" x="20" y="70">v9 · today</text>
+        <g>
+          <rect class="cellh" x="150" y="50" width="14" height="30"/><rect class="cellh" x="164" y="50" width="14" height="30"/><rect class="cellh" x="178" y="50" width="14" height="30"/><rect class="cellh" x="192" y="50" width="14" height="30"/>
+          <rect class="cellh" x="206" y="50" width="14" height="30"/><rect class="cellh" x="220" y="50" width="14" height="30"/><rect class="cellh" x="234" y="50" width="14" height="30"/><rect class="cellh" x="248" y="50" width="14" height="30"/>
+        </g>
+        <rect class="cellf" x="262" y="50" width="336" height="30"/>
+        <line class="ar amb" x1="598" y1="46" x2="598" y2="86"/>
+        <circle class="gb" cx="598" cy="40" r="6"/>
+        <text class="ta" x="614" y="62">goal: pelvis at exactly 1.2 s</text>
+        <text class="tr" x="614" y="80">≈ a fingerprint for a rare clip</text>
+
+        <text class="tn" x="20" y="140">v10</text>
+        <text class="tf" x="20" y="156">85 % of windows</text>
+        <g>
+          <rect class="cellh" x="150" y="130" width="14" height="30"/><rect class="cellh" x="164" y="130" width="14" height="30"/><rect class="cellh" x="178" y="130" width="14" height="30"/><rect class="cellh" x="192" y="130" width="14" height="30"/>
+          <rect class="cellh" x="206" y="130" width="14" height="30"/><rect class="cellh" x="220" y="130" width="14" height="30"/><rect class="cellh" x="234" y="130" width="14" height="30"/><rect class="cellh" x="248" y="130" width="14" height="30"/>
+        </g>
+        <path class="ar tl" d="M152 152 C 185 134, 225 160, 260 140"/>
+        <rect class="cellf" x="262" y="130" width="336" height="30"/>
+        <path class="ar amb" d="M374 124 V118 H598 V124"/>
+        <circle class="noise" cx="490" cy="118" r="11"/><circle class="gb" cx="490" cy="118" r="5"/>
+        <g class="nm"><circle cx="388" cy="97" r="9"/><text x="388" y="101">3</text></g>
+        <text class="ta" x="402" y="101">goal at a random horizon 0.4–1.2 s (an input) · 5 cm noise</text>
+        <g class="nm"><circle cx="624" cy="146" r="9"/><text x="624" y="150">2</text></g>
+        <text class="tt" x="640" y="150">smooth noise, see right</text>
+
+        <text class="tn" x="20" y="210">v10</text>
+        <text class="tf" x="20" y="226">15 % of windows</text>
+        <rect class="cellx" x="150" y="200" width="112" height="30"/>
+        <text class="tf c" x="206" y="219">hidden</text>
+        <rect class="cellf" x="262" y="200" width="336" height="30"/>
+        <path class="ar amb" d="M374 194 V188 H598 V194"/>
+        <circle class="noise" cx="540" cy="188" r="11"/><circle class="gb" cx="540" cy="188" r="5"/>
+        <g class="nm"><circle cx="624" cy="216" r="9"/><text x="624" y="220">1</text></g>
+        <text class="tt" x="640" y="220">hidden: read terrain + goal</text>
+
+        <line class="grid-line" x1="150" y1="246" x2="598" y2="246"/>
+        <line class="dim" x1="150" y1="242" x2="150" y2="250"/><line class="dim" x1="262" y1="242" x2="262" y2="250"/><line class="dim" x1="374" y1="242" x2="374" y2="250"/><line class="dim" x1="598" y1="242" x2="598" y2="250"/>
+        <text class="tf c" x="150" y="264">−0.4 s</text><text class="tf c" x="262" y="264">now</text><text class="tf c" x="374" y="264">+0.4 s</text><text class="tf c" x="598" y="264">+1.2 s</text>
+
+        <text class="tn" x="840" y="34">History noise</text>
+        <g class="nm"><circle cx="946" cy="30" r="9"/><text x="946" y="34">2</text></g>
+        <polyline class="leg ghost" points="930,60 918,110 934,156 962,160"/>
+        <polyline class="leg bad" points="930,60 906,108 930,152"/>
+        <circle class="dot bad" cx="948" cy="170" r="4"/><circle class="dot bad" cx="976" cy="164" r="4"/>
+        <circle class="dot" cx="930" cy="60" r="4"/>
+        <text class="tf" x="860" y="192">v9 · noise per channel</text>
+        <text class="tr" x="860" y="210">joints and feet disagree</text>
+        <polyline class="leg ghost" points="1150,60 1138,110 1154,156 1182,160"/>
+        <polyline class="leg ok" points="1150,60 1131,108 1141,156 1168,164"/>
+        <circle class="dot ok" cx="1141" cy="160" r="4"/><circle class="dot ok" cx="1168" cy="164" r="4"/>
+        <circle class="dot" cx="1150" cy="60" r="4"/>
+        <text class="tf" x="1060" y="192">v10 · smooth offset → FK</text>
+        <text class="tt" x="1060" y="210">still one consistent body</text>
+
+        <rect x="840" y="232" width="400" height="126" rx="10" class="n"/>
+        <text class="tn" x="856" y="256">Planner outputs, per future frame</text>
+        <text class="ts" x="856" y="278">contacts · footholds · pelvis · 4 foot points</text>
+        <text class="ts" x="856" y="298">17 joint angles (the truth)</text>
+        <g class="nb"><rect x="856" y="309" width="36" height="16" rx="8"/><text x="874" y="320.5">NEW</text></g>
+        <text class="tb" x="900" y="322">+ 9 segment poses (origin + 6D rotation):</text>
+        <text class="tb" x="900" y="342">femur, tibia, calcn (heel), toes L/R, torso</text>
+      </svg>
+    </div>
+    <figcaption>Hiding the history and loosening the goal stop the model from recognising a memorised clip from its first frames.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Hide the history in 15 % of windows</b><span>The model must learn what terrain + goal alone call for.</span></div>
+    <div class="why"><span class="num">2</span><b>Noise = smooth whole-body offset, re-run through FK</b><span>A noisy history is still a body a policy could produce. Before, per-channel noise made joints and foot positions disagree.</span></div>
+    <div class="why"><span class="num">3</span><b>Goal at a random 0.4–1.2 s horizon, + 5 cm noise</b><span>The horizon is an input, so the goal means <i>head about here</i> instead of a clip's exact pelvis position.</span></div>
+  </div>
+
+  <div class="subhead"><h3>Fix 2 · terrain</h3><span>make the foot's relation to the ground a direct target</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 310" role="img" aria-label="Terrain fixes, side views, v9 above and v10 below. Cells: a 22 cm tread is 2 cells at 10 cm and 4 cells at 5 cm. Contacts: v9 matched the data's height and could sit inside the step; v10 pulls contact points onto the surface. Penetration: v9 took the lowest of 4 coarse cells and missed a sphere inside the step corner, about 20 percent of stair stance spheres; v10 checks the exact heightfield. Random terrain in 10 percent of batches with only the penetration loss.">
+        <line class="grid-line" x1="320" y1="10" x2="320" y2="300"/><line class="grid-line" x1="630" y1="10" x2="630" y2="300"/><line class="grid-line" x1="940" y1="10" x2="940" y2="300"/>
+        <line class="grid-line" x1="20" y1="168" x2="930" y2="168"/>
+
+        <g class="nm"><circle cx="30" cy="24" r="9"/><text x="30" y="28">4</text></g>
+        <text class="tn" x="46" y="29">5 cm cells near the feet</text>
+        <text class="tn" x="20" y="58">v9</text>
+        <text class="tf" x="20" y="78">tread 22 cm = 2 cells</text>
+        <path class="gfill" d="M20 160 V150 H120 V110 H175 V70 H310 V160 Z"/>
+        <rect class="cellf" x="120" y="85" width="25" height="25"/><rect class="cellf" x="145" y="85" width="25" height="25"/>
+        <text class="tn" x="20" y="190">v10</text>
+        <text class="tf" x="20" y="210">tread 22 cm = 4 cells</text>
+        <path class="gfill" d="M20 292 V282 H120 V242 H175 V202 H310 V292 Z"/>
+        <rect class="cellf" x="120" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="132.5" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="145" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="157.5" y="229.5" width="12.5" height="12.5"/>
+
+        <g class="nm"><circle cx="340" cy="24" r="9"/><text x="340" y="28">5</text></g>
+        <text class="tn" x="356" y="29">Contacts on the real surface</text>
+        <text class="tn" x="330" y="58">v9</text>
+        <text class="tr" x="440" y="80">matched the data's height</text>
+        <text class="tf" x="440" y="96">not this surface</text>
+        <path class="gfill" d="M330 160 V150 H450 V110 H620 V160 Z"/>
+        <line class="ghl" x1="460" y1="124" x2="610" y2="124"/>
+        <circle class="sph bad" cx="530" cy="118" r="6"/>
+        <text class="tn" x="330" y="190">v10</text>
+        <text class="tt" x="440" y="212">pulled onto the surface</text>
+        <path class="gfill" d="M330 292 V282 H450 V242 H620 V292 Z"/>
+        <circle class="sph" cx="530" cy="236" r="6"/>
+
+        <g class="nm"><circle cx="650" cy="24" r="9"/><text x="650" y="28">6</text></g>
+        <text class="tn" x="666" y="29">Exact penetration check</text>
+        <text class="tn" x="640" y="58">v9</text>
+        <text class="tr" x="640" y="80">missed ~20 % of stair stance spheres</text>
+        <text class="tf" x="640" y="96">lowest of 4 coarse cells: looks clear</text>
+        <path class="gfill" d="M640 160 V150 H790 V110 H930 V160 Z"/>
+        <line class="ar amb dash thin" x1="755" y1="150" x2="830" y2="150"/>
+        <circle class="sph" cx="786" cy="118" r="8"/>
+        <text class="tn" x="640" y="190">v10</text>
+        <text class="tt" x="640" y="212">exact heightfield: caught</text>
+        <path class="gfill" d="M640 292 V282 H790 V242 H930 V292 Z"/>
+        <circle class="sph bad" cx="786" cy="250" r="8"/>
+
+        <g class="nm"><circle cx="960" cy="24" r="9"/><text x="960" y="28">7</text></g>
+        <text class="tn" x="976" y="29">Random terrain</text>
+        <g class="nb"><rect x="1192" y="17" width="36" height="16" rx="8"/><text x="1210" y="28.5">NEW</text></g>
+        <text class="tf" x="950" y="56">10 % of batches</text>
+        <path class="gfill" d="M950 160 V130 H990 V112 H1035 V138 H1080 V100 H1125 V120 H1170 V92 H1240 V160 Z"/>
+        <circle class="sph" cx="1012" cy="106" r="6"/><circle class="sph" cx="1102" cy="94" r="6"/><circle class="sph" cx="1205" cy="86" r="6"/>
+        <text class="tt" x="950" y="190">penetration loss only</text>
+        <text class="tf" x="950" y="206">teaches: never feet in the ground</text>
+        <text class="tf" x="950" y="222">beyond the few real terrains</text>
+        <path class="gfill" d="M950 292 V270 H1000 V250 H1045 V276 H1100 V240 H1150 V262 H1195 V244 H1240 V292 Z"/>
+        <circle class="sph" cx="1022" cy="244" r="6"/><circle class="sph" cx="1125" cy="234" r="6"/><circle class="sph" cx="1217" cy="238" r="6"/>
+      </svg>
+    </div>
+    <figcaption>The terrain terms make the foot's relation to the ground a direct target. In ④ tread and cells are to scale; spheres are foot contact spheres.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">4</span><b>5 cm cells near the feet</b><span>A 22 cm tread was only 2 cells at 10 cm.</span></div>
+    <div class="why"><span class="num">5</span><b>Contact points pulled onto the surface</b><span>Before, they only matched the data's height.</span></div>
+    <div class="why"><span class="num">6</span><b>Penetration on the exact heightfield</b><span>The lowest of 4 coarse cells missed about 20 % of stair stance spheres.</span></div>
+    <div class="why"><span class="num">7</span><b>Random terrain in 10 % of batches</b><span>Penetration loss only: teaches <i>never put feet in the ground</i> beyond the few real terrains.</span></div>
+  </div>
+
+  <div class="subhead"><h3>Fix 3 · sampling</h3><span>keep the terrain in charge at run time</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 262" role="img" aria-label="Sampling: at each of ten denoising steps the planner predicts once with history and once without, and mixes them 65 to 35 toward the with-history prediction; the draft plan's joints are the truth and forward kinematics rebuilds segment poses; the foot hold pins stance feet and puts contact feet on the surface; 0.2 s is executed and the next history is rebuilt from the joints.">
+        <defs><marker id="q1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="q2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
+        <rect x="20" y="40" width="170" height="66" rx="12" class="n gs"/>
+        <text class="t c" x="105" y="68">History</text>
+        <text class="ts c" x="105" y="90">rebuilt from joints</text>
+        <rect x="20" y="130" width="170" height="66" rx="12" class="n gs"/>
+        <text class="t c" x="105" y="158">Terrain + goal</text>
+        <text class="ts c" x="105" y="180">command or clip path</text>
+
+        <rect x="250" y="24" width="400" height="192" rx="16" class="n dash"/>
+        <g class="nm"><circle cx="264" cy="24" r="10"/><text x="264" y="28">8</text></g>
+        <text class="tm" x="282" y="47">× 10 denoising steps · was 50</text>
+        <rect x="272" y="62" width="190" height="52" rx="10" class="n hl"/>
+        <text class="ts c" x="367" y="93">predict with history</text>
+        <rect x="272" y="138" width="190" height="52" rx="10" class="n hl"/>
+        <text class="ts c" x="367" y="169">predict without history</text>
+        <g class="nb"><rect x="414" y="130" width="36" height="16" rx="8"/><text x="432" y="141.5">NEW</text></g>
+        <path class="ar" d="M190 73 H226 V84 H270" marker-end="url(#q1)"/>
+        <path class="ar" d="M190 163 H244 V104 H270" marker-end="url(#q1)"/>
+        <path class="ar" d="M244 163 H270" marker-end="url(#q1)"/>
+
+        <circle cx="596" cy="126" r="40" class="n amb"/>
+        <text class="ta c" x="596" y="122">mix</text>
+        <text class="tm c" x="596" y="140">65 / 35</text>
+        <g class="nm"><circle cx="566" cy="92" r="10"/><text x="566" y="96">9</text></g>
+        <path class="ar" d="M462 88 H526 V112 H556" marker-end="url(#q1)"/>
+        <text class="tf c" x="494" y="80">65 %</text>
+        <path class="ar" d="M462 164 H526 V140 H556" marker-end="url(#q1)"/>
+        <text class="tf c" x="494" y="156">35 %</text>
+
+        <line class="ar" x1="636" y1="126" x2="728" y2="126" marker-end="url(#q1)"/>
+        <text class="tf c" x="690" y="116">draft plan</text>
+        <rect x="730" y="86" width="200" height="80" rx="12" class="n"/>
+        <text class="t c" x="830" y="116">Joints are the truth</text>
+        <text class="ts c" x="830" y="140">FK rebuilds segment poses</text>
+        <g class="nb"><rect x="882" y="78" width="36" height="16" rx="8"/><text x="900" y="89.5">NEW</text></g>
+        <g class="nm"><circle cx="744" cy="86" r="10"/><text x="744" y="90">10</text></g>
+
+        <line class="ar" x1="930" y1="126" x2="998" y2="126" marker-end="url(#q1)"/>
+        <text class="tf c" x="964" y="116">one body</text>
+        <rect x="1000" y="86" width="240" height="80" rx="12" class="n tl"/>
+        <text class="t c" x="1120" y="116">Foot hold</text>
+        <text class="ts c" x="1120" y="140">stance pinned · contacts on surface</text>
+        <g class="db"><rect x="1184" y="78" width="44" height="16" rx="8"/><text x="1206" y="89.5">TODAY</text></g>
+        <g class="nm"><circle cx="1014" cy="86" r="10"/><text x="1014" y="90">11</text></g>
+
+        <path class="ar tl dash" d="M1120 166 V246 H8 V73 H18" marker-end="url(#q2)"/>
+        <text class="tt c" x="640" y="238">plan out · execute 0.2 s · next history rebuilt from joints</text>
+      </svg>
+    </div>
+    <figcaption>Blending with a history-free prediction keeps the terrain in charge, as PARC (s = 0.65) and CAMDM (γ = 0.7) do. Ten steps instead of fifty, and no unused guidance pass, cut sampling time about tenfold.</figcaption>
+  </figure>
+  <div class="split">
+    <figure class="panel">
+      <div class="scroll">
+        <svg class="dia dia-mid" viewBox="0 0 640 310" role="img" aria-label="One swing at an unseen staircase, side view. With history alone the foot keeps its rhythm and hits the step 40 cm ahead. Without history, terrain and goal call for a high lift. The 65 to 35 mix lifts the foot over the edge, and the foot hold sets the landing on the tread.">
+          <line class="pw" x1="20" y1="22" x2="56" y2="22"/><text class="tn" x="64" y="26">with history: keep this rhythm</text>
+          <line class="pwo" x1="20" y1="44" x2="56" y2="44"/><text class="tn" x="64" y="48">without history: lift for the step</text>
+          <line class="pmix" x1="20" y1="66" x2="56" y2="66"/><text class="tn" x="64" y="70">mix: 65 % with + 35 % without</text>
+          <path class="gfill" d="M20 270 V250 H220 V186 H620 V270 Z"/>
+          <path class="pw" d="M60 250 Q175 186 290 250"/>
+          <path class="pwo" d="M60 250 Q140 40 290 186"/>
+          <path class="pmix" d="M60 250 Q163 135 290 186"/>
+          <circle class="dot" cx="60" cy="250" r="5"/>
+          <circle class="dot" cx="290" cy="186" r="5"/>
+          <line class="xmark" x1="214" y1="217" x2="226" y2="229"/><line class="xmark" x1="226" y1="217" x2="214" y2="229"/>
+          <text class="tf" x="24" y="240">foot</text>
+          <text class="tr" x="125" y="242">hits the step</text>
+          <text class="tt" x="300" y="176">foot hold sets it on the tread</text>
+          <line class="dim" x1="60" y1="284" x2="220" y2="284"/><line class="dim" x1="60" y1="278" x2="60" y2="290"/><line class="dim" x1="220" y1="278" x2="220" y2="290"/>
+          <text class="tf c" x="140" y="303">step 40 cm ahead</text>
+        </svg>
+      </div>
+      <figcaption>Approaching an unseen staircase, <i>keep walking at this rhythm</i> meets <i>a step is 40 cm ahead, lift the foot</i>, and the mix lifts the foot.</figcaption>
+    </figure>
+    <div class="whys stack">
+      <div class="why"><span class="num">8</span><b>10 denoising steps</b><span>Was 50: 3.4 s instead of 17.2 s for 2,048 plans.</span></div>
+      <div class="why"><span class="num">9</span><b>With and without history, mixed 65/35</b><span>Each step runs the network twice and leans 65 % toward the with-history prediction (PARC uses s = 0.65).</span></div>
+      <div class="why"><span class="num">10</span><b>Joints are the truth</b><span>FK rebuilds the segment poses, so a plan is always one consistent body.</span></div>
+      <div class="why"><span class="num">11</span><b>Foot hold, then execute 0.2 s</b><span>Stance feet stay pinned, contact feet land on the surface; the next history is rebuilt from the joints.</span></div>
+      <div class="why cost"><span class="num">!</span><b>Cost</b><span>Weaker history could make replan seams rougher. The foot hold compensates, and the scoreboard's seam metric measures it.</span></div>
+    </div>
+  </div>
+
+  <div class="reads">
+    <div class="read"><b>17.2 s</b><span>v9 today: 2,048 plans at 50 steps (4090, measured)</span></div>
+    <div class="read"><b>3.4 s</b><span>same, 10 steps (measured)</span></div>
+    <div class="read target"><b>≤ 0.5 s</b><span>needed: 4,096 plans, for training with the planner in the loop (P4)</span></div>
+    <div class="read"><b>4×256</b><span>PARC-size network vs our 6×512: ~6× faster; v10 compares both</span></div>
+  </div>
+
+  <div class="subhead"><h3>Optional v11 · warp the rare terrain</h3><span>only if v10 still memorises stairs</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1260 210" role="img" aria-label="Optional v11: our one staircase, rise 16.2 cm and tread 22 cm, is warped into variants such as rise 12 cm with tread 35 cm and rise 20 cm with tread 25 cm, with legs re-solved so contacts sit on the new surface. Drawn to scale.">
+        <defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
+        <g class="db"><rect x="20" y="14" width="62" height="16" rx="8"/><text x="51" y="25.5">OPTIONAL</text></g>
+        <text class="tf" x="94" y="26">one staircase becomes ~20 shapes · to scale</text>
+        <path class="gfill" d="M40 190 V160 H84 V128 H128 V96 H172 V64 H260 V190 Z"/>
+        <circle cx="62" cy="154" r="5" class="sph"/><circle cx="106" cy="122" r="5" class="sph"/><circle cx="150" cy="90" r="5" class="sph"/>
+        <text class="ts" x="40" y="54">ours: rise 16.2 cm · tread 22 cm</text>
+        <line class="ar" x1="300" y1="130" x2="420" y2="130" marker-end="url(#w1)"/>
+        <text class="ts c" x="360" y="116">re-solve legs</text>
+        <text class="tm c" x="360" y="152">contact on new surface</text>
+        <text class="tm c" x="360" y="168">no penetration · smooth</text>
+        <path class="gfill" d="M460 190 V166 H530 V142 H600 V118 H670 V94 H740 V190 Z"/>
+        <circle cx="495" cy="160" r="5" class="sph"/><circle cx="565" cy="136" r="5" class="sph"/><circle cx="635" cy="112" r="5" class="sph"/>
+        <text class="ts" x="460" y="80">rise 12 cm · tread 35 cm</text>
+        <path class="gfill" d="M800 190 V150 H850 V110 H900 V70 H950 V30 H1040 V190 Z"/>
+        <circle cx="825" cy="144" r="5" class="sph"/><circle cx="875" cy="104" r="5" class="sph"/><circle cx="925" cy="64" r="5" class="sph"/>
+        <text class="ts" x="1060" y="80">rise 20 cm</text>
+        <text class="ts" x="1060" y="100">tread 25 cm</text>
+        <text class="tm" x="1060" y="140">~20 variants per clip</text>
+        <text class="tm" x="1060" y="158">boxes 30–70 cm likewise</text>
+        <text class="tm" x="1060" y="176">physics check before use</text>
+      </svg>
+    </div>
+    <figcaption>Only if v10 still memorises stairs: many stair shapes make any one take a weaker clue. Otherwise the loop in P3 supplies terrain variety from executed motion.</figcaption>
+  </figure>
+
+  <div class="gates"><span class="lbl">G1 vs v9 · before P2</span>
+    <span class="gate">stair-descent penetration ≤ 10 % (now 36 %)</span>
+    <span class="gate">box clips no jerkier than human</span>
+    <span class="gate">slip ≤ 1.5× real</span>
+    <span class="gate">goal error ≤ v9</span>
+    <span class="gate">style in real range</span>
+    <span class="gate">4,096 plans ≤ 0.5 s</span>
+  </div>
+</section>
+
+<!-- ============ P2 ============ -->
+<section>
+  <div class="sec-head">
+    <span class="phase"><b>P2</b><span class="eyebrow">3–4 days</span></span>
+    <h2>A library of plans, and a teacher that tracks them</h2>
+    <p>PARC's recipe with our parts: generate, keep the best, clean up, check, then try it on the muscle body.</p>
+  </div>
+  <p class="problem"><b>Problem</b><span>P3 needs plans on terrain the clips never covered, and a muscle-body policy that can carry them out. Today's teacher has only been tested on AB01.</span></p>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 376" role="img" aria-label="Library pipeline: clip terrains and generated courses feed open-loop rollouts of the v10 planner; 16 samples per plan are scored and the best kept; a clean-up optimiser and a physics check follow; passing plans form the library. The library and real windows train the teacher, which starts from the AB01 teacher. Gate G2 requires 90 percent of real held-out windows played.">
+        <defs><marker id="l1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="l2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
+        <rect x="20" y="30" width="180" height="72" rx="12" class="n gs"/>
+        <text class="t c" x="110" y="60">Clip terrains</text>
+        <text class="ts c" x="110" y="82">aim at each clip's path</text>
+        <g class="db"><rect x="144" y="22" width="44" height="16" rx="8"/><text x="166" y="33.5">TODAY</text></g>
+        <rect x="20" y="120" width="180" height="72" rx="12" class="n gs"/>
+        <text class="t c" x="110" y="150">Generated courses</text>
+        <text class="ts c" x="110" y="172">0.4–2.0 m/s · turns</text>
+        <g class="nb"><rect x="152" y="112" width="36" height="16" rx="8"/><text x="170" y="123.5">NEW</text></g>
+        <path class="ar" d="M200 66 H224 V156 H200"/>
+        <line class="ar" x1="224" y1="111" x2="298" y2="111" marker-end="url(#l1)"/>
+        <text class="tf c" x="261" y="103">terrain</text>
+        <text class="tf c" x="261" y="127">+ goal</text>
+
+        <rect x="300" y="66" width="170" height="90" rx="12" class="n hl"/>
+        <text class="tp" x="312" y="86">v10</text>
+        <text class="t c" x="385" y="110">Planner rollout</text>
+        <text class="ts c" x="385" y="132">open loop, 6–10 s</text>
+        <line class="ar" x1="470" y1="111" x2="528" y2="111" marker-end="url(#l1)"/>
+        <text class="tf c" x="499" y="103">× 16</text>
+
+        <rect x="530" y="50" width="200" height="124" rx="12" class="n"/>
+        <text class="t c" x="630" y="76">Best of 16</text>
+        <g>
+          <rect class="tile" x="552" y="86" width="16" height="10"/><rect class="tile" x="572" y="86" width="16" height="10"/><rect class="tile" x="592" y="86" width="16" height="10"/><rect class="tile" x="612" y="86" width="16" height="10"/><rect class="tile" x="632" y="86" width="16" height="10"/><rect class="tile ok" x="652" y="86" width="16" height="10"/><rect class="tile" x="672" y="86" width="16" height="10"/><rect class="tile" x="692" y="86" width="16" height="10"/>
+          <rect class="tile" x="552" y="100" width="16" height="10"/><rect class="tile" x="572" y="100" width="16" height="10"/><rect class="tile" x="592" y="100" width="16" height="10"/><rect class="tile" x="612" y="100" width="16" height="10"/><rect class="tile" x="632" y="100" width="16" height="10"/><rect class="tile" x="652" y="100" width="16" height="10"/><rect class="tile" x="672" y="100" width="16" height="10"/><rect class="tile" x="692" y="100" width="16" height="10"/>
+        </g>
+        <text class="ts c" x="630" y="130">penetration · contact</text>
+        <text class="ts c" x="630" y="148">seam · jerk · goal</text>
+        <text class="tr c" x="630" y="166">drops 15 of 16</text>
+        <g class="nb"><rect x="682" y="42" width="36" height="16" rx="8"/><text x="700" y="53.5">NEW</text></g>
+        <g class="nm"><circle cx="544" cy="50" r="10"/><text x="544" y="54">1</text></g>
+        <line class="ar" x1="730" y1="111" x2="778" y2="111" marker-end="url(#l1)"/>
+        <text class="tf c" x="754" y="103">best</text>
+
+        <rect x="780" y="50" width="210" height="124" rx="12" class="n"/>
+        <text class="t c" x="885" y="80">Clean-up</text>
+        <text class="ts c" x="885" y="104">stay close · low jerk</text>
+        <text class="ts c" x="885" y="124">no penetration · no slide</text>
+        <text class="ts c" x="885" y="144">contact feet on the surface</text>
+        <g class="nb"><rect x="942" y="42" width="36" height="16" rx="8"/><text x="960" y="53.5">NEW</text></g>
+        <g class="nm"><circle cx="794" cy="50" r="10"/><text x="794" y="54">2</text></g>
+        <line class="ar" x1="990" y1="111" x2="1038" y2="111" marker-end="url(#l1)"/>
+        <text class="tf c" x="1014" y="103">clean</text>
+
+        <rect x="1040" y="50" width="200" height="124" rx="12" class="n amb"/>
+        <text class="t c" x="1140" y="80">Physics check</text>
+        <text class="ts c" x="1140" y="102">centre-of-mass accel</text>
+        <text class="ts c" x="1140" y="120">inside the friction cone</text>
+        <text class="ts c" x="1140" y="138">joint limits · jerk</text>
+        <text class="tr c" x="1140" y="160">drops failures</text>
+        <g class="nb"><rect x="1192" y="42" width="36" height="16" rx="8"/><text x="1210" y="53.5">NEW</text></g>
+        <g class="nm"><circle cx="1054" cy="50" r="10"/><text x="1054" y="54">3</text></g>
+        <line class="ar" x1="1140" y1="174" x2="1140" y2="228" marker-end="url(#l1)"/>
+        <text class="tf" x="1150" y="206">passing plans</text>
+
+        <rect x="1040" y="230" width="200" height="80" rx="12" class="n"/>
+        <text class="t c" x="1140" y="262">Plan library</text>
+        <text class="ts c" x="1140" y="284">2,000–5,000 clips</text>
+        <g class="nb"><rect x="1192" y="222" width="36" height="16" rx="8"/><text x="1210" y="233.5">NEW</text></g>
+        <line class="ar tl" x1="1040" y1="270" x2="982" y2="270" marker-end="url(#l2)"/>
+        <text class="tf c" x="1011" y="262">plans</text>
+
+        <rect x="760" y="222" width="220" height="96" rx="12" class="n tl"/>
+        <text class="t c" x="870" y="252">Teacher (full pose)</text>
+        <text class="ts c" x="870" y="274">starts from AB01 teacher</text>
+        <text class="ts c" x="870" y="294">replays its failures more</text>
+        <g class="ub"><rect x="912" y="214" width="56" height="16" rx="8"/><text x="940" y="225.5">UPGRADE</text></g>
+        <g class="nm"><circle cx="774" cy="222" r="10"/><text x="774" y="226">4</text></g>
+
+        <rect x="470" y="230" width="200" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="570" y="262">Real windows</text>
+        <text class="ts c" x="570" y="284">AB01 · SEED · PARC</text>
+        <g class="db"><rect x="614" y="222" width="44" height="16" rx="8"/><text x="636" y="233.5">TODAY</text></g>
+        <line class="ar tl" x1="670" y1="270" x2="758" y2="270" marker-end="url(#l2)"/>
+        <text class="tf c" x="714" y="262">human clips</text>
+
+        <line class="ar" x1="870" y1="318" x2="870" y2="339"/>
+        <circle cx="870" cy="352" r="13" class="gb"/><text class="gt" x="870" y="356">G2</text>
+        <text class="ta" x="892" y="357">≥ 90 % of real held-out windows played</text>
+        <text class="tm" x="480" y="340">AB01 teacher today: 4.9° · 2.2 % falls</text>
+      </svg>
+    </div>
+    <figcaption>Library success is measured here but has no threshold. Raising it is the job of P3.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Best of 16</b><span>Samples vary; score each on penetration, contact, seam, jerk and goal, and keep the cleanest.</span></div>
+    <div class="why"><span class="num">2</span><b>Clean-up</b><span>Fix small flaws (jerk, sliding, feet off the surface) while staying close to the plan.</span></div>
+    <div class="why"><span class="num">3</span><b>Physics check</b><span>Drop plans no body could do: an acceleration the feet cannot push, joints past their limits.</span></div>
+    <div class="why"><span class="num">4</span><b>Teacher from the AB01 teacher</b><span>Starts from a policy that already tracks (4.9° · 2.2 % falls) and practises most where it fails.</span></div>
+  </div>
+  <p class="risk"><b>Risk:</b> one teacher tracking the whole SEED library has never worked for us. The v4 policies fell on every clip, but they used the older recipe; the current teacher recipe has only been tested on AB01. Fallback: SEED's walking, stairs and box subsets only.</p>
+</section>
+
+<!-- ============ P3 ============ -->
+<section>
+  <div class="sec-head">
+    <span class="phase"><b>P3</b><span class="eyebrow">3 rounds · ~1 day of compute each</span></span>
+    <h2>The loop: keep only what the muscle body completed</h2>
+    <p>The Tier 2 relabeling from the 11-20 page and the 11-16 decision: retrain the planner on real data plus executed plans.</p>
+  </div>
+  <p class="problem"><b>Problem</b><span>Human clips cover few terrains and say nothing about what this muscle body can do.</span></p>
+  <div class="split">
+    <figure class="panel">
+      <div class="scroll">
+        <svg class="dia dia-mid" viewBox="0 0 820 460" role="img" aria-label="Loop: the round's planner samples plans on wider terrain, the teacher tracks them in simulation, every episode is recorded with kinematics, contacts, forces and effort, a keep filter rejects falls, large tracking error and non-human style, and kept episodes join real human clips in the training mix, which retrains the planner from scratch for the next round.">
+          <defs><marker id="r1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+            <marker id="r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk bad"/></marker></defs>
+          <rect x="25" y="180" width="170" height="80" rx="12" class="n hl"/>
+          <text class="t c" x="110" y="214">Planner, round k</text>
+          <text class="ts c" x="110" y="236">from scratch</text>
+          <g class="ub"><rect x="127" y="172" width="56" height="16" rx="8"/><text x="155" y="183.5">UPGRADE</text></g>
+          <rect x="215" y="40" width="170" height="80" rx="12" class="n"/>
+          <text class="t c" x="300" y="74">Generate</text>
+          <text class="ts c" x="300" y="96">wider terrain</text>
+          <g class="nb"><rect x="337" y="32" width="36" height="16" rx="8"/><text x="355" y="43.5">NEW</text></g>
+          <g class="nm"><circle cx="229" cy="40" r="10"/><text x="229" y="44">3</text></g>
+          <rect x="475" y="40" width="170" height="80" rx="12" class="n tl"/>
+          <text class="t c" x="560" y="74">Teacher tracks</text>
+          <text class="ts c" x="560" y="96">in simulation</text>
+          <rect x="630" y="180" width="170" height="80" rx="12" class="n"/>
+          <text class="t c" x="715" y="208">Record</text>
+          <text class="ts c" x="715" y="228">kinematics · contacts</text>
+          <text class="ts c" x="715" y="246">forces · effort</text>
+          <g class="nb"><rect x="752" y="172" width="36" height="16" rx="8"/><text x="770" y="183.5">NEW</text></g>
+          <rect x="475" y="320" width="170" height="80" rx="12" class="n amb"/>
+          <text class="t c" x="560" y="348">Keep filter</text>
+          <text class="ts c" x="560" y="368">no fall · ≤ 8° · ≤ 5 cm</text>
+          <text class="ts c" x="560" y="386">style in human range</text>
+          <g class="nb"><rect x="597" y="312" width="36" height="16" rx="8"/><text x="615" y="323.5">NEW</text></g>
+          <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">1</text></g>
+          <rect x="215" y="320" width="170" height="80" rx="12" class="n"/>
+          <text class="t c" x="300" y="348">Training mix</text>
+          <text class="ts c" x="300" y="368">real ≥ 2/3</text>
+          <text class="ts c" x="300" y="386">kept ≤ 1/3</text>
+          <g class="nb"><rect x="337" y="312" width="36" height="16" rx="8"/><text x="355" y="323.5">NEW</text></g>
+          <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">2</text></g>
+          <rect x="25" y="330" width="130" height="60" rx="12" class="n gs"/>
+          <text class="t c" x="90" y="356">Human clips</text>
+          <text class="ts c" x="90" y="376">AB01 · PARC · SEED</text>
+
+          <path class="ar" d="M110 180 V80 H213" marker-end="url(#r1)"/>
+          <text class="tf c" x="162" y="72">samples</text>
+          <line class="ar" x1="385" y1="80" x2="473" y2="80" marker-end="url(#r1)"/>
+          <text class="tf c" x="429" y="72">plans</text>
+          <path class="ar" d="M645 80 H715 V178" marker-end="url(#r1)"/>
+          <text class="tf" x="725" y="140">episodes</text>
+          <path class="ar" d="M715 260 V360 H647" marker-end="url(#r1)"/>
+          <text class="tf" x="725" y="300">every episode</text>
+          <line class="ar" x1="475" y1="360" x2="387" y2="360" marker-end="url(#r1)"/>
+          <text class="tf c" x="431" y="352">kept</text>
+          <line class="ar" x1="155" y1="360" x2="213" y2="360" marker-end="url(#r1)"/>
+          <text class="tf c" x="184" y="352">real</text>
+          <path class="ar" d="M260 320 V290 H110 V262" marker-end="url(#r1)"/>
+          <text class="tf" x="122" y="282">retrain from scratch</text>
+          <line class="ar bad" x1="560" y1="400" x2="560" y2="428" marker-end="url(#r2)"/>
+          <text class="tr" x="572" y="426">rejected</text>
+          <text class="tf" x="572" y="442">fell · tracking error · style</text>
+          <text class="tl2 c" x="410" y="206">3 rounds</text>
+          <text class="tm c" x="410" y="230">PARC: tracker success 27 → 68 %</text>
+        </svg>
+      </div>
+    </figure>
+    <div class="panel" style="display:grid; gap:16px">
+      <h3>Each round widens the terrain</h3>
+      <table class="kv">
+        <tr><th>Round</th><th>Stairs up to</th><th>Boxes up to</th></tr>
+        <tr><td>1</td><td>18 cm</td><td>50 cm</td></tr>
+        <tr><td>2</td><td>20 cm</td><td>60 cm</td></tr>
+        <tr><td>3</td><td>22 cm</td><td>70 cm</td></tr>
+      </table>
+      <p class="credit">Example ranges, to be set from round 1's success.</p>
+      <h3>Watch per round</h3>
+      <table class="kv">
+        <tr><th>Teacher success on fresh plans</th><td>up</td></tr>
+        <tr><th>Penetration, high-jerk frames</th><td>down</td></tr>
+        <tr><th>Realism on held-out human windows</th><td>must not drop</td></tr>
+      </table>
+      <p style="color:var(--muted); font-size:15px">Stop when success plateaus or realism drops. Kept episodes come from a SEED-trained generator, so they stay confidential.</p>
+    </div>
+  </div>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Keep filter</b><span>The body decides what is doable: no fall, tracking error ≤ 8° · ≤ 5 cm, style in human range.</span></div>
+    <div class="why"><span class="num">2</span><b>Real ≥ 2/3, kept ≤ 1/3 of each batch</b><span>Real data stays in every batch as the human anchor.</span></div>
+    <div class="why"><span class="num">3</span><b>Wider terrain each round</b><span>Pushes past the clips' terrain as far as the body succeeds.</span></div>
+  </div>
+</section>
+
+<!-- ============ P4 ============ -->
+<section>
+  <div class="sec-head">
+    <span class="phase"><b>P4</b><span class="eyebrow">2–3 days</span></span>
+    <h2>The deployable policy follows the planner live</h2>
+    <p>The planner replans from the simulated body, so an infeasible stretch is corrected 0.2 s later instead of piling up.</p>
+  </div>
+  <p class="problem"><b>Problem</b><span>A deployable policy cannot see a clip's future, and a fixed plan cannot react when the body drifts from it.</span></p>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 340" role="img" aria-label="Runtime loop: the frozen planner makes a 1.2 second full-pose plan every 0.2 s; the student receives only a slice at 9 time points (per-foot contact, foothold, touchdown and lift-off, centre of mass, pelvis, own heightmap) and drives the 90 muscles; the body's last 0.4 seconds, rebuilt from joints, return to the planner every 0.2 seconds and at touchdowns. During training only, the teacher tracks the full plan and its actions are the student's targets.">
+        <defs><marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="d2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker>
+          <marker id="d3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk blue"/></marker></defs>
+        <rect x="560" y="20" width="240" height="70" rx="12" class="n tl dash"/>
+        <text class="t c" x="680" y="50">Teacher</text>
+        <text class="ts c" x="680" y="72">tracks the same full plan</text>
+        <g class="nm"><circle cx="574" cy="20" r="10"/><text x="574" y="24">3</text></g>
+
+        <rect x="20" y="150" width="170" height="96" rx="12" class="n hl"/>
+        <text class="tp" x="32" y="172">P4</text>
+        <text class="t c" x="105" y="198">Planner</text>
+        <text class="ts c" x="105" y="220">frozen after P3</text>
+        <text class="ts c" x="105" y="238">10 steps</text>
+        <g class="nb"><rect x="142" y="142" width="36" height="16" rx="8"/><text x="160" y="153.5">NEW</text></g>
+        <line class="ar blue" x1="190" y1="198" x2="278" y2="198" marker-end="url(#d3)"/>
+        <text class="tf c" x="234" y="188">every 0.2 s</text>
+
+        <rect x="280" y="150" width="170" height="96" rx="12" class="n"/>
+        <text class="t c" x="365" y="190">Plan</text>
+        <text class="ts c" x="365" y="212">1.2 s · full pose</text>
+        <text class="ts c" x="365" y="230">all joints · 24 frames</text>
+        <path class="ar tl dash" d="M365 150 V55 H558" marker-end="url(#d2)"/>
+        <text class="tt" x="376" y="47">full pose · training only</text>
+        <path class="ar tl dash" d="M800 55 H970 V156" marker-end="url(#d2)"/>
+        <text class="tt" x="812" y="47">teacher's actions as targets (DAgger)</text>
+
+        <line class="ar" x1="450" y1="198" x2="528" y2="198" marker-end="url(#d1)"/>
+        <text class="tf c" x="489" y="188">slice</text>
+        <rect x="530" y="118" width="300" height="160" rx="12" class="n"/>
+        <g class="nm"><circle cx="544" cy="118" r="10"/><text x="544" y="122">1</text></g>
+        <text class="t c" x="680" y="144">Slice at 9 time points</text>
+        <line class="grid-line" x1="566" y1="152" x2="566" y2="196"/><line class="grid-line" x1="596" y1="152" x2="596" y2="196"/><line class="grid-line" x1="626" y1="152" x2="626" y2="196"/>
+        <line class="grid-line" x1="656" y1="152" x2="656" y2="196"/><line class="grid-line" x1="686" y1="152" x2="686" y2="196"/><line class="grid-line" x1="716" y1="152" x2="716" y2="196"/>
+        <line class="grid-line" x1="746" y1="152" x2="746" y2="196"/><line class="grid-line" x1="776" y1="152" x2="776" y2="196"/><line class="grid-line" x1="806" y1="152" x2="806" y2="196"/>
+        <text class="tf" x="546" y="167">L</text><text class="tf" x="546" y="187">R</text>
+        <rect class="stance" x="566" y="157" width="90" height="12" rx="3"/><rect class="stance" x="746" y="157" width="60" height="12" rx="3"/>
+        <rect class="stance" x="626" y="177" width="120" height="12" rx="3"/>
+        <circle class="dot ok" cx="746" cy="163" r="3.5"/><circle class="dot ok" cx="626" cy="183" r="3.5"/>
+        <text class="tf c" x="566" y="209">0</text><text class="tf e" x="812" y="209">1.2 s</text>
+        <text class="ts c" x="680" y="230">per foot: contact · foothold</text>
+        <text class="ts c" x="680" y="248">touchdown · lift-off</text>
+        <text class="ts c" x="680" y="266">COM · pelvis · own heightmap</text>
+
+        <line class="ar" x1="830" y1="198" x2="888" y2="198" marker-end="url(#d1)"/>
+        <text class="tf c" x="859" y="188">targets</text>
+        <rect x="890" y="158" width="160" height="80" rx="12" class="n tl"/>
+        <text class="t c" x="970" y="192">Student</text>
+        <text class="ts c" x="970" y="214">+ proprioception</text>
+        <g class="ub"><rect x="982" y="150" width="56" height="16" rx="8"/><text x="1010" y="161.5">UPGRADE</text></g>
+        <line class="ar" x1="1050" y1="198" x2="1108" y2="198" marker-end="url(#d1)"/>
+        <text class="tf c" x="1079" y="188">muscles</text>
+        <rect x="1110" y="158" width="130" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="1175" y="192">Body in sim</text>
+        <text class="ts c" x="1175" y="214">90 muscles</text>
+        <g class="db"><rect x="1184" y="150" width="44" height="16" rx="8"/><text x="1206" y="161.5">TODAY</text></g>
+
+        <path class="ar blue" d="M1175 238 V318 H105 V248" marker-end="url(#d3)"/>
+        <text class="tb c" x="640" y="310">last 0.4 s, rebuilt from joints · replan every 0.2 s and at touchdowns</text>
+        <g class="nm"><circle cx="240" cy="318" r="10"/><text x="240" y="322">2</text></g>
+      </svg>
+    </div>
+    <figcaption>After distillation, the student is fine-tuned with RL against the frozen planner on random terrain (as CLoSD and Zhang–Hutter do): loose slice tracking, effort, style.</figcaption>
+  </figure>
+  <div class="whys">
+    <div class="why"><span class="num">1</span><b>Only a slice of the plan</b><span>Where and when each foot lands and where the body goes; the body finds its own joint motion.</span></div>
+    <div class="why"><span class="num">2</span><b>Replan from the simulated body</b><span>An infeasible stretch is corrected 0.2 s later instead of piling up.</span></div>
+    <div class="why"><span class="num">3</span><b>Teacher reads the same plan</b><span>Training only: its actions are the student's targets, and only the full-pose vs slice gap remains (below).</span></div>
+  </div>
+
+  <div class="grid2">
+    <figure class="card mini">
+      <span class="tag">Before · distill_ab01</span>
+      <svg class="dia" viewBox="0 0 560 200" role="img" aria-label="Before: the teacher read the clip's future, which the student could not see, so 84 percent of windows fell.">
+        <defs><marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
+        <rect x="20" y="70" width="150" height="60" rx="10" class="n gs"/>
+        <text class="t c" x="95" y="105">Clip's future</text>
+        <rect x="330" y="20" width="150" height="60" rx="10" class="n tl"/>
+        <text class="t c" x="405" y="55">Teacher</text>
+        <rect x="330" y="120" width="150" height="60" rx="10" class="n tl"/>
+        <text class="t c" x="405" y="155">Student</text>
+        <path class="ar" d="M170 90 H250 V50 H328" marker-end="url(#b1)"/>
+        <text class="ts" x="182" y="40">teacher reads it</text>
+        <path class="ar dash" d="M170 110 H250 V150 H328"/>
+        <line class="xmark" x1="240" y1="140" x2="260" y2="160"/><line class="xmark" x1="260" y1="140" x2="240" y2="160"/>
+        <text class="tr" x="190" y="190">student can't see it</text>
+      </svg>
+      <p><b style="color:var(--bad)">84 %</b> of windows fell: the teacher acted on information the student never had.</p>
+    </figure>
+    <figure class="card mini">
+      <span class="tag">Now · shared plan</span>
+      <svg class="dia" viewBox="0 0 560 200" role="img" aria-label="Now: the teacher reads the plan's full pose and the student reads its slice; both come from the same plan.">
+        <defs><marker id="b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk blue"/></marker></defs>
+        <rect x="20" y="70" width="150" height="60" rx="10" class="n hl"/>
+        <text class="t c" x="95" y="105">Plan</text>
+        <rect x="330" y="20" width="150" height="60" rx="10" class="n tl"/>
+        <text class="t c" x="405" y="55">Teacher</text>
+        <rect x="330" y="120" width="150" height="60" rx="10" class="n tl"/>
+        <text class="t c" x="405" y="155">Student</text>
+        <path class="ar blue" d="M170 90 H250 V50 H328" marker-end="url(#b2)"/>
+        <text class="tb" x="182" y="40">full pose</text>
+        <path class="ar blue" d="M170 110 H250 V150 H328" marker-end="url(#b2)"/>
+        <text class="tb" x="182" y="172">slice</text>
+      </svg>
+      <p>Only the full-pose vs slice gap remains. The plan student, given a clip's slice, is at <b>8.2 %</b> falls.</p>
+    </figure>
+  </div>
+
+  <div class="gates"><span class="lbl">G4 closed loop</span>
+    <span class="gate">≤ 10 % falls per episode, held-out terrain</span>
+    <span class="gate">goals reached</span>
+    <span class="gate">kinematics + EMG timing human-like</span>
+    <span class="gate">metabolic cost / m in human range</span>
+  </div>
+</section>
+
+<!-- ============ TIMELINE ============ -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Timeline</span>
+    <h2>About three weeks, mostly the loop</h2>
+    <p>Each gate must pass before the next phase starts. P3's three rounds take ~1 day of compute each.</p>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1260 280" role="img" aria-label="Timeline in working days: P0 day 0 to 1; P1 days 1 to 3, possibly 4; P2 days 4 to 7, possibly 8; P3 three rounds days 8 to 11, possibly 12; P4 days 12 to 14, possibly 15. Gates G1, G2 and G4 at the ends of P1, P2 and P4. P2 carries the most risk, P3 the most compute.">
+        <!-- axis: x = 200 + 60*day, days 0..15 -->
+        <text class="tf c" x="350" y="16">week 1</text><text class="tf c" x="650" y="16">week 2</text><text class="tf c" x="950" y="16">week 3</text>
+        <line class="grid-line" x1="200" y1="24" x2="200" y2="240"/><line class="grid-line" x1="1100" y1="24" x2="1100" y2="240"/>
+        <line class="dim" x1="500" y1="234" x2="500" y2="248"/><line class="dim" x1="800" y1="234" x2="800" y2="248"/>
+        <line class="dim" x1="500" y1="6" x2="500" y2="22"/><line class="dim" x1="800" y1="6" x2="800" y2="22"/>
+        <line class="grid-line" x1="200" y1="240" x2="1100" y2="240"/>
+        <g class="dim">
+          <line x1="260" y1="240" x2="260" y2="245"/><line x1="320" y1="240" x2="320" y2="245"/><line x1="380" y1="240" x2="380" y2="245"/><line x1="440" y1="240" x2="440" y2="245"/>
+          <line x1="560" y1="240" x2="560" y2="245"/><line x1="620" y1="240" x2="620" y2="245"/><line x1="680" y1="240" x2="680" y2="245"/><line x1="740" y1="240" x2="740" y2="245"/>
+          <line x1="860" y1="240" x2="860" y2="245"/><line x1="920" y1="240" x2="920" y2="245"/><line x1="980" y1="240" x2="980" y2="245"/><line x1="1040" y1="240" x2="1040" y2="245"/>
+        </g>
+        <text class="tm c" x="200" y="262">0</text><text class="tm c" x="500" y="262">5</text><text class="tm c" x="800" y="262">10</text><text class="tm c" x="1100" y="262">15 working days</text>
+
+        <text class="ts e" x="184" y="50">P0 scoreboard</text>
+        <rect class="bar" x="200" y="33" width="60" height="26" rx="5"/>
+        <text class="barlbl" x="230" y="50">~1 d</text>
+        <text class="ts e" x="184" y="90">P1 prior v10 (+ v11)</text>
+        <rect class="bar" x="260" y="73" width="120" height="26" rx="5"/>
+        <rect class="bar lt" x="380" y="73" width="60" height="26" rx="5"/>
+        <text class="barlbl" x="320" y="90">2–3 d</text>
+        <circle cx="456" cy="86" r="11" class="gb"/><text class="gt" x="456" y="90">G1</text>
+        <text class="ts" x="474" y="90">v10 beats v9</text>
+        <text class="ts e" x="184" y="130">P2 library + teacher</text>
+        <rect class="bar" x="440" y="113" width="180" height="26" rx="5"/>
+        <rect class="bar lt" x="620" y="113" width="60" height="26" rx="5"/>
+        <text class="barlbl" x="530" y="130">3–4 d</text>
+        <circle cx="696" cy="126" r="11" class="gb"/><text class="gt" x="696" y="130">G2</text>
+        <text class="ts" x="714" y="130">teacher plays ≥ 90 % of real windows</text>
+        <text class="tr" x="960" y="130">most risk</text>
+        <text class="ts e" x="184" y="170">P3 loop, 3 rounds</text>
+        <rect class="bar p3" x="680" y="153" width="58" height="26" rx="5"/>
+        <rect class="bar p3" x="740" y="153" width="58" height="26" rx="5"/>
+        <rect class="bar p3" x="800" y="153" width="60" height="26" rx="5"/>
+        <rect class="bar lt" x="860" y="153" width="60" height="26" rx="5"/>
+        <text class="barlbl" x="709" y="170">R1</text><text class="barlbl" x="769" y="170">R2</text><text class="barlbl" x="830" y="170">R3</text>
+        <text class="tt" x="934" y="170">most compute</text>
+        <text class="ts e" x="184" y="210">P4 student + RL</text>
+        <rect class="bar" x="920" y="193" width="120" height="26" rx="5"/>
+        <rect class="bar lt" x="1040" y="193" width="60" height="26" rx="5"/>
+        <text class="barlbl" x="980" y="210">2–3 d</text>
+        <circle cx="1116" cy="206" r="11" class="gb"/><text class="gt" x="1116" y="210">G4</text>
+        <text class="ts" x="1134" y="210">closed loop</text>
+      </svg>
+    </div>
+    <figcaption>Light segments are the upper end of each estimate. P3 dominates the compute; P2 carries the most risk.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ DECISIONS ============ -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Open</span>
+    <h2>Four decisions before P2</h2>
+  </div>
+  <div class="cards">
+    <div class="card open"><span class="tag">1 · Simulate plans</span><h3>Run generated motion in sim?</h3><p>P2–P3 need it. The 11-16 rule against simulating replayed data is read here as PARC's replays only.</p></div>
+    <div class="card open"><span class="tag">2 · Teacher scope</span><h3>AB01 → SEED, PARC, library</h3><p>P3 needs a teacher beyond AB01. Fallback: SEED subsets.</p></div>
+    <div class="card open"><span class="tag">3 · v11 warping</span><h3>Warp stairs and boxes?</h3><p>Or leave terrain variety to the loop.</p></div>
+    <div class="card open"><span class="tag">4 · Kept share</span><h3>Cap at 1/3 of each batch?</h3><p>Real data stays in every batch as the human anchor.</p></div>
+  </div>
+  <p class="credit">Motion Data by Bones Studio</p>
+</section>
+
+</div>
