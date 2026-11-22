@@ -142,8 +142,8 @@ class _Block(nn.Module):
         super().__init__()
         self.heads = heads
         # RMS-normalised queries and keys bound the attention logits: without it the full-pose planner's adaLN shift
-        # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22). With a
-        # learnable gain (qk_gain) they still crept up (147 -> 170 over 8.5k-11k); without it they stay <= sqrt(head_dim)
+        # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22). With the
+        # learnable gain (qk_gain, v8) they stayed at 7-11 (gains 1.0-1.3 at 14.5k); without it they are <= sqrt(head_dim)
         self.qn = nn.RMSNorm(dim // heads, elementwise_affine=qk_gain) if qk_norm else None
         self.kn = nn.RMSNorm(dim // heads, elementwise_affine=qk_gain) if qk_norm else None
         self.n1 = nn.LayerNorm(dim, eps=1e-5, elementwise_affine=False)
