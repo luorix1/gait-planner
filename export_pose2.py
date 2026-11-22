@@ -66,7 +66,7 @@ def decode(x: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tens
     pcom = torch.stack([pxz[..., 0], x[..., 10] + g0[:, None], pxz[..., 1]], -1)
     psi = a_psi[:, None] + torch.atan2(x[..., 12], x[..., 11])
     quat = _qmul(yaw_quat(psi), qexp(x[..., 13:16]))
-    pf = x[..., P0:].view(B, K, 4, 3)
+    pf = x[..., P0:P0 + 12].view(B, K, 4, 3)
     ptxz = from_frame(pf[..., :2], o, a_psi)
     pty = pf[..., 2] + g0[:, None, None]
     return dict(pcom=pcom, quat=quat, psi=psi, contact=x[..., :4] > 0,
@@ -119,8 +119,8 @@ def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tenso
         last = {key: torch.cat(v, 1)[:, -HIST:] for key, v in seq.items()}
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
         g0 = G(gid, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
-        hist = frame_features(last, o, a_psi, g0)
-        fut = P.generate(hist, patch(G, gid, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
+        hist = P.with_segments(frame_features(last, o, a_psi, g0))
+        fut = P.generate(hist, patch(G, gid, o, a_psi, g0, P.grid), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
         if hold:
             fut = hold_feet(P, hist, fut, hold)
         new = decode(fut, o, a_psi, g0)

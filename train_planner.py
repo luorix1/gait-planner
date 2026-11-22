@@ -64,6 +64,19 @@ def main() -> None:
                     "(its licence forbids motion generators unless cleared)")
     ap.add_argument("--bf16", action=argparse.BooleanOptionalAction, default=True,
                     help="bfloat16 autocast for the network (2x faster on a 4090; the weights and EMA stay fp32)")
+    ap.add_argument("--segments", action="store_true", help="--pose2 v10: 9 segment poses as channels (gp.footfk.SegFK)")
+    ap.add_argument("--hist-drop", type=float, default=0.0, help="--pose2 v10: share of windows with the history hidden; "
+                    "sampling blends with/without it")
+    ap.add_argument("--hist-noise-mode", choices=("white", "body"), default="white",
+                    help="--pose2: per-channel noise (v9) or a smooth whole-body offset re-run through FK (v10)")
+    ap.add_argument("--goal-horizon", action="store_true", help="--pose2 v10: goal at a random 0.4-1.2 s horizon + noise")
+    ap.add_argument("--patch-res", type=float, default=0.1, help="--pose2: terrain patch cell (m); v10 0.05")
+    ap.add_argument("--contact-surface", action="store_true", help="--pose2 v10: contact height over the exact terrain")
+    ap.add_argument("--rand-terrain", type=float, default=0.0, help="--pose2 v10: share of windows on random terrain, "
+                    "penetration loss only")
+    ap.add_argument("--dropout", type=float, default=0.0, help="--pose2: attention + residual dropout")
+    ap.add_argument("--weight-decay", type=float, default=0.01, help="AdamW weight decay (torch default 0.01)")
+    ap.add_argument("--sample-steps", type=int, default=None, help="--pose2: DDIM steps when sampling (default all 50)")
     ap.add_argument("--score-every", type=int, default=0, help="--pose2: roll out the P0 scoreboard every N iterations "
                     "(keeps ckpt_<it>.pt; 0 = off)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -88,19 +101,28 @@ def main() -> None:
         from gp.pose_planner import PosePlanner
         from gp.pose_planner import Windows as Windows2
         fk = footfk.fit(Dtr, a.device, data.ROOT / "data" / "foot_fk.pt")
-        W, Wt = Windows2(Dtr, a.device, fk, a.balance, a.balance_terrain), Windows2(Dte, a.device, fk)
+        if a.segments:
+            from gp.pose_planner import SEG_FK
+            footfk.fit_seg(Dtr, a.device, SEG_FK)
+        planner = PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
+                              goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w,
+                              qk_norm=a.qk_norm, qk_gain=False, segments=a.segments, hist_drop=a.hist_drop,
+                              hist_noise_mode=a.hist_noise_mode, goal_h=a.goal_horizon, patch_res=a.patch_res,
+                              contact_surface=a.contact_surface, rand_terrain=a.rand_terrain, dropout=a.dropout,
+                              sample_steps=a.sample_steps).to(a.device).attach(fk)
+        W = Windows2(Dtr, a.device, fk, a.balance, a.balance_terrain, planner.grid, planner.sfk)
+        Wt = Windows2(Dte, a.device, fk, grid=planner.grid, sfk=planner.sfk)
     else:
         W, Wt = Windows(Dtr, a.device, a.pose, a.balance), Windows(Dte, a.device, a.pose)
     print(f"{len(W.anchors)} training windows, {len(Wt.anchors)} held out", flush=True)
-    planner = (PosePlanner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, contact_w=a.contact_w,
-                           goal_drop=a.goal_drop, hist_noise=a.hist_noise, fk_w=a.fk_w, pen_w=a.pen_w, qk_norm=a.qk_norm, qk_gain=False).to(a.device).attach(fk) if a.pose2
-               else Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device))
+    if not a.pose2:
+        planner = Planner(layers=a.layers, heads=a.heads, head_dim=a.head_dim, c=W.c).to(a.device)
     planner.set_normaliser(*W.batch(20_000))
     board = None
     if a.score_every and a.pose2:
         from scoreboard import Scoreboard
         board, rows = Scoreboard(Dte, fk, a.device), []
-    opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr)
+    opt = torch.optim.AdamW(planner.net.parameters(), lr=a.lr, weight_decay=a.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.iters) if a.cosine else None
     gen = torch.Generator(device=a.device).manual_seed(1)
     log = csv.writer((out / "progress.csv").open("w", buffering=1))

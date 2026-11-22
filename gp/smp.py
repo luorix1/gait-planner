@@ -138,9 +138,11 @@ def _timestep_embedding(t: torch.Tensor, dim: int = 256) -> torch.Tensor:
 class _Block(nn.Module):
     """StableMotionDiTBlock: adaLN-modulated self-attention and a SwiGLU feed-forward, each gated."""
 
-    def __init__(self, dim: int, heads: int, qk_norm: bool = False, qk_gain: bool = True) -> None:
+    def __init__(self, dim: int, heads: int, qk_norm: bool = False, qk_gain: bool = True, dropout: float = 0.0) -> None:
         super().__init__()
         self.heads = heads
+        self.p = dropout                                  # attention and residual dropout (v10 full-pose planner)
+        self.drop = nn.Dropout(dropout)
         # RMS-normalised queries and keys bound the attention logits: without it the full-pose planner's adaLN shift
         # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22). With the
         # learnable gain (qk_gain, v8) they stayed at 7-11 (gains 1.0-1.3 at 14.5k); without it they are <= sqrt(head_dim)
@@ -161,11 +163,11 @@ class _Block(nn.Module):
         q, k, v = self.qkv(h).view(B, S, 3, self.heads, D // self.heads).permute(2, 0, 3, 1, 4)
         if self.qn is not None:
             q, k = self.qn(q), self.kn(k)
-        a = F.scaled_dot_product_attention(q, k, v).transpose(1, 2).reshape(B, S, D)
-        x = x + g1[:, None] * self.out(a)
+        a = F.scaled_dot_product_attention(q, k, v, dropout_p=self.p if self.training else 0.0).transpose(1, 2).reshape(B, S, D)
+        x = x + g1[:, None] * self.drop(self.out(a))
         h = self.n2(x) * (1 + sc2[:, None]) + sh2[:, None]
         u, g = self.ff_in(h).chunk(2, -1)
-        return x + g2[:, None] * self.ff_out(u * F.silu(g))
+        return x + g2[:, None] * self.drop(self.ff_out(u * F.silu(g)))
 
 
 class DiT(nn.Module):

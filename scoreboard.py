@@ -45,7 +45,7 @@ from export_pose2 import NS, Scorer, circmean, frame_features, rollout, start
 from export_pose_planner import to_qpos
 from gp import data
 from gp.planner import FUT, HIST, HZ, POSE_COORDS, STRIDE, from_frame, to_frame, yaw_quat
-from gp.pose_planner import C, PosePlanner, Windows
+from gp.pose_planner import PosePlanner, Windows
 from gp.smp import Prior
 from gp.smp import W as STYLE_W
 from gp.terrain import Ground, atlas, pad
@@ -279,8 +279,8 @@ class Scoreboard:
             m.pop("gait_raw")
             eps.append(dict(kind="course", cls=f"course {cls}", name=name, speed=v, gait=None, **m))
 
-        hist = torch.zeros(512, HIST, C, device=dev) + P.x_mean
-        patch0 = torch.zeros(512, *W(self.a_rep[:1])[1].shape[1:], device=dev)
+        hist = torch.zeros(512, HIST, P.c, device=dev) + P.x_mean
+        patch0 = torch.zeros(512, len(P.grid[0]), len(P.grid[1]), device=dev)
         torch.cuda.synchronize() if str(dev).startswith("cuda") else None
         t1 = time.time()
         P.generate(hist, patch0, torch.zeros(512, 2, device=dev), gen, w=w)
