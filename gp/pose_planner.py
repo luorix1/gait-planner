@@ -360,10 +360,9 @@ class PosePlanner(nn.Module):
 
     @torch.no_grad()
     def generate(self, hist: torch.Tensor, p: torch.Tensor, g: torch.Tensor, gen: torch.Generator | None = None,
-                 ema: bool = True, stride: int = 1, w: float = GUIDANCE, guide: Any = None) -> torch.Tensor:
+                 ema: bool = True, stride: int = 1, w: float = GUIDANCE) -> torch.Tensor:
         """The future ``[B, FUT, C]`` after ``hist`` ``[B, HIST, C]``: DDIM over every ``stride``-th step, guided
-        with weight ``w`` (1 = the plain conditional model); ``guide(x0, t)`` may edit each step's normalised clean
-        estimate (export_pose2.foot_hold)."""
+        with weight ``w`` (1 = the plain conditional model)."""
         pad = hist.new_zeros(len(hist), FUT, C)
         h, pn, gn = self._n(torch.cat([hist, pad], 1), p, g)
         h = h[:, :HIST]
@@ -376,8 +375,6 @@ class PosePlanner(nn.Module):
             tt = torch.full((2 * B,), t, device=h.device)
             out = net(torch.cat([h, x], 1).repeat(2, 1, 1), tt, pn.repeat(2, 1, 1), gn.repeat(2, 1), keep)[:, HIST:]
             x0 = out[B:] + w * (out[:B] - out[B:])
-            if guide is not None:
-                x0 = guide(x0, t)
             if t_prev < 0:
                 x = x0
                 break
