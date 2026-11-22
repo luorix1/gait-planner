@@ -26,42 +26,51 @@ h1 { font-size:clamp(32px, 4.6vw, 50px); line-height:1.05 }
 h2 { font-size:clamp(23px, 2.8vw, 30px); line-height:1.15 }
 h3 { font-size:18px; line-height:1.25 }
 p { margin:0 }
-input:focus-visible { outline:3px solid var(--blue); outline-offset:3px }
+input:focus-visible, summary:focus-visible { outline:3px solid var(--blue); outline-offset:3px }
 .eyebrow { font-size:13px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--blue) }
 header { display:grid; gap:14px; max-width:900px }
 .lede { font-size:clamp(17px, 1.6vw, 20px); color:var(--muted); max-width:62ch }
 .chips { display:flex; flex-wrap:wrap; gap:8px }
 .chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; font-size:14px; font-weight:500; border:1px solid var(--line); background:var(--panel) }
-.chip i { width:9px; height:9px; border-radius:50%; background:var(--blue) }
-.chip.next i { background:transparent; border:2px solid var(--blue); width:7px; height:7px }
+.chip i { width:9px; height:9px; border-radius:50%; background:var(--blue); flex:none }
+.chip.live i { background:var(--teal); box-shadow:0 0 0 3px var(--teal-soft) }
 section { display:grid; gap:18px }
 .sec-head { display:grid; gap:6px; max-width:860px }
 .sec-head p { color:var(--muted); max-width:70ch }
 .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px; min-width:0 }
+figure { margin:0; display:grid; gap:12px; min-width:0 }
+figcaption { font-size:14px; color:var(--muted); max-width:95ch }
+.credit { font:500 12.5px var(--mono); color:var(--muted) }
 .scroll { overflow-x:auto }
 svg.dia { width:100%; height:auto; display:block }
 .dia-wide { min-width:860px }
+.dia-xl { min-width:1000px }
 .cards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px }
 .grid2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; display:grid; gap:8px; align-content:start; min-width:0 }
 .card p { color:var(--muted); font-size:15px }
 .card .tag { font:600 12px var(--body); letter-spacing:.1em; text-transform:uppercase; color:var(--blue) }
 .card svg { width:100%; height:auto; display:block; background:var(--grey-soft); border-radius:8px }
+.card svg.plot .tm { font-size:15px } .card svg.plot .ts, .card svg.plot .tb { font-size:16px }
+.opt { margin:0; padding-left:18px; color:var(--muted); font-size:15px; display:grid; gap:5px }
+.opt b { color:var(--ink); font-weight:600 }
 
 .n { fill:var(--panel); stroke:var(--line); stroke-width:1.5 }
 .n.hl { fill:var(--blue-soft); stroke:var(--blue) }
 .n.tl { fill:var(--teal-soft); stroke:var(--teal) }
 .n.amb { fill:var(--amber-soft); stroke:var(--amber) }
+.n.gs { fill:var(--grey-soft); stroke:var(--wire) }
 .t { fill:var(--ink); font:600 15px var(--display) }
 .ts { fill:var(--muted); font:400 12.5px var(--body) }
 .tm { fill:var(--muted); font:500 11.5px var(--mono) }
 .tb { fill:var(--blue); font:600 12.5px var(--body) }
 .tt { fill:var(--teal); font:600 12.5px var(--body) }
 .ta { fill:var(--amber); font:600 12.5px var(--body) }
+.tr { fill:var(--bad); font:600 12.5px var(--body) }
 .tw { fill:#FFFFFF; font:600 12.5px var(--body) }
 .ar { fill:none; stroke:var(--wire); stroke-width:2 }
-.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) } .ar.amb { stroke:var(--amber) }
-.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) } .mk.amb { fill:var(--amber) }
+.ar.tl { stroke:var(--teal) } .ar.blue { stroke:var(--blue) } .ar.amb { stroke:var(--amber) } .ar.bad { stroke:var(--bad) }
+.mk { fill:var(--wire) } .mk.tl { fill:var(--teal) } .mk.blue { fill:var(--blue) } .mk.amb { fill:var(--amber) } .mk.bad { fill:var(--bad) }
 .cell-h { fill:var(--ink) } .cell-f { fill:var(--blue) }
 .grid-line { stroke:var(--line); stroke-width:1 }
 .gfill { fill:var(--terrain); stroke:var(--wire); stroke-width:2; stroke-linejoin:round }
@@ -78,6 +87,15 @@ svg.dia { width:100%; height:auto; display:block }
 .readout b { font:600 22px var(--display); font-variant-numeric:tabular-nums }
 .readout span { font-size:13.5px; color:var(--muted) }
 
+details.more { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px }
+details.more summary { cursor:pointer; font:600 16px var(--display) }
+details.more[open] summary { margin-bottom:10px }
+.kv-wrap { overflow-x:auto }
+.kv { width:100%; border-collapse:collapse; font-size:14.5px; font-variant-numeric:tabular-nums }
+.kv th, .kv td { padding:8px 10px; border-top:1px solid var(--line); text-align:left; vertical-align:top }
+.kv th { font-weight:600; white-space:nowrap; color:var(--ink) }
+.kv td { color:var(--muted) }
+
 @media (max-width:980px) { .cmd { grid-template-columns:1fr } }
 @media (max-width:760px) { .cards, .grid2 { grid-template-columns:1fr } }
 </style>
@@ -87,10 +105,10 @@ svg.dia { width:100%; height:auto; display:block }
 <header>
   <span class="eyebrow">gait_planner · full-pose planner</span>
   <h1>A planner that sketches motion, a muscle policy that carries it out</h1>
-  <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only the pelvis, foot and trunk targets from it.</p>
+  <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only its pelvis, foot and trunk targets.</p>
   <div class="chips">
-    <span class="chip"><i></i>Plain planner, 17 h of motion: training, done ~7:50 pm</span>
-    <span class="chip next"><i></i>This design (v2): starts after it, done ~10:15 pm</span>
+    <span class="chip live"><i></i>v9 training · started 12:17 pm · 120,000 iterations at ~7 it/s · done ~5 pm</span>
+    <span class="chip"><i></i>Sampling: no goal guidance (w = 1) · foot hold on</span>
   </div>
 </header>
 
@@ -100,18 +118,18 @@ svg.dia { width:100%; height:auto; display:block }
     <h2>Separate where to go from how to move</h2>
   </div>
   <div class="cards">
-    <div class="card"><h3>Learn motion from data</h3><p>A diffusion model trained on human motion knows what walking, turning and stepping onto terrain look like.</p></div>
-    <div class="card"><h3>Let the muscles decide the joints</h3><p>Generated poses can contain transitions our muscle model can't make. The policy gets targets, not poses, and finds joint motion it can actually produce.</p></div>
+    <div class="card"><h3>Learn motion from data</h3><p>Trained on 13,379 human clips, the planner knows what walking, turning, stairs and steps look like.</p></div>
+    <div class="card"><h3>Let the muscles decide the joints</h3><p>Generated poses can ask for moves our muscle model can't make. The policy gets targets, not poses.</p></div>
     <div class="card"><h3>Command it, don't retrain it</h3><p>A new speed, direction or terrain changes the planner's input, not the muscle policy.</p></div>
   </div>
 </section>
 
-<!-- planner -->
+<!-- planner I/O -->
 <section>
   <div class="sec-head">
     <span class="eyebrow">How · the planner</span>
     <h2>One window in, 1.2 seconds out</h2>
-    <p>Positions are relative to the pelvis at "now" and its smoothed heading. Heights are measured from the ground directly underneath.</p>
+    <p>Everything is placed relative to the anchor: the pelvis at the last given frame, turned to its 1 s average heading.</p>
   </div>
   <div class="panel scroll">
     <svg class="dia dia-wide" viewBox="0 0 1280 320" role="img" aria-label="Inputs: 0.4 s of history, a ground height patch and a goal point go into the diffusion model, which outputs 1.2 s of whole-body motion.">
@@ -119,22 +137,22 @@ svg.dia { width:100%; height:auto; display:block }
         <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
       <text class="t" x="20" y="34">History</text>
-      <text class="ts" x="20" y="54">the last 0.4 s of the body</text>
+      <text class="ts" x="20" y="54">the last 0.4 s: 8 frames</text>
       <g id="hist"></g>
       <text class="t" x="20" y="166">Ground ahead</text>
-      <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m</text>
+      <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m, 10 cm cells</text>
       <g id="patch"></g>
       <text class="t" x="20" y="272">Goal</text>
       <text class="ts" x="20" y="292">pelvis position in 1.2 s</text>
       <circle cx="300" cy="282" r="9" fill="none" stroke="var(--teal)" stroke-width="3"/><circle cx="300" cy="282" r="3" fill="var(--teal)"/>
 
       <path class="ar" d="M372,70 C440,70 440,165 486,165" marker-end="url(#ah)"/>
-      <path class="ar" d="M372,205 C430,205 430,175 486,175" marker-end="url(#ah)"/>
+      <path class="ar" d="M372,222 C430,222 430,175 486,175" marker-end="url(#ah)"/>
       <path class="ar" d="M320,282 C440,282 440,185 486,185" marker-end="url(#ah)"/>
 
       <rect class="n hl" x="490" y="110" width="250" height="130" rx="12"/>
       <text class="t" x="615" y="166" text-anchor="middle">Diffusion model</text>
-      <text class="ts" x="615" y="190" text-anchor="middle">noise → motion</text>
+      <text class="ts" x="615" y="190" text-anchor="middle">noise → motion in 50 steps</text>
 
       <path class="ar" d="M740,175 H786" marker-end="url(#ah)"/>
 
@@ -152,7 +170,7 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
 </section>
 
-<!-- four design choices -->
+<!-- design choices -->
 <section>
   <div class="sec-head">
     <span class="eyebrow">How · what keeps it physical</span>
@@ -161,63 +179,62 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
   <div class="grid2">
     <div class="card">
-      <svg viewBox="0 0 520 230" role="img" aria-label="Side view on a slope: the pelvis height and each foot point's height are measured to the ground directly below them.">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Side view: one zero line, the ground under the anchor's pelvis. The pelvis height and a foot point on a step ahead are both measured from that line.">
         <defs><marker id="ahA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
-        <path class="gfill" d="M0,205 L180,205 L420,150 L520,150 L520,230 L0,230 Z"/>
-        <path class="bone" d="M250,92 L258,30"/><circle class="head" cx="260" cy="16" r="11"/>
-        <path class="bone" d="M250,92 L262,140 L270,181"/><path class="bone" d="M250,92 L232,138 L214,190" opacity=".7"/>
-        <circle cx="250" cy="92" r="7" fill="var(--blue)"/>
-        <path class="ar blue" d="M250,100 V184" marker-end="url(#ahA)" stroke-dasharray="5 4"/>
-        <text class="tb" x="140" y="140">pelvis height</text>
-        <circle cx="272" cy="179" r="5" fill="var(--blue)"/><circle cx="212" cy="192" r="5" fill="var(--blue)"/>
-        <text class="ts" x="300" y="172">each foot point: height over</text>
-        <text class="ts" x="300" y="187">the ground below it</text>
+        <path class="gfill" d="M0,200 L300,200 L300,150 L520,150 L520,230 L0,230 Z"/>
+        <line x1="0" y1="200" x2="520" y2="200" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="6 5"/>
+        <path class="bone" d="M130,88 L138,30"/><circle class="head" cx="140" cy="17" r="11"/>
+        <path class="bone" d="M130,88 L142,140 L150,194"/><path class="bone" d="M130,88 L114,138 L98,192" opacity=".7"/>
+        <circle cx="130" cy="88" r="7" fill="var(--blue)"/>
+        <path class="ar blue" d="M130,98 V194" marker-end="url(#ahA)" stroke-dasharray="5 4"/>
+        <text class="tb" x="20" y="150">pelvis height</text>
+        <text class="ts" x="160" y="40">anchor: the last given frame</text>
+        <circle cx="398" cy="144" r="5" fill="var(--blue)"/><circle cx="432" cy="144" r="5" fill="var(--blue)"/>
+        <path class="ar blue" d="M415,198 V152" marker-end="url(#ahA)"/>
+        <text class="ts" x="350" y="120">foot point on the step</text>
+        <text class="tb" x="424" y="182">+16 cm</text>
+        <text class="tb" x="12" y="222">zero: ground under the anchor's pelvis</text>
       </svg>
       <span class="tag">1 · Absolute heights</span>
-      <h3>Heights from the ground, not from the body</h3>
-      <p>The pelvis and every foot point carry their height above the terrain directly below. The floor can't drift away between replans.</p>
+      <h3>One zero per plan: the ground under the anchor</h3>
+      <p>Pelvis, foot points and the terrain patch are all measured from the ground under the anchor's pelvis. Heights measured per point would jump at every step edge.</p>
     </div>
     <div class="card">
       <svg viewBox="0 0 520 230" role="img" aria-label="Foot points predicted directly must match the foot points computed from the predicted joint angles; a point on the ground in the data must stay put.">
         <defs><marker id="ahT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker></defs>
         <rect x="0" y="190" width="520" height="40" fill="var(--terrain)"/><line x1="0" y1="190" x2="520" y2="190" stroke="var(--wire)" stroke-width="2"/>
-        <!-- left: consistency -->
         <path class="bone" d="M120,30 L132,100 L124,168" /><path d="M110,172 L160,180" class="bone"/>
         <circle cx="112" cy="173" r="6" fill="none" stroke="var(--ink)" stroke-width="2.5"/><circle cx="152" cy="179" r="6" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
         <circle cx="116" cy="168" r="5" fill="var(--teal)"/><circle cx="157" cy="172" r="5" fill="var(--teal)"/>
         <text class="ts" x="20" y="30">from the joints</text><text class="ts" x="20" y="46">(open circles)</text>
         <text class="tt" x="176" y="150">predicted directly</text>
         <text class="tt" x="176" y="166">must agree</text>
-        <!-- right: stance -->
         <rect x="350" y="180" width="70" height="10" rx="3" fill="var(--blue)"/>
         <path class="ar" d="M350,150 H440" marker-end="url(#ahT)" style="stroke:var(--wire)"/>
         <path d="M384,136 L406,160 M406,136 L384,160" stroke="var(--bad)" stroke-width="3" stroke-linecap="round"/>
         <text class="ts" x="320" y="110">on the ground in the data:</text>
         <text class="ts" x="320" y="126">stays put, stays at ground height</text>
       </svg>
-      <span class="tag">2 · Foot points + contact losses</span>
+      <span class="tag">2 · Foot points + contact</span>
       <h3>Feet that agree with the joints and stay planted</h3>
-      <p>The planner also outputs heel and ball positions. Training checks them against the feet computed from its own joint angles, and holds still any point the data has on the ground.</p>
+      <p>The planner also outputs heel and ball points. Training ties them to the feet its own joint angles make, and holds still any point the data has on the ground.</p>
     </div>
     <div class="card">
-      <svg viewBox="0 0 520 230" role="img" aria-label="Guidance: the no-goal prediction, the goal prediction, and the guided result twice as far along the same direction.">
-        <defs><marker id="ahG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
-              <marker id="ahG2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker></defs>
-        <circle cx="90" cy="170" r="9" fill="var(--wire)"/>
-        <text class="ts" x="40" y="200">no-goal prediction</text>
-        <path class="ar" d="M98,164 L240,104" marker-end="url(#ahG2)"/>
-        <circle cx="250" cy="100" r="9" fill="var(--blue)"/>
-        <text class="tb" x="190" y="84">with the goal</text>
-        <path class="ar tl" d="M258,96 L400,36" marker-end="url(#ahG)" stroke-dasharray="6 5" style="stroke-width:2.5"/>
-        <circle cx="410" cy="32" r="10" fill="none" stroke="var(--teal)" stroke-width="3"/>
-        <text class="tt" x="330" y="70">guided, w = 2</text>
-        <text class="ts" x="300" y="170">training hides the goal</text>
-        <text class="ts" x="300" y="186">10 % of the time, so one</text>
-        <text class="ts" x="300" y="202">network learns both</text>
+      <svg viewBox="0 0 520 230" role="img" aria-label="A foot on the floor next to a box edge. Interpolating the 10 cm height cells smears the edge into a slope that puts the foot inside; the lowest of the four surrounding cells keeps it on the floor.">
+        <path class="gfill" d="M0,180 L260,180 L260,100 L520,100 L520,230 L0,230 Z"/>
+        <g id="penGrid"></g>
+        <path d="M220,180 L260,100" stroke="var(--bad)" stroke-width="2.5" stroke-dasharray="6 5" fill="none"/>
+        <circle cx="236" cy="169" r="10" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
+        <rect x="216" y="176" width="48" height="8" rx="3" fill="none" stroke="var(--blue)" stroke-width="2"/>
+        <text class="tr" x="20" y="40">interpolated cells: the box edge</text>
+        <text class="tr" x="20" y="56">becomes a slope, foot looks "inside"</text>
+        <text class="tb" x="280" y="150">lowest of the 4 cells around it:</text>
+        <text class="tb" x="280" y="166">on the floor, fine</text>
+        <text class="ts" x="20" y="208">10 cm cells · 1 cm allowed below</text>
       </svg>
-      <span class="tag">3 · Goal guidance</span>
-      <h3>Follow the command more firmly</h3>
-      <p>Each step predicts with and without the goal and pushes twice as far toward the goal. Rare fast commands stop drifting back to the average speed.</p>
+      <span class="tag">3 · Terrain penetration</span>
+      <h3>No foot inside the ground</h3>
+      <p>Every foot sphere, placed by the joint angles, may sit at most 1 cm under the terrain patch. Using the lowest nearby cell keeps box edges sharp.</p>
     </div>
     <div class="card">
       <svg viewBox="0 0 520 230" role="img" aria-label="Pelvis yaw swings with each step; the anchor heading is its one-second average.">
@@ -230,9 +247,329 @@ svg.dia { width:100%; height:auto; display:block }
       </svg>
       <span class="tag">4 · Smoothed heading</span>
       <h3>A steady frame to plan in</h3>
-      <p>Each plan is laid out along the pelvis heading averaged over the last second, not its momentary yaw, so replans don't twist with every step.</p>
+      <p>Each plan is laid out along the pelvis heading averaged over the last second, so replans don't twist with every step.</p>
     </div>
   </div>
+</section>
+
+<!-- network -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · inside the planner</span>
+    <h2>A diffusion transformer</h2>
+    <p>Terrain and frames become one row of tokens. The diffusion step and the goal steer every layer.</p>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1280 550" role="img" aria-label="Terrain patch through two convolutions gives 50 tokens; 32 frames through a linear layer give 32 tokens; together 82 tokens pass six transformer blocks steered by the diffusion step and goal; the frame tokens are read out as 24 clean future frames.">
+        <defs><marker id="ahN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahNa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk amb" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <!-- inputs -->
+        <text class="t" x="20" y="36">Terrain patch</text>
+        <text class="ts" x="20" y="54">37 × 17 heights · 10 cm cells</text>
+        <g id="netPatch"></g>
+        <text class="t" x="20" y="200">Frames</text>
+        <text class="ts" x="20" y="218">8 given (0.4 s) + 24 to generate (1.2 s)</text>
+        <g id="netFrames"></g>
+        <text class="tm" x="20" y="312">flag 1</text><text class="tm" x="90" y="312">flag 0: noisy, to generate</text>
+        <text class="t" x="20" y="372">Condition</text>
+        <rect class="n" x="20" y="386" width="270" height="46" rx="10"/>
+        <text class="t" x="36" y="414">Diffusion step t</text><text class="ts" x="170" y="414">1 … 50</text>
+        <rect class="n amb" x="20" y="452" width="270" height="46" rx="10"/>
+        <text class="t" x="36" y="480">Goal</text><text class="ts" x="84" y="480">pelvis 1.2 s ahead (2 numbers)</text>
+        <!-- embeddings -->
+        <path class="ar" d="M246,108 H326" marker-end="url(#ahN)"/>
+        <path class="ar" d="M292,262 H326" marker-end="url(#ahN)"/>
+        <path class="ar" d="M290,409 H326" marker-end="url(#ahN)"/>
+        <path class="ar" d="M290,475 H326" marker-end="url(#ahN)"/>
+        <rect class="n" x="330" y="76" width="230" height="66" rx="10"/>
+        <text class="t" x="445" y="104" text-anchor="middle">2 convolutions</text>
+        <text class="tm" x="445" y="126" text-anchor="middle">stride 2 · 1 → 32 → 512</text>
+        <rect class="n" x="330" y="229" width="230" height="66" rx="10"/>
+        <text class="t" x="445" y="257" text-anchor="middle">Linear 46 → 512</text>
+        <text class="ts" x="445" y="279" text-anchor="middle">45 numbers + flag · + position</text>
+        <rect class="n" x="330" y="386" width="230" height="46" rx="10"/>
+        <text class="tm" x="445" y="414" text-anchor="middle">sinusoid 256 → MLP → 512</text>
+        <rect class="n" x="330" y="452" width="230" height="46" rx="10"/>
+        <text class="tm" x="445" y="480" text-anchor="middle">MLP → 512</text>
+        <text class="ta" x="330" y="524">10 % of training: a learned "no goal" token instead</text>
+        <path class="ar" d="M560,409 C580,409 584,436 598,438" marker-end="url(#ahN)"/>
+        <path class="ar" d="M560,475 C580,475 584,448 598,446" marker-end="url(#ahN)"/>
+        <circle class="n" cx="610" cy="442" r="12"/><text class="t" x="610" y="447" text-anchor="middle">+</text>
+        <path class="ar" d="M622,442 H646" marker-end="url(#ahN)"/>
+        <rect class="n amb" x="650" y="418" width="160" height="48" rx="10"/>
+        <text class="tm" x="730" y="438" text-anchor="middle">SiLU + Linear</text>
+        <text class="ts" x="730" y="456" text-anchor="middle">→ 6 × 512 numbers</text>
+        <!-- tokens -->
+        <text class="tm" x="600" y="64">82 tokens × 512</text>
+        <path class="ar" d="M560,109 C580,109 580,130 596,130" marker-end="url(#ahN)"/>
+        <path class="ar" d="M560,262 C580,262 580,252 596,252" marker-end="url(#ahN)"/>
+        <rect class="n gs" x="600" y="76" width="96" height="120" rx="6"/>
+        <text class="ts" x="648" y="132" text-anchor="middle">50 terrain</text><text class="ts" x="648" y="148" text-anchor="middle">tokens</text>
+        <rect class="n hl" x="600" y="206" width="96" height="90" rx="6"/>
+        <text class="ts" x="648" y="246" text-anchor="middle">32 frame</text><text class="ts" x="648" y="262" text-anchor="middle">tokens</text>
+        <!-- blocks -->
+        <path class="ar" d="M696,186 H756" marker-end="url(#ahN)"/>
+        <rect class="n" x="790" y="66" width="220" height="190" rx="12"/>
+        <rect class="n" x="784" y="72" width="220" height="190" rx="12"/>
+        <rect class="n" x="778" y="78" width="220" height="190" rx="12"/>
+        <rect class="n" x="772" y="84" width="220" height="190" rx="12"/>
+        <rect class="n" x="766" y="90" width="220" height="190" rx="12"/>
+        <rect class="n hl" x="760" y="96" width="220" height="190" rx="12"/>
+        <text class="t" x="870" y="164" text-anchor="middle">Transformer block</text>
+        <text class="ts" x="870" y="188" text-anchor="middle">attention + feed-forward</text>
+        <text class="tb" x="870" y="214" text-anchor="middle">× 6 identical blocks</text>
+        <text class="ts" x="870" y="238" text-anchor="middle">every token sees every token</text>
+        <path class="ar amb" d="M810,442 H870 V292" marker-end="url(#ahNa)"/>
+        <text class="ta" x="884" y="392">shift · scale · gate</text>
+        <text class="ts" x="884" y="410">for attention and feed-forward,</text>
+        <text class="ts" x="884" y="428">+ each block's own learned table</text>
+        <!-- read out -->
+        <path class="ar" d="M992,186 H1036" marker-end="url(#ahN)"/>
+        <rect class="n" x="1040" y="140" width="220" height="92" rx="10"/>
+        <text class="t" x="1150" y="168" text-anchor="middle">Read out</text>
+        <text class="tm" x="1150" y="190" text-anchor="middle">LayerNorm → Linear</text>
+        <text class="tm" x="1150" y="210" text-anchor="middle">512 → 45, frame tokens</text>
+        <path class="ar" d="M1150,232 V258" marker-end="url(#ahN)"/>
+        <g id="netOut"></g>
+        <text class="t" x="1040" y="336">24 clean future frames</text>
+        <text class="ts" x="1040" y="354">x̂₀: the clean-motion guess</text>
+      </svg>
+    </div>
+    <figcaption>The network predicts the clean future frames directly, not the noise. Its history outputs are thrown away.</figcaption>
+  </figure>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1280 296" role="img" aria-label="One block: LayerNorm shifted and scaled by the condition, self-attention with normalised queries and keys, a gate, a skip connection; then LayerNorm, shift and scale, SwiGLU feed-forward, a gate and a second skip connection.">
+        <defs><marker id="ahB2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahBa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk amb" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <text class="ta" x="130" y="36">from the condition: 6 × 512 numbers, plus this block's own learned table</text>
+        <line x1="130" y1="56" x2="1190" y2="56" stroke="var(--amber)" stroke-width="2"/>
+        <path class="ar amb" d="M200,56 V136" marker-end="url(#ahBa)"/><text class="tm" x="208" y="100">shift₁ scale₁</text>
+        <path class="ar amb" d="M595,56 V146" marker-end="url(#ahBa)"/><text class="tm" x="603" y="100">gate₁</text>
+        <path class="ar amb" d="M790,56 V136" marker-end="url(#ahBa)"/><text class="tm" x="798" y="100">shift₂ scale₂</text>
+        <path class="ar amb" d="M1155,56 V146" marker-end="url(#ahBa)"/><text class="tm" x="1163" y="100">gate₂</text>
+
+        <text class="ts" x="20" y="166">82 tokens</text>
+        <path class="ar" d="M84,170 H126" marker-end="url(#ahB2)"/>
+        <rect class="n" x="130" y="140" width="140" height="60" rx="10"/>
+        <text class="t" x="200" y="166" text-anchor="middle">LayerNorm</text>
+        <text class="tm" x="200" y="186" text-anchor="middle">×(1+scale)+shift</text>
+        <path class="ar" d="M270,170 H306" marker-end="url(#ahB2)"/>
+        <rect class="n hl" x="310" y="124" width="210" height="92" rx="10"/>
+        <text class="t" x="415" y="152" text-anchor="middle">Self-attention</text>
+        <text class="tm" x="415" y="174" text-anchor="middle">8 heads × 64</text>
+        <text class="ts" x="415" y="196" text-anchor="middle">queries, keys RMS-normalised</text>
+        <text class="ta" x="415" y="240" text-anchor="middle">attention scores stay ≤ 8, so training can't blow up</text>
+        <path class="ar" d="M520,170 H556" marker-end="url(#ahB2)"/>
+        <rect class="n" x="560" y="150" width="70" height="40" rx="8"/>
+        <text class="tm" x="595" y="175" text-anchor="middle">× gate</text>
+        <path class="ar" d="M630,170 H654" marker-end="url(#ahB2)"/>
+        <circle class="n" cx="670" cy="170" r="14"/><text class="t" x="670" y="175" text-anchor="middle">+</text>
+        <path class="ar" d="M684,170 H716" marker-end="url(#ahB2)"/>
+        <rect class="n" x="720" y="140" width="140" height="60" rx="10"/>
+        <text class="t" x="790" y="166" text-anchor="middle">LayerNorm</text>
+        <text class="tm" x="790" y="186" text-anchor="middle">×(1+scale)+shift</text>
+        <path class="ar" d="M860,170 H896" marker-end="url(#ahB2)"/>
+        <rect class="n tl" x="900" y="124" width="190" height="92" rx="10"/>
+        <text class="t" x="995" y="152" text-anchor="middle">Feed-forward</text>
+        <text class="tm" x="995" y="174" text-anchor="middle">SwiGLU</text>
+        <text class="tm" x="995" y="196" text-anchor="middle">512 → 2×2048 → 512</text>
+        <path class="ar" d="M1090,170 H1116" marker-end="url(#ahB2)"/>
+        <rect class="n" x="1120" y="150" width="70" height="40" rx="8"/>
+        <text class="tm" x="1155" y="175" text-anchor="middle">× gate</text>
+        <path class="ar" d="M1190,170 H1202" marker-end="url(#ahB2)"/>
+        <circle class="n" cx="1218" cy="170" r="14"/><text class="t" x="1218" y="175" text-anchor="middle">+</text>
+        <path class="ar" d="M1232,170 H1272" marker-end="url(#ahB2)"/>
+        <text class="ts" x="1206" y="128">next</text>
+
+        <path class="ar" d="M104,170 V264 H670 V188" marker-end="url(#ahB2)"/>
+        <text class="ts" x="250" y="284">skip connection</text>
+        <path class="ar" d="M700,170 V264 H1218 V188" marker-end="url(#ahB2)"/>
+        <text class="ts" x="900" y="284">skip connection</text>
+      </svg>
+    </div>
+    <figcaption>One block. The condition sets how each LayerNorm is shifted and scaled, and how much of each branch passes ("adaptive LayerNorm").</figcaption>
+  </figure>
+</section>
+
+<!-- training -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · training</span>
+    <h2>One training step: noise the future, recover it</h2>
+    <p>The data's own future is the answer key. Foot geometry is scored too.</p>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1280 410" role="img" aria-label="A window is drawn from 1.48 million, its 24 future frames are noised to a random step, the network recovers them, and the guess is scored by a denoising error plus four foot-geometry losses computed through a frozen FootFK network.">
+        <defs><marker id="ahR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <!-- data -->
+        <text class="t" x="20" y="30">Data</text>
+        <rect class="n" x="20" y="44" width="270" height="166" rx="10"/>
+        <text class="t" x="36" y="74">13,379 clips</text>
+        <text class="ts" x="36" y="94">2.46 M frames at 40 Hz</text>
+        <text class="ts" x="36" y="122">· lab walking recordings (AB01)</text>
+        <text class="ts" x="36" y="140">· PARC motions</text>
+        <text class="ts" x="36" y="158">· Bones SEED, incl. stairs</text>
+        <text class="tb" x="36" y="190">1.48 M training windows</text>
+        <text class="ts" x="20" y="236">batch share by terrain</text>
+        <g id="mixBar"></g>
+        <text class="ts" x="20" y="340">recordings equal within a source;</text>
+        <text class="ts" x="20" y="358">sources, terrain classes by √length</text>
+        <text class="tb" x="20" y="386">half mirrored left ↔ right</text>
+        <!-- window -->
+        <path class="ar" d="M290,120 C310,120 306,90 326,90" marker-end="url(#ahR)"/>
+        <text class="t" x="330" y="30">One window</text>
+        <g id="trWin"></g>
+        <text class="tm" x="330" y="152">8 given</text><text class="tm" x="384" y="152">24 future</text>
+        <text class="ts" x="330" y="176">normalised per channel</text>
+        <!-- noise -->
+        <path class="ar" d="M540,89 H576" marker-end="url(#ahR)"/>
+        <text class="t" x="580" y="30">Noise the future</text>
+        <g id="trNoise"></g>
+        <text class="tm" x="580" y="152">clean</text><text class="tm" x="634" y="152">step t of 50</text>
+        <rect class="n" x="580" y="170" width="240" height="48" rx="10"/>
+        <text class="tm" x="700" y="199" text-anchor="middle">x_t = √ā·x₀ + √(1−ā)·noise</text>
+        <text class="ts" x="580" y="242">history: clean + jitter ≤ 0.1 std,</text>
+        <text class="ts" x="580" y="260">so a slightly-off history is fine</text>
+        <text class="ts" x="580" y="290">ā: share of signal left at step t</text>
+        <!-- network -->
+        <path class="ar" d="M820,89 H856" marker-end="url(#ahR)"/>
+        <rect class="n hl" x="860" y="44" width="150" height="90" rx="10"/>
+        <text class="t" x="935" y="84" text-anchor="middle">Network</text>
+        <text class="ts" x="935" y="106" text-anchor="middle">6 blocks</text>
+        <path class="ar" d="M935,134 V160" marker-end="url(#ahR)"/>
+        <g id="trOut"></g>
+        <text class="ts" x="860" y="234">x̂₀: clean-future guess</text>
+        <!-- losses -->
+        <text class="t" x="1050" y="30">Losses</text>
+        <path class="ar" d="M1010,180 C1030,180 1030,68 1046,68" marker-end="url(#ahR)"/>
+        <path class="ar" d="M1010,196 C1030,196 1030,148 1046,148" marker-end="url(#ahR)"/>
+        <rect class="n amb" x="1050" y="44" width="210" height="48" rx="10"/>
+        <text class="t" x="1064" y="74">Denoising error</text><text class="tm" x="1246" y="74" text-anchor="end">× 1</text>
+        <rect class="n tl" x="1050" y="112" width="210" height="72" rx="10"/>
+        <text class="t" x="1064" y="138">FootFK (frozen)</text>
+        <text class="ts" x="1064" y="158">leg angles → 18 foot spheres</text>
+        <text class="ts" x="1064" y="176">0.2 mm median error</text>
+        <line x1="1060" y1="184" x2="1060" y2="339" stroke="var(--teal)" stroke-width="2"/>
+        <g id="lossRows"></g>
+        <text class="ts" x="1050" y="378">each: Huber past 2 cm,</text>
+        <text class="ts" x="1050" y="396">weighted by ā</text>
+      </svg>
+    </div>
+    <figcaption>Training data: lab walking recordings (AB01), PARC motions and Bones SEED. <span class="credit">Motion Data by Bones Studio</span></figcaption>
+  </figure>
+  <div class="cards">
+    <div class="card">
+      <svg class="plot" viewBox="0 0 520 230" role="img" aria-label="Share of signal over the 50 diffusion steps of the cosine schedule, falling from 1 to 0. Geometry losses are weighted by it.">
+        <g id="abPlot"></g>
+      </svg>
+      <span class="tag">Signal share ā</span>
+      <h3>Score feet only when the guess is sharp</h3>
+      <p>At heavy noise the clean guess is a blur, so one exact foot height is not a fair target.</p>
+    </div>
+    <div class="card">
+      <svg class="plot" viewBox="0 0 520 230" role="img" aria-label="Cost against error: squared up to 2 cm, then a straight line.">
+        <g id="huberPlot"></g>
+      </svg>
+      <span class="tag">Huber</span>
+      <h3>Squared up to 2 cm, straight beyond</h3>
+      <p>A few far-off points can't take over the gradient.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Optimiser</span>
+      <h3>120,000 steps, best held-out kept</h3>
+      <ul class="opt">
+        <li><b>AdamW</b>, learning rate 2e-4, cosine decay to 0</li>
+        <li><b>batch 512</b>, gradient clip 1, bfloat16</li>
+        <li><b>EMA 0.995</b>: a running average of the weights, used for sampling</li>
+        <li><b>kept</b>: lowest held-out loss (held-out trials and terrain, incl. 6 stair clips)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- sampling and rollout -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">How · sampling</span>
+    <h2>Draw a plan, pin the feet, keep a little, plan again</h2>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1280 240" role="img" aria-label="Rollout cycle: window, 50 denoising steps, foot hold, keep the first 0.2 s, re-anchor, and plan again from the latest 0.4 s.">
+        <defs><marker id="ahS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahSb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect class="n" x="20" y="40" width="190" height="100" rx="12"/>
+        <text class="t" x="115" y="76" text-anchor="middle">Window</text>
+        <text class="ts" x="115" y="98" text-anchor="middle">last 0.4 s</text>
+        <text class="ts" x="115" y="118" text-anchor="middle">terrain + goal</text>
+        <path class="ar" d="M210,90 H246" marker-end="url(#ahS)"/>
+        <rect class="n hl" x="250" y="40" width="230" height="100" rx="12"/>
+        <text class="t" x="365" y="76" text-anchor="middle">50 denoising steps</text>
+        <text class="ts" x="365" y="98" text-anchor="middle">noise → 1.2 s plan</text>
+        <text class="ts" x="365" y="118" text-anchor="middle">averaged (EMA) weights</text>
+        <text class="ts" x="365" y="166" text-anchor="middle">no guidance: the goal model alone</text>
+        <path class="ar" d="M480,90 H516" marker-end="url(#ahS)"/>
+        <rect class="n tl" x="520" y="40" width="220" height="100" rx="12"/>
+        <text class="t" x="630" y="76" text-anchor="middle">Foot hold</text>
+        <text class="ts" x="630" y="98" text-anchor="middle">50 optimiser steps</text>
+        <text class="ts" x="630" y="118" text-anchor="middle">leg joints + foot points only</text>
+        <text class="ts" x="630" y="166" text-anchor="middle">pelvis path stays as planned</text>
+        <path class="ar" d="M740,90 H776" marker-end="url(#ahS)"/>
+        <rect class="n" x="780" y="40" width="180" height="100" rx="12"/>
+        <text class="t" x="870" y="76" text-anchor="middle">Keep 0.2 s</text>
+        <text class="ts" x="870" y="98" text-anchor="middle">first 4 of 24 frames</text>
+        <text class="ts" x="870" y="118" text-anchor="middle">the rest is dropped</text>
+        <path class="ar" d="M960,90 H996" marker-end="url(#ahS)"/>
+        <rect class="n" x="1000" y="40" width="260" height="100" rx="12"/>
+        <text class="t" x="1130" y="76" text-anchor="middle">Re-anchor</text>
+        <text class="ts" x="1130" y="98" text-anchor="middle">at the pelvis centre of mass,</text>
+        <text class="ts" x="1130" y="118" text-anchor="middle">1 s heading, ground under it</text>
+        <path class="ar blue" d="M1130,140 V200 H115 V144" marker-end="url(#ahSb)" style="stroke-width:2.5"/>
+        <text class="tb" x="640" y="224" text-anchor="middle">plan again from the latest 0.4 s, every 0.2 s</text>
+      </svg>
+    </div>
+  </figure>
+  <div class="grid2">
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="A foot planted at the end of the history stays where it was in the new plan; without the hold it slides forward at each replan. The pelvis path is unchanged.">
+        <defs><marker id="ahH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk bad" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect x="0" y="180" width="520" height="50" fill="var(--terrain)"/><line x1="0" y1="180" x2="520" y2="180" stroke="var(--wire)" stroke-width="2"/>
+        <path d="M40,64 C160,52 320,52 480,62" fill="none" stroke="var(--blue)" stroke-width="2" stroke-dasharray="6 5"/>
+        <text class="tb" x="300" y="40">pelvis path: as planned</text>
+        <path class="bone" d="M250,58 L242,118 L236,170"/><path class="bone" d="M250,58 L270,112 L300,150" opacity=".6"/>
+        <circle cx="250" cy="58" r="7" fill="var(--blue)"/>
+        <circle cx="262" cy="172" r="6" fill="none" stroke="var(--bad)" stroke-width="2" opacity=".6"/><circle cx="298" cy="174" r="6" fill="none" stroke="var(--bad)" stroke-width="2" opacity=".6"/>
+        <circle cx="282" cy="172" r="6" fill="none" stroke="var(--bad)" stroke-width="2" opacity=".35"/><circle cx="318" cy="174" r="6" fill="none" stroke="var(--bad)" stroke-width="2" opacity=".35"/>
+        <circle cx="232" cy="172" r="6" fill="var(--blue)"/><circle cx="268" cy="174" r="6" fill="var(--blue)"/>
+        <text class="tb" x="20" y="130">held where the</text>
+        <text class="tb" x="20" y="146">history left it</text>
+        <path class="ar bad" d="M236,204 H320" marker-end="url(#ahH)"/>
+        <text class="tr" x="332" y="208">without the hold: slides</text>
+      </svg>
+      <span class="tag">Foot hold</span>
+      <h3>A planted foot stays planted across replans</h3>
+      <p>Each foot point on the ground at the end of the history stays put until the plan's own contact flag lifts it.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Stance slip in centimetres per second on 14 held-out replays: at replan seams 14.3 without the hold and 1.7 with it; over the whole replay 5.7 and 2.2; real clips about 3.5.">
+        <g id="slipChart"></g>
+      </svg>
+      <span class="tag">Effect</span>
+      <h3>Stance slip, cm/s</h3>
+      <p>14 held-out replays, measured on an earlier checkpoint of this design.</p>
+    </div>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 0 1280 280" role="img" aria-label="Timeline: a new plan every 0.2 s, each from the latest 0.4 s and reaching 1.2 s ahead; only the first 0.2 s of each is kept.">
+        <g id="horizon"></g>
+      </svg>
+    </div>
+    <figcaption>Each plan reaches 1.2 s ahead and only its first 0.2 s is used. The far end keeps the near end sensible.</figcaption>
+  </figure>
 </section>
 
 <!-- command -->
@@ -240,45 +577,66 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="eyebrow">How · commanding it</span>
     <h2>A command is a goal point</h2>
-    <p>Speed sets how far ahead the pelvis should be in 1.2 s. Direction sets where, and it doesn't have to be where the body faces.</p>
+    <p>Speed sets how far ahead the pelvis should be in 1.2 s. The direction is fixed in the world, so the walker can't wander off it.</p>
   </div>
   <div class="panel cmd">
     <div class="scroll">
-      <svg class="dia" viewBox="0 0 620 360" style="min-width:460px" role="img" aria-label="Top view: the body, the direction it faces, and the goal point at the commanded distance and direction.">
+      <svg class="dia" viewBox="0 0 620 400" style="min-width:460px" role="img" aria-label="Top view: the command direction is the start heading plus an angle, fixed in the world. At every replan the goal is speed times 1.2 s along that direction from where the walker is, so the walker turns once, then walks straight, and drift is turned back.">
         <defs>
           <marker id="ahT3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="ahK" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
-        <rect x="0" y="0" width="620" height="360" rx="10" fill="var(--grey-soft)"/>
-        <g id="rings"></g>
-        <path class="ar" d="M180,180 L250,180" marker-end="url(#ahK)" style="stroke:var(--ink)"/>
-        <text class="ts" x="196" y="170">facing</text>
-        <ellipse cx="180" cy="180" rx="12" ry="20" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/>
-        <path id="goalLine" class="ar tl" d="M180,180 L410,180" marker-end="url(#ahT3)" style="stroke-width:3"/>
-        <circle id="goalDot" cx="410" cy="180" r="10" fill="none" stroke="var(--teal)" stroke-width="3"/>
-        <text id="goalLbl" class="tt" x="410" y="160" text-anchor="middle">goal</text>
+        <rect x="0" y="0" width="620" height="400" rx="10" fill="var(--grey-soft)"/>
+        <path id="startLine" class="ar" stroke-dasharray="6 5" marker-end="url(#ahK)"/>
+        <text id="startLbl" class="ts" text-anchor="middle">start heading</text>
+        <path id="angArc" fill="none" stroke="var(--teal)" stroke-width="1.5"/>
+        <text id="angLbl" class="tt" text-anchor="middle"></text>
+        <path id="walkPath" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+        <path id="goalA" class="ar tl" marker-end="url(#ahT3)" style="stroke-width:3"/>
+        <circle id="ringA" r="9" fill="none" stroke="var(--teal)" stroke-width="3"/>
+        <ellipse id="walkerA" rx="9" ry="16" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/>
+        <text id="startTxt" class="ts" text-anchor="end">start</text>
+        <path id="goalB" class="ar tl" marker-end="url(#ahT3)" style="stroke-width:3"/>
+        <circle id="ringB" r="9" fill="none" stroke="var(--teal)" stroke-width="3"/>
+        <line id="faceB" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 3"/>
+        <ellipse id="walkerB" rx="9" ry="16" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/>
+        <text id="lblB" class="ts">heading drifted: goal turns it back</text>
+        <text id="lblGoal" class="tt">goal</text>
       </svg>
     </div>
     <div class="controls">
       <div class="slider">
-        <label for="speed">Speed: <span id="spdOut">1.6</span> m/s</label>
-        <input id="speed" type="range" min="0" max="3" step="0.1" value="1.6">
+        <label for="speed">Speed: <span id="spdOut">1.2</span> m/s</label>
+        <input id="speed" type="range" min="0" max="3" step="0.1" value="1.2">
       </div>
       <div class="slider">
-        <label for="dir">Direction from facing: <span id="dirOut">0</span>°</label>
-        <input id="dir" type="range" min="-180" max="180" step="15" value="0">
+        <label for="dir">Angle from start heading: <span id="dirOut">+30</span>°</label>
+        <input id="dir" type="range" min="-90" max="90" step="15" value="30">
       </div>
-      <div class="readout"><b id="goalM">1.92 m</b><span id="goalNote">straight on</span></div>
+      <div class="readout"><b id="goalM">1.44 m ahead</b><span id="goalNote">turn once, then straight</span></div>
     </div>
   </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-wide" viewBox="0 80 1280 150" role="img" aria-label="Replay: the goal is where the reference clip's pelvis is 1.2 s ahead, measured from where the walker actually is, so drift is steered back; where the clip ends the goal shrinks to zero and the walker stops.">
+        <defs><marker id="ahRp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <g id="replay"></g>
+        <text class="ts" x="330" y="112">reference clip's pelvis</text>
+        <text class="tb" x="90" y="200">walker</text>
+        <text class="tt" x="300" y="214">goal: the clip's pelvis 1.2 s ahead, seen from the walker</text>
+        <text class="ts" x="1260" y="154" text-anchor="end">clip ends: goal shrinks to 0</text>
+      </svg>
+    </div>
+    <figcaption>Replays of held-out clips aim at the clip, not along it, so a drift off its path is steered back.</figcaption>
+  </figure>
 </section>
 
 <!-- loop -->
 <section>
   <div class="sec-head">
-    <span class="eyebrow">How · forward simulation</span>
+    <span class="eyebrow">How · with the muscle policy</span>
     <h2>Two loops at two speeds</h2>
-    <p>The planner always starts from the body's measured state, so a drift or stumble is corrected at the next replan.</p>
+    <p>Each plan starts from the body's measured state, so a drift or stumble is corrected at the next replan. For now the planner is rolled out alone: its own kept frames become the next history.</p>
   </div>
   <div class="panel scroll">
     <svg class="dia dia-wide" viewBox="0 0 1280 440" role="img" aria-label="Closed loop: command and terrain set the goal and ground; the measured state gives history; the planner generates motion; its slice goes to the muscle policy, which drives the physics; the state feeds both loops.">
@@ -288,7 +646,7 @@ svg.dia { width:100%; height:auto; display:block }
         <marker id="ahT2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk tl" d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
       <rect x="10" y="20" width="760" height="230" rx="16" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="3 6"/>
-      <text class="tb" x="28" y="44">PLANNER LOOP · every 0.2 s and at touchdowns</text>
+      <text class="tb" x="28" y="44">PLANNER LOOP · every 0.2 s</text>
       <rect x="800" y="20" width="470" height="410" rx="16" fill="none" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="3 6"/>
       <text class="tt" x="818" y="44">MUSCLE LOOP · 40 times a second</text>
 
@@ -306,8 +664,9 @@ svg.dia { width:100%; height:auto; display:block }
       <text class="ts" x="315" y="184" text-anchor="middle">measured last 0.4 s</text>
 
       <rect class="n hl" x="440" y="70" width="150" height="160" rx="12"/>
-      <text class="t" x="515" y="146" text-anchor="middle">Planner</text>
-      <text class="ts" x="515" y="168" text-anchor="middle">next 1.2 s</text>
+      <text class="t" x="515" y="136" text-anchor="middle">Planner</text>
+      <text class="ts" x="515" y="158" text-anchor="middle">next 1.2 s</text>
+      <text class="ts" x="515" y="176" text-anchor="middle">+ foot hold</text>
 
       <rect class="n hl" x="620" y="70" width="140" height="160" rx="12"/>
       <text class="t" x="690" y="130" text-anchor="middle">Slice</text>
@@ -331,7 +690,8 @@ svg.dia { width:100%; height:auto; display:block }
       <path class="ar" d="M400,150 H436" marker-end="url(#ah2)"/>
       <path class="ar" d="M590,150 H616" marker-end="url(#ah2)"/>
       <path class="ar blue" d="M760,150 H836" marker-end="url(#ahB)" style="stroke-width:2.5"/>
-      <text class="tb" x="770" y="140">targets</text>
+      <rect x="770" y="126" width="56" height="18" rx="4" fill="var(--panel)"/>
+      <text class="tb" x="798" y="140" text-anchor="middle">targets</text>
       <path class="ar" d="M1030,150 H1066" marker-end="url(#ah2)"/>
       <path class="ar" d="M1160,230 V296" marker-end="url(#ah2)"/>
       <path class="ar tl" d="M1070,340 H935 V236" marker-end="url(#ahT2)"/>
@@ -342,19 +702,22 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
 </section>
 
-<!-- horizon -->
-<section>
-  <div class="sec-head">
-    <span class="eyebrow">How · over time</span>
-    <h2>Plan far, use a little, plan again</h2>
-    <p>Each plan reaches 1.2 s ahead; the policy follows only its first 0.2 s. The far end keeps the near end sensible.</p>
+<details class="more">
+  <summary>All settings of the current run</summary>
+  <div class="kv-wrap">
+    <table class="kv">
+      <tr><th>Frames</th><td>20 Hz · 8 given (0.4 s) + 24 generated (1.2 s) · 45 numbers each</td></tr>
+      <tr><th>Terrain patch</th><td>37 × 17 cells of 10 cm · 0.6 m behind to 3.0 m ahead, 0.8 m to each side · heights from the ground under the anchor's pelvis</td></tr>
+      <tr><th>Network</th><td>6 blocks · 512 wide · 8 heads × 64 · SwiGLU 2 × 2048 · queries and keys RMS-normalised, no learnable gain · adaptive LayerNorm (shared 6 × 512 + per-block table)</td></tr>
+      <tr><th>Diffusion</th><td>50 steps, cosine schedule · predicts the clean frames · goal replaced by a learned "no goal" token 10 % of the time</td></tr>
+      <tr><th>Losses</th><td>denoising 1 · contact height 0.3 · contact slip 0.3 · FK consistency 0.1 · terrain penetration 0.5 (1 cm allowed) · geometry Huber past 2 cm, weighted by ā</td></tr>
+      <tr><th>Data</th><td>13,379 clips · 2.46 M frames at 40 Hz · 1.48 M training windows · 151,431 held-out windows · half mirrored · terrain share: level 78 %, ramps 12 %, obstacles 6 %, stairs 5 %</td></tr>
+      <tr><th>Optimiser</th><td>AdamW 2e-4, cosine to 0 · 120,000 iterations · batch 512 · gradient clip 1 · bfloat16 · EMA 0.995 (every 10 iterations after the first 5,000) · history jitter up to 0.1 std</td></tr>
+      <tr><th>Sampling</th><td>50 DDIM steps · EMA weights · guidance weight 1 · foot hold: 50 Adam steps on leg joints and foot points</td></tr>
+      <tr><th>Rollout</th><td>keep 0.2 s (4 frames) · re-anchor at the pelvis centre of mass and 1 s mean heading · replan from the latest 0.4 s</td></tr>
+    </table>
   </div>
-  <div class="panel scroll">
-    <svg class="dia dia-wide" viewBox="0 0 1280 250" role="img" aria-label="Timeline: a new plan every 0.2 s, each 1.2 s long; only the first 0.2 s of each is used.">
-      <g id="horizon"></g>
-    </svg>
-  </div>
-</section>
+</details>
 
 </div>
 
@@ -362,23 +725,27 @@ svg.dia { width:100%; height:auto; display:block }
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); for (const k in a) if (a[k] != null) e.setAttribute(k, a[k]); parent.appendChild(e); return e; };
 const txt = (s, a, parent) => { const e = el("text", a, parent); e.textContent = s; return e; };
+const $ = id => document.getElementById(id);
+let seed = 7;                                    // fixed pseudo-random noise, so every render looks the same
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
+// planner I/O: history, patch, future
 (function () {
-  const h = document.getElementById("hist");
+  const h = $("hist");
   for (let i = 0; i < 8; i++) for (let r = 0; r < 4; r++)
     el("rect", { x: 20 + i * 42, y: 68 + r * 12, width: 38, height: 9, rx: 2, class: "cell-h", opacity: (0.35 + 0.65 * (i + 1) / 8).toFixed(2) }, h);
-  const p = document.getElementById("patch");
+  const p = $("patch");
   for (let i = 0; i < 18; i++) for (let j = 0; j < 4; j++)
     el("rect", { x: 20 + i * 19, y: 198 + j * 12, width: 17, height: 10, rx: 2, fill: "var(--wire)", opacity: ((i > 10 ? 0.55 : 0.18) + 0.04 * j).toFixed(2) }, p);
-  const f = document.getElementById("fut");
+  const f = $("fut");
   for (let i = 0; i < 24; i++) for (let r = 0; r < 14; r++)
     el("rect", { x: 792 + i * 19.5, y: 56 + r * 15, width: 16.5, height: 11, rx: 2, fill: r < 6 ? "var(--blue)" : "var(--wire)", opacity: r < 6 ? "0.9" : "0.3" }, f);
 })();
 
 // frame composition bar
 (function () {
-  const g = document.getElementById("frameBar");
-  const parts = [["contacts", 4, true, "heel + ball, each foot"], ["footholds", 4, true, "next landing, each foot"],
+  const g = $("frameBar");
+  const parts = [["contacts", 4, true, "heel + ball, each foot"], ["footholds", 4, true, "current or next, each foot"],
                  ["pelvis", 3, true, "position + height"], ["heading, tilt", 5, true, "pelvis orientation"],
                  ["joint angles", 17, false, "hips, trunk, knees, ankles, toes"], ["foot points", 12, false, "heel + ball positions"]];
   const x0 = 20, W = 1240, unit = W / 45;
@@ -393,59 +760,233 @@ const txt = (s, a, parent) => { const e = el("text", a, parent); e.textContent =
   }
 })();
 
+// penetration card: 10 cm sample grid along the surface
+(function () {
+  const g = $("penGrid");
+  for (let x = 20; x <= 500; x += 40) {
+    const y = x < 260 ? 180 : 100;
+    el("circle", { cx: x, cy: y, r: 3.5, fill: "var(--wire)" }, g);
+  }
+})();
+
 // smoothed heading sketch
 (function () {
   let w = "", s = "";
   for (let i = 0; i <= 470; i += 5) {
     const t = i / 470, x = 30 + i;
-    const base = 150 - 50 * t;                           // a slow turn
-    const y = base + 28 * Math.sin(i / 470 * Math.PI * 2 * 4.5);
+    const base = 150 - 50 * t;
+    const y = base + 28 * Math.sin(t * Math.PI * 2 * 4.5);
     w += (i ? "L" : "M") + x + "," + y.toFixed(1);
     s += (i ? "L" : "M") + x + "," + (base + 6).toFixed(1);
   }
-  document.getElementById("wiggle").setAttribute("d", w);
-  document.getElementById("smooth").setAttribute("d", s);
+  $("wiggle").setAttribute("d", w);
+  $("smooth").setAttribute("d", s);
 })();
 
+// network: patch, frames, terrain tokens, output
 (function () {
-  const g = document.getElementById("rings");
-  for (const m of [1, 2, 3]) {
-    el("circle", { cx: 180, cy: 180, r: m * 70, fill: "none", stroke: "var(--line)", "stroke-width": 1.2, "stroke-dasharray": "4 5" }, g);
-    txt(m + " m", { x: 180 + m * 70 + 4, y: 196, class: "tm" }, g);
+  const p = $("netPatch");
+  for (let i = 0; i < 37; i++) for (let j = 0; j < 17; j++) {
+    const box = i >= 21 && i <= 30 && j >= 3 && j <= 12;
+    el("rect", { x: 20 + i * 6, y: 66 + j * 5, width: 5.2, height: 4.2, fill: box ? "var(--ink)" : "var(--wire)", opacity: box ? 0.75 : 0.22 }, p);
   }
+  const f = $("netFrames");
+  for (let i = 0; i < 32; i++) {
+    const given = i < 8;
+    for (let r = 0; r < 8; r++)
+      el("rect", { x: 20 + i * 8.4, y: 230 + r * 8, width: 7.2, height: 6.4, rx: 1, fill: given ? "var(--ink)" : "var(--blue)",
+                   opacity: given ? 0.8 : (0.15 + 0.6 * rnd()).toFixed(2) }, f);
+  }
+  const o = $("netOut");
+  for (let i = 0; i < 24; i++) for (let r = 0; r < 6; r++)
+    el("rect", { x: 1040 + i * 9, y: 262 + r * 8.4, width: 7.6, height: 7, rx: 1, fill: "var(--blue)", opacity: 0.9 }, o);
 })();
-const PX = 70;
-function update() {
-  const v = parseFloat(document.getElementById("speed").value), deg = parseFloat(document.getElementById("dir").value);
-  const d = v * 1.2, r = deg * Math.PI / 180;
-  const x = 180 + d * PX * Math.cos(r), y = 180 - d * PX * Math.sin(r);
-  const back = d > 0.2 ? 12 / (d * PX) : 0;
-  document.getElementById("goalLine").setAttribute("d", `M180,180 L${x - (x - 180) * back},${y - (y - 180) * back}`);
-  document.getElementById("goalDot").setAttribute("cx", x); document.getElementById("goalDot").setAttribute("cy", y);
-  document.getElementById("goalLbl").setAttribute("x", x); document.getElementById("goalLbl").setAttribute("y", y - 18);
-  document.getElementById("spdOut").textContent = v.toFixed(1);
-  document.getElementById("dirOut").textContent = deg > 0 ? "+" + deg : deg;
-  document.getElementById("goalM").textContent = d.toFixed(2) + " m";
-  const a = Math.abs(deg);
-  document.getElementById("goalNote").textContent = v < 0.2 ? "stay put" : a <= 15 ? "straight on" : a <= 60 ? (deg > 0 ? "veer left" : "veer right") : a <= 120 ? (deg > 0 ? "to the left" : "to the right") : "behind";
-}
-document.getElementById("speed").addEventListener("input", update);
-document.getElementById("dir").addEventListener("input", update);
-update();
 
+// training: data mix, window, noise, output, loss rows
 (function () {
-  const g = document.getElementById("horizon");
-  const x0 = 70, px = 380;
-  for (let k = 0; k <= 15; k++) {
+  const mix = [["level", 78, "var(--blue)"], ["ramps", 12, "var(--teal)"], ["obstacles", 6, "var(--amber)"], ["stairs", 5, "var(--ink)"]];
+  const g = $("mixBar"), tot = mix.reduce((a, m) => a + m[1], 0);
+  let x = 20;
+  mix.forEach(([name, v, c], k) => {
+    const w = 270 * v / tot;
+    el("rect", { x: x, y: 246, width: Math.max(w - 1.5, 1), height: 24, fill: c, opacity: 0.9 }, g);
+    x += w;
+    const lx = 20 + (k % 2) * 130, ly = 296 + Math.floor(k / 2) * 18;
+    el("rect", { x: lx, y: ly - 10, width: 11, height: 11, rx: 2, fill: c, opacity: 0.9 }, g);
+    txt(`${name} ${v} %`, { x: lx + 17, y: ly, class: "ts" }, g);
+  });
+  const strip = (id, x0, noisy) => {
+    const s = $(id);
+    for (let i = 0; i < 32; i++) for (let r = 0; r < 10; r++) {
+      const given = i < 8;
+      el("rect", { x: x0 + i * 6.5, y: 44 + r * 9, width: 5.4, height: 7.6, rx: 1,
+                   fill: given ? "var(--ink)" : noisy ? (rnd() < 0.5 ? "var(--wire)" : "var(--blue)") : "var(--blue)",
+                   opacity: given ? 0.8 : noisy ? (0.12 + 0.6 * rnd()).toFixed(2) : 0.9 }, s);
+    }
+  };
+  strip("trWin", 330, false);
+  strip("trNoise", 580, true);
+  const o = $("trOut");
+  for (let i = 0; i < 24; i++) for (let r = 0; r < 6; r++)
+    el("rect", { x: 860 + i * 6.25, y: 164 + r * 8.4, width: 5.2, height: 7, rx: 1, fill: "var(--blue)", opacity: 0.9 }, o);
+  const rows = [["contact height", "× 0.3"], ["contact slip", "× 0.3"], ["FK consistency", "× 0.1"], ["terrain penetration", "× 0.5"]];
+  const L = $("lossRows");
+  rows.forEach(([name, w], k) => {
+    const y = 196 + k * 42;
+    el("rect", { x: 1072, y: y, width: 188, height: 34, rx: 8, class: "n" }, L);
+    el("line", { x1: 1060, x2: 1072, y1: y + 17, y2: y + 17, stroke: "var(--teal)", "stroke-width": 2 }, L);
+    txt(name, { x: 1084, y: y + 22, class: "ts" }, L);
+    txt(w, { x: 1248, y: y + 22, class: "tm", "text-anchor": "end" }, L);
+  });
+})();
+
+// plots: signal share (the planner's own cosine schedule) and Huber
+function axes(g, ylab, xlab, yt, xt, X, Y) {
+  for (const [v, s] of yt) { el("line", { x1: 60, x2: 500, y1: Y(v), y2: Y(v), class: "grid-line" }, g); txt(s, { x: 52, y: Y(v) + 4, class: "tm", "text-anchor": "end" }, g); }
+  for (const [v, s] of xt) txt(s, { x: X(v), y: 208, class: "tm", "text-anchor": "middle" }, g);
+  txt(ylab, { x: 64, y: 22, class: "ts" }, g);
+  txt(xlab, { x: 500, y: 224, class: "ts", "text-anchor": "end" }, g);
+}
+(function () {
+  const T = 50, f = s => Math.cos((s + 0.008) / 1.008 * Math.PI / 2) ** 2;
+  const ab = []; let c = 1;
+  for (let i = 0; i < T; i++) { c *= 1 - Math.min(1 - f((i + 1) / T) / f(i / T), 0.999); ab.push(c); }
+  const g = $("abPlot"), X = i => 70 + i * (420 / (T - 1)), Y = v => 190 - 155 * v;
+  axes(g, "ā: share of signal", "diffusion step", [[0, "0"], [0.5, "0.5"], [1, "1"]], [[0, "1"], [24, "25"], [49, "50"]], X, Y);
+  let d = `M${X(0)},${Y(0)}`;
+  ab.forEach((v, i) => d += `L${X(i).toFixed(1)},${Y(v).toFixed(1)}`);
+  el("path", { d: d + `L${X(T - 1)},${Y(0)}Z`, fill: "var(--blue-soft)" }, g);
+  el("path", { d: d.replace(/^M[^L]*L/, "M"), fill: "none", stroke: "var(--blue)", "stroke-width": 3 }, g);
+  txt("little noise", { x: 76, y: 60, class: "ts" }, g);
+  txt("heavy noise", { x: 494, y: 156, class: "ts", "text-anchor": "end" }, g);
+  txt("= weight of the geometry losses", { x: 80, y: 176, class: "tb" }, g);
+})();
+(function () {
+  const g = $("huberPlot"), X = e => 70 + e * 70, Y = v => 190 - v * (155 / 9);
+  axes(g, "cost", "foot error, cm", [[0, "0"], [3, "3"], [6, "6"], [9, "9"]], [[0, "0"], [2, "2"], [4, "4"], [6, "6"]], X, Y);
+  let sq = "", hu = "";
+  for (let e = 0; e <= 6.001; e += 0.1) {
+    const q = (e / 2) ** 2, h = q < 1 ? q : 2 * (e / 2) - 1;
+    sq += (e ? "L" : "M") + X(e).toFixed(1) + "," + Y(q).toFixed(1);
+    hu += (e ? "L" : "M") + X(e).toFixed(1) + "," + Y(h).toFixed(1);
+  }
+  el("line", { x1: X(2), x2: X(2), y1: 30, y2: 190, stroke: "var(--wire)", "stroke-width": 1.2, "stroke-dasharray": "3 4" }, g);
+  el("path", { d: sq, fill: "none", stroke: "var(--wire)", "stroke-width": 2, "stroke-dasharray": "6 5" }, g);
+  el("path", { d: hu, fill: "none", stroke: "var(--blue)", "stroke-width": 3 }, g);
+  txt("squared", { x: X(4.6), y: Y(6.2), class: "ts", "text-anchor": "end" }, g);
+  txt("Huber", { x: X(5.9), y: Y(4.9) + 22, class: "tb", "text-anchor": "end" }, g);
+  txt("2 cm", { x: X(2) + 6, y: 46, class: "tm" }, g);
+})();
+
+// foot hold effect
+(function () {
+  const g = $("slipChart"), Y = v => 190 - v * (150 / 15);
+  for (const v of [0, 5, 10, 15]) { el("line", { x1: 60, x2: 500, y1: Y(v), y2: Y(v), class: "grid-line" }, g); txt(String(v), { x: 52, y: Y(v) + 4, class: "tm", "text-anchor": "end" }, g); }
+  const groups = [["at replan seams", 170, 14.3, 1.7], ["whole replay", 330, 5.7, 2.2]];
+  for (const [name, cx, off, held] of groups) {
+    for (const [v, x, held_] of [[off, cx - 54, false], [held, cx + 4, true]]) {
+      el("rect", { x: x, y: Y(v), width: 50, height: 190 - Y(v), rx: 3, fill: held_ ? "var(--blue)" : "var(--wire)", opacity: held_ ? 0.92 : 0.5 }, g);
+      txt(v.toFixed(1), { x: x + 25, y: Y(v) - 6, class: "tm", "text-anchor": "middle", style: "paint-order:stroke;stroke:var(--grey-soft);stroke-width:5px" }, g);
+    }
+    txt(name, { x: cx, y: 210, class: "ts", "text-anchor": "middle" }, g);
+  }
+  el("line", { x1: 60, x2: 500, y1: Y(3.5), y2: Y(3.5), stroke: "var(--teal)", "stroke-width": 2, "stroke-dasharray": "6 5" }, g);
+  txt("real clips ≈ 3.5", { x: 498, y: Y(3.5) - 6, class: "tt", "text-anchor": "end" }, g);
+  el("rect", { x: 300, y: 26, width: 12, height: 12, rx: 2, fill: "var(--wire)", opacity: 0.5 }, g); txt("no hold", { x: 318, y: 37, class: "ts" }, g);
+  el("rect", { x: 390, y: 26, width: 12, height: 12, rx: 2, fill: "var(--blue)" }, g); txt("foot hold", { x: 408, y: 37, class: "ts" }, g);
+})();
+
+// horizon timeline: 0.4 s given, 1.2 s planned, 0.2 s kept
+(function () {
+  const g = $("horizon"), x0 = 180, px = 340;
+  for (let k = -2; k <= 14; k++) {
     const s = k * 0.2, x = x0 + s * px;
-    el("line", { x1: x, y1: 20, x2: x, y2: 210, class: "grid-line" }, g);
-    if (k % 2 === 0) txt(s.toFixed(1) + " s", { x: x, y: 236, class: "tm", "text-anchor": "middle" }, g);
+    el("line", { x1: x, y1: 14, x2: x, y2: 204, class: "grid-line" }, g);
+    if (k % 2 === 0) txt(s.toFixed(1) + " s", { x: x, y: 226, class: "tm", "text-anchor": "middle" }, g);
   }
   for (let i = 0; i < 9; i++) {
-    const s = i * 0.2, x = x0 + s * px, y = 26 + i * 20;
-    el("rect", { x: x, y: y, width: Math.min(1.2 * px, 1260 - x), height: 12, rx: 3, fill: "var(--blue-soft)", stroke: "var(--blue)", "stroke-width": 1 }, g);
+    const s = i * 0.2, x = x0 + s * px, y = 20 + i * 20;
+    el("rect", { x: x - 0.4 * px, y: y, width: 0.4 * px, height: 12, rx: 3, fill: "var(--ink)", opacity: 0.22 }, g);
+    el("rect", { x: x, y: y, width: 1.2 * px, height: 12, rx: 3, fill: "var(--blue-soft)", stroke: "var(--blue)", "stroke-width": 1 }, g);
     el("rect", { x: x, y: y, width: 0.2 * px, height: 12, rx: 3, fill: "var(--blue)" }, g);
-    txt("plan " + (i + 1), { x: 10, y: y + 10, class: "tm" }, g);
+    txt("plan " + (i + 1), { x: x + 1.2 * px + 8, y: y + 10, class: "tm" }, g);
+  }
+  const leg = [["var(--ink)", 0.22, "given: latest 0.4 s"], ["var(--blue)", 1, "kept: first 0.2 s"], ["var(--blue-soft)", 1, "rest of the 1.2 s plan"]];
+  leg.forEach(([c, o, s], k) => {
+    el("rect", { x: 180 + k * 240, y: 250, width: 14, height: 14, rx: 3, fill: c, opacity: o, stroke: k === 2 ? "var(--blue)" : "none" }, g);
+    txt(s, { x: 202 + k * 240, y: 262, class: "ts" }, g);
+  });
+})();
+
+// command: world-fixed direction (drawn in model units, then fitted into the 620 x 400 box)
+const CW = 620, CH = 400, PAD = 60;
+const dir = a => [Math.cos(a), -Math.sin(a)];
+const at = (p, d, l) => [p[0] + d[0] * l, p[1] + d[1] * l];
+const f1 = p => p.map(n => n.toFixed(1)).join(",");
+function seg(id, a, b, back) {                   // screen-space line a -> b, stopped `back` px short (arrowheads)
+  const n = Math.hypot(b[0] - a[0], b[1] - a[1]), e = $(id);
+  if (n < back + 4) { e.setAttribute("d", ""); return; }
+  e.setAttribute("d", `M${f1(a)} L${f1([b[0] - (b[0] - a[0]) / n * back, b[1] - (b[1] - a[1]) / n * back])}`);
+}
+function place(id, p, dy) {                      // a label kept inside the box
+  const e = $(id); e.setAttribute("y", p[1] + dy); e.setAttribute("x", p[0]);
+  const w = e.getComputedTextLength ? e.getComputedTextLength() : 0;
+  if (e.getAttribute("text-anchor") !== "middle" && e.getAttribute("text-anchor") !== "end") e.setAttribute("x", Math.max(8, Math.min(p[0], CW - 8 - w)));
+}
+function updateCmd() {
+  const v = parseFloat($("speed").value), deg = parseFloat($("dir").value), th = deg * Math.PI / 180, d = dir(th);
+  const L = v * 1.2 * 55;
+  const S0 = [0, 0], H = [130, 0], P1 = [45, 0], P2 = at(P1, d, 45), B = at(P2, d, 80), E = at(B, d, 30), gA = at(S0, d, L), gB = at(B, d, L);
+  const pts = [S0, H, P1, P2, B, E, gA, gB], xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const k = Math.min(1.8, (CW - 2 * PAD) / Math.max(x1 - x0, 1), (CH - 2 * PAD) / Math.max(y1 - y0, 1));
+  const ox = CW / 2 - k * (x0 + x1) / 2, oy = CH / 2 - k * (y0 + y1) / 2, T = p => [ox + k * p[0], oy + k * p[1]];
+  const s = T(S0), b = T(B);
+  seg("startLine", s, T(H), 2);
+  place("startLbl", T([90, 0]), deg < 0 ? -10 : 20);
+  $("walkPath").setAttribute("d", `M${f1(s)} Q${f1(T(P1))} ${f1(T(P2))} L${f1(T(E))}`);
+  const r = 60, a1 = at(s, d, r);
+  $("angArc").setAttribute("d", deg ? `M${s[0] + r},${s[1]} A${r},${r} 0 0 ${deg > 0 ? 0 : 1} ${f1(a1)}` : "");
+  $("angLbl").textContent = deg ? (deg > 0 ? "+" : "") + deg + "°" : "";
+  place("angLbl", at(s, dir(th / 2), r + 18), 4);
+  const wA = $("walkerA"); wA.setAttribute("cx", s[0]); wA.setAttribute("cy", s[1]);
+  place("startTxt", [s[0] - 16, s[1]], 5);
+  seg("goalA", s, T(gA), 11);
+  const ga = T(gA); $("ringA").setAttribute("cx", ga[0]); $("ringA").setAttribute("cy", ga[1]);
+  const drift = -12, wd = dir(th + drift * Math.PI / 180);
+  const wB = $("walkerB");
+  wB.setAttribute("cx", b[0]); wB.setAttribute("cy", b[1]);
+  wB.setAttribute("transform", `rotate(${-(deg + drift)} ${b[0].toFixed(1)} ${b[1].toFixed(1)})`);
+  const f = at(b, wd, 34);
+  ["x1", "y1", "x2", "y2"].forEach((key, i) => $("faceB").setAttribute(key, [b[0], b[1], f[0], f[1]][i]));
+  seg("goalB", b, T(gB), 11);
+  const gb = T(gB); $("ringB").setAttribute("cx", gb[0]); $("ringB").setAttribute("cy", gb[1]);
+  place("lblB", at(b, dir(th - Math.PI / 2), 32).map((n, i) => i ? n : n - 10), 4);
+  place("lblGoal", at(gb, dir(th + Math.PI / 2), 20).map((n, i) => i ? n : n - 12), 4);
+  $("spdOut").textContent = v.toFixed(1);
+  $("dirOut").textContent = deg > 0 ? "+" + deg : deg;
+  $("goalM").textContent = (v * 1.2).toFixed(2) + " m ahead";
+  $("goalNote").textContent = v < 0.2 ? "stand still" : deg === 0 ? "straight along the start heading" : `turn ${Math.abs(deg)}° ${deg > 0 ? "left" : "right"} once, then straight`;
+}
+$("speed").addEventListener("input", updateCmd);
+$("dir").addEventListener("input", updateCmd);
+updateCmd();
+
+// replay: aim at the clip's pelvis 1.2 s ahead, from where the walker is
+(function () {
+  const g = $("replay");
+  const bez = (p, t) => { const m = 1 - t; return [0, 1].map(k => m * m * m * p[0][k] + 3 * m * m * t * p[1][k] + 3 * m * t * t * p[2][k] + t * t * t * p[3][k]); };
+  const ghost = [[60, 150], [400, 175], [700, 85], [1100, 110]], walk = [[60, 150], [380, 215], [760, 140], [1096, 112]];
+  const path = p => `M${p[0]} C${p[1]} ${p[2]} ${p[3]}`;
+  el("path", { d: path(ghost), fill: "none", stroke: "var(--wire)", "stroke-width": 3, "stroke-dasharray": "8 6" }, g);
+  el("path", { d: path(walk), fill: "none", stroke: "var(--blue)", "stroke-width": 3 }, g);
+  el("line", { x1: 1100, x2: 1100, y1: 94, y2: 126, stroke: "var(--ink)", "stroke-width": 3 }, g);
+  for (const s of [0.22, 0.52, 0.93]) {
+    const w = bez(walk, s), c = bez(ghost, Math.min(1, s + 0.2));
+    const dx = c[0] - w[0], dy = c[1] - w[1], n = Math.hypot(dx, dy);
+    if (n > 24) el("path", { d: `M${w[0]},${w[1]} L${c[0] - dx / n * 12},${c[1] - dy / n * 12}`, class: "ar tl", "marker-end": "url(#ahRp)", style: "stroke-width:2.5" }, g);
+    el("circle", { cx: c[0], cy: c[1], r: 8, fill: "none", stroke: "var(--teal)", "stroke-width": 2.5 }, g);
+    el("circle", { cx: w[0], cy: w[1], r: 6.5, fill: "var(--blue)" }, g);
   }
 })();
 </script>
