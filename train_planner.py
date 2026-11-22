@@ -161,13 +161,20 @@ def main() -> None:
         if board is not None and (it % a.score_every == 0 or it == a.iters):
             name = f"ckpt_{it:06d}.pt"
             planner.save(out / name, iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
-            r = dict(board(planner), checkpoint=name, iters=it)
-            rows.append(r)
-            with (out / "scores.jsonl").open("a") as f:
-                f.write(json.dumps(r) + "\n")
-            for k, v in r["balanced"].items():
-                tb.add_scalar(f"score/{k}", v, it)
-            print(f"{it:>7d}  scoreboard {r['balanced']}  ({r['rollout_s']} s)", flush=True)
+            torch.cuda.empty_cache()
+            try:
+                r = dict(board(planner), checkpoint=name, iters=it)
+            except torch.OutOfMemoryError:          # a shared GPU: skip this pass rather than lose the run
+                r = None
+                print(f"{it:>7d}  scoreboard skipped (out of GPU memory)", flush=True)
+            torch.cuda.empty_cache()
+            if r is not None:
+                rows.append(r)
+                with (out / "scores.jsonl").open("a") as f:
+                    f.write(json.dumps(r) + "\n")
+                for k, v in r["balanced"].items():
+                    tb.add_scalar(f"score/{k}", v, it)
+                print(f"{it:>7d}  scoreboard {r['balanced']}  ({r['rollout_s']} s)", flush=True)
         if it % 2000 == 0 or it == a.iters:
             planner.save(out / "planner.pt", iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
     if board is not None and rows:
