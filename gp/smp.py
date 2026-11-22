@@ -138,9 +138,13 @@ def _timestep_embedding(t: torch.Tensor, dim: int = 256) -> torch.Tensor:
 class _Block(nn.Module):
     """StableMotionDiTBlock: adaLN-modulated self-attention and a SwiGLU feed-forward, each gated."""
 
-    def __init__(self, dim: int, heads: int) -> None:
+    def __init__(self, dim: int, heads: int, qk_norm: bool = False) -> None:
         super().__init__()
         self.heads = heads
+        # RMS-normalised queries and keys bound the attention logits: without it the full-pose planner's adaLN shift
+        # grew 1 -> 37 and its logits 371 -> 347,000 within 14k iterations, and training broke (2026-11-22)
+        self.qn = nn.RMSNorm(dim // heads) if qk_norm else None
+        self.kn = nn.RMSNorm(dim // heads) if qk_norm else None
         self.n1 = nn.LayerNorm(dim, eps=1e-5, elementwise_affine=False)
         self.qkv = nn.Linear(dim, 3 * dim, bias=False)
         self.out = nn.Linear(dim, dim)
@@ -154,6 +158,8 @@ class _Block(nn.Module):
         h = self.n1(x) * (1 + sc1[:, None]) + sh1[:, None]
         B, S, D = h.shape
         q, k, v = self.qkv(h).view(B, S, 3, self.heads, D // self.heads).permute(2, 0, 3, 1, 4)
+        if self.qn is not None:
+            q, k = self.qn(q), self.kn(k)
         a = F.scaled_dot_product_attention(q, k, v).transpose(1, 2).reshape(B, S, D)
         x = x + g1[:, None] * self.out(a)
         h = self.n2(x) * (1 + sc2[:, None]) + sh2[:, None]

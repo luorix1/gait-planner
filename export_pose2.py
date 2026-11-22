@@ -39,7 +39,7 @@ from sprint.recipes.motion import _rotate, forward_kinematics_np, model_layout
 from export_pose_planner import to_qpos
 from gp import data, footfk
 from gp.planner import FUT, HIST, HZ, STRIDE, from_frame, qexp, tilt, to_frame, yaw_quat
-from gp.pose_planner import J0, P0, SMOOTH_S, PosePlanner, Windows, _rot, patch
+from gp.pose_planner import GEO_SCALE, J0, P0, SMOOTH_S, PosePlanner, Windows, _rot, geometry, patch
 from train import build
 
 NS = int(round(SMOOTH_S * HZ))              # plan frames in the heading average
@@ -74,8 +74,34 @@ def decode(x: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tens
                 points=torch.stack([ptxz[..., 0], pty, ptxz[..., 1]], -1))
 
 
+def foot_hold(P: PosePlanner, hist: torch.Tensor, iters: int, from_t: int, lr: float = 0.02):
+    """A ``guide`` for PosePlanner.generate: every foot point the history ends on the ground stays where it was (as
+    the joints place it, which playback shows, and in the point channels) until the plan's own flag lifts it; ``iters``
+    Adam steps on each clean estimate at noise steps <= ``from_t``. Replans slid the stance foot at every seam (v6 stair
+    descent: 17 cm/s at seams, 2-3 within a plan, 2026-11-22)."""
+    tgt = geometry(P.fk, hist[:, -1:])[1][:, 0]                      # [B, 4, 3] the last given frame's foot points
+    down = hist[:, -1, :4] > 0
+
+    def guide(x0: torch.Tensor, t: int) -> torch.Tensor:
+        if t > from_t:
+            return x0
+        x = x0.detach().clone().requires_grad_(True)
+        opt = torch.optim.Adam([x], lr=lr)
+        with torch.enable_grad():
+            for _ in range(iters):
+                xu = x * P.x_std + P.x_mean
+                ch, kin, _ = geometry(P.fk, xu)
+                held = ((xu[..., :4] > 0).int().cumprod(1).bool() & down[:, None]).detach()   # until the flag lifts
+                err = ((kin - tgt[:, None]).square().sum(-1) + (ch - tgt[:, None]).square().sum(-1)) / GEO_SCALE ** 2
+                opt.zero_grad()
+                (err * held).sum().backward()
+                opt.step()
+        return x.detach()
+    return guide
+
+
 def rollout(P: PosePlanner, W: Windows, a0: torch.Tensor, goal_of, n_plans: int, keep: int, w: float,
-            gen: torch.Generator) -> dict[str, np.ndarray]:
+            gen: torch.Generator, hold: int = 0, hold_from: int = 49) -> dict[str, np.ndarray]:
     fr = W.fr
     clip = fr.clip[a0]
     k = a0[:, None] + W.k[:HIST]
@@ -90,7 +116,8 @@ def rollout(P: PosePlanner, W: Windows, a0: torch.Tensor, goal_of, n_plans: int,
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
         g0 = fr.G(clip, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
         hist = frame_features(last, o, a_psi, g0)
-        fut = P.generate(hist, patch(fr.G, clip, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
+        guide = foot_hold(P, hist, hold, hold_from) if hold else None
+        fut = P.generate(hist, patch(fr.G, clip, o, a_psi, g0), goal_of(i, o, a_psi), gen, w=w, guide=guide)[:, :keep]
         new = decode(fut, o, a_psi, g0)
         for key in seq:
             seq[key].append(new[key])
