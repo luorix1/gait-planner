@@ -3,9 +3,13 @@ physics (kinematic playback), plus a score of how physical the motion is.
 
 As export_pose_planner.py: open loop, each plan's first ``--keep`` frames kept (0.2 s), the next plan from the
 planner's own last 0.4 s, re-anchored at its last pelvis centre of mass and smoothed heading. Episodes:
-- **replay**: from held-out windows (spread over modes and terrain); goal = the clip's own pelvis travel over 1.2 s
-  in its smoothed heading frame; the clip is the ghost.
-- **command**: from a held-out level walk; goal = speed x 1.2 s at a fixed angle to the current smoothed heading.
+- **replay**: from held-out windows (spread over modes and terrain); goal = where the clip's pelvis is 1.2 s ahead,
+  seen from the generated anchor, so a drift off the clip's path is steered back and the goal shrinks to 0 where the
+  clip stops (its last frame is held); the clip is the ghost. (Until 11-22 the clip's own 1.2 s travel in its own
+  heading frame: dead reckoning, every heading error became sideways drift, and the last goal was held after the
+  clip ended, so a stopping clip kept walking.)
+- **command**: from a held-out level walk; goal = speed x 1.2 s along a world-fixed direction (the start's smoothed
+  heading + the angle): heading drift is turned back, and an angle is one turn, then straight.
 
 Score (summary.json, also printed), from SPRINT's exact forward kinematics of the decoded poses against each clip's
 terrain: the lowest foot sphere's height (5/50/95th percentile), the share of frames with both feet more than 3 cm up
@@ -150,7 +154,6 @@ def main() -> None:
     names = list(D["coord_names"])
     gen = torch.Generator(device=dev).manual_seed(0)
     n_plans = int(round(a.seconds * HZ / a.keep))
-    last_anchor = torch.as_tensor(D["start"] + D["frames"] - STRIDE * FUT - 1, device=dev)
     room = np.asarray(D["frames"]) - STRIDE * (HIST + FUT)
 
     # replays: the longest clip of each (source, mode, terrain) group, then the next longest, up to --replays
@@ -165,18 +168,25 @@ def main() -> None:
                 picked.append(groups[g].pop(0))
     a_rep = torch.as_tensor([int(D["start"][k]) + STRIDE * (HIST - 1) for k in picked], device=dev)
 
+    clip_last = torch.as_tensor(D["start"] + D["frames"] - 1, device=dev)
+
     def replay_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
-        return W(torch.minimum(a_rep + i * a.keep * STRIDE, last_anchor[W.fr.clip[a_rep]]))[2]
+        tgt = torch.minimum(a_rep + i * a.keep * STRIDE + STRIDE * FUT, clip_last[W.fr.clip[a_rep]])
+        return to_frame(W.fr.pcom[tgt][:, None, [0, 2]], o, psi)[:, 0]
 
     walk = [k for k in range(len(D["name"])) if str(D["mode"][k]) == "walk" and str(D["terrain_class"][k]) == "level"
             and str(D["source"][k]) == "ab01" and room[k] > 0]
     k_cmd = max(walk, key=lambda k: float(D["frames"][k]))
     cmds = [(float(v), 0.0) for v in a.speeds.split(",")] + ([(1.2, a.turn_deg)] if a.turn_deg else [])
     a_cmd = torch.full((len(cmds),), int(D["start"][k_cmd]) + STRIDE * (HIST - 1), device=dev)
-    g_cmd = torch.as_tensor([[v * FUT / HZ * np.cos(np.radians(d)), v * FUT / HZ * np.sin(np.radians(d))]
-                             for v, d in cmds], dtype=torch.float32, device=dev)
+    th = W.fr.psi_s[a_cmd] + torch.as_tensor([np.radians(d) for _, d in cmds], dtype=torch.float32, device=dev)
+    reach = torch.as_tensor([v * FUT / HZ for v, _ in cmds], dtype=torch.float32, device=dev)
+
+    def command_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
+        ahead = o + reach[:, None] * torch.stack([th.cos(), -th.sin()], -1)       # to_frame's forward convention
+        return to_frame(ahead[:, None], o, psi)[:, 0]
     r_rep = rollout(P, W, a_rep, replay_goal, n_plans, a.keep, a.guidance, gen)
-    r_cmd = rollout(P, W, a_cmd, lambda i, o, p: g_cmd, n_plans, a.keep, a.guidance, gen)
+    r_cmd = rollout(P, W, a_cmd, command_goal, n_plans, a.keep, a.guidance, gen)
     episodes = [("replay", k, to_qpos(r_rep, b, names)) for b, k in enumerate(picked)]
     episodes += [(f"command {v:.1f} m/s" + (f" at {d:+.0f} deg" if d else ""), k_cmd, to_qpos(r_cmd, b, names))
                  for b, (v, d) in enumerate(cmds)]
