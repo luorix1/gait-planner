@@ -1,0 +1,5 @@
+# The 4 running-calibration jogs only (submit_hard.sh --clips scripts/hard/clips_running.txt --frames 50e6 --minutes 240)
+seed_jog_forward_loop_002__A026_w0
+seed_jog_forward_loop_003__A030_w0
+seed_jog_forward_loop_003__A036_w0
+seed_jog_forward_loop_003__A021_w0
