@@ -198,6 +198,9 @@ def main() -> None:
     ap.add_argument("--speeds", default="0.8,1.2,1.6,2.0")
     ap.add_argument("--turn-deg", type=float, default=30.0)
     ap.add_argument("--hold", type=int, default=50, help="Adam steps holding planted feet across replans (0 = off)")
+    ap.add_argument("--xfade", type=int, default=0, help="frames each new plan fades in from the previous plan (v12: 4)")
+    ap.add_argument("--hold-smooth", type=float, default=0.0, help="foot-hold smoothness weight (v12: 1)")
+    ap.add_argument("--tag", default="", help="output folder suffix: <run>/studio_pose2<tag>")
     ap.add_argument("--to-studio", action="store_true")
     a = ap.parse_args()
     run, dev = Path(a.run), "cuda" if torch.cuda.is_available() else "cpu"
@@ -240,8 +243,10 @@ def main() -> None:
     def command_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
         ahead = o + reach[:, None] * torch.stack([th.cos(), -th.sin()], -1)       # to_frame's forward convention
         return to_frame(ahead[:, None], o, psi)[:, 0]
-    r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, n_plans, a.keep, a.guidance, gen, a.hold)
-    r_cmd = rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), command_goal, n_plans, a.keep, a.guidance, gen, a.hold)
+    r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, n_plans, a.keep, a.guidance, gen, a.hold,
+                    xfade=a.xfade, hold_smooth=a.hold_smooth)
+    r_cmd = rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), command_goal, n_plans, a.keep, a.guidance, gen, a.hold,
+                    xfade=a.xfade, hold_smooth=a.hold_smooth)
     episodes = [("replay", k, to_qpos(r_rep, b, names)) for b, k in enumerate(picked)]
     episodes += [(f"command {v:.1f} m/s" + (f" at {d:+.0f} deg" if d else ""), k_cmd, to_qpos(r_cmd, b, names))
                  for b, (v, d) in enumerate(cmds)]
@@ -253,7 +258,7 @@ def main() -> None:
     src = FrameSource(env, meshes=bake(data.MODEL))
     from sprint.dynamics.forward import forward_kinematics
     from sprint.pipeline import forward
-    out = run / "studio_pose2"
+    out = run / f"studio_pose2{a.tag}"
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -287,7 +292,8 @@ def main() -> None:
         print(row, flush=True)
     fmt.write_config(out, {"producer": "sprint.export.studio", "model_file": fmt.MODEL_NAME, "dt_ctrl": 1.0 / data.HZ,
                            "run": str(run), "clips": clips,
-                           "policy": f"full-pose planner v2 {a.checkpoint}, guidance {a.guidance}, foot hold {a.hold}, kinematic open loop"})
+                           "policy": f"full-pose planner v2 {a.checkpoint}, guidance {a.guidance}, foot hold {a.hold}"
+                                     f" (smooth {a.hold_smooth:g}), crossfade {a.xfade}, kinematic open loop"})
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     print(f"-> {out}  ({len(episodes)} episodes)")
     if a.to_studio:

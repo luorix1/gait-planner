@@ -362,9 +362,10 @@ def main() -> None:
     (run / out).write_text(json.dumps(rows, indent=1))
     print(table(rows))
     print("real held-out clips per class:", json.dumps(rows[0]["real"]))
-    if a.all:
-        shutil.copy2(run / best["file"], run / "planner_score_best.pt")
-        print(f"best by mean rank: {best['checkpoint']} -> planner_score_best.pt")
+    if a.all:                     # with --out: planner_score_best_<out stem>.pt, the training-time pick stays
+        dst = "planner_score_best.pt" if a.out is None else f"planner_score_best_{Path(a.out).stem}.pt"
+        shutil.copy2(run / best["file"], run / dst)
+        print(f"best by mean rank: {best['checkpoint']} -> {dst}")
 
 
 if __name__ == "__main__":
