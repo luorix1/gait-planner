@@ -69,6 +69,14 @@ MAX_JOINT_SPEED = 20.0
 #: labels a hand down in 3-5 % of frames, under the seed library's 5 % cut); ``parc_dm_platform_024_dm`` swing toe
 #: 7.5 cm into a platform face for 0.33 s (its untracked twin is clean). User 2026-11-15.
 EXCLUDE = ("_mdm_", "mid_climbing", "parc_dm_platform_024_dm")
+#: Takes beyond the training body (user 2026-11-22), every window: single-clip imitation (runs/hard/summary.md) failed
+#: or covered only part of them, and their take-offs need soleus muscle-tendon shortening at 60-96 % of its maximum
+#: speed with the model's default tendons (passing clips <= 57 %); the box jumps also need arm swing the armless model
+#: lacks. Matched by take name like EXCLUDE.
+BEYOND_MODEL = ("seed_jump_on_50cm_002__A415", "seed_broad_jump_002__A360",
+                "seed_jump_over_obstacle_no_hand_0_75m_R_002__A415", "seed_run_loop_180_R_001__A333",
+                "parc_platform_platform_005")
+BEYOND_MODEL_LABEL = "beyond the capabilities of our model"
 #: PARC's physics-tracker replays: its dm_motion_recorder appends ``_dm`` to the motion PARC's torque-driven humanoid
 #: produced while tracking a clip, so these are simulation, not capture. In v2 they were 16.0 of PARC's 17.9 min (all
 #: running, jumps, stairs and walking, half the platforms). Datasets with ``no_replays`` leave them out (user
@@ -308,8 +316,11 @@ def heightfield_gap(hf: dict[str, Any], offset: Any, ctr: np.ndarray, r: np.ndar
 
 
 def excluded(name: str, dataset: str = DATASET) -> str:
-    """Why ``dataset`` leaves a clip out by its name ('' if it does not): an EXCLUDE entry, or a PARC tracker replay."""
+    """Why ``dataset`` leaves a clip out by its name ('' if it does not): an EXCLUDE entry, a take beyond the model
+    (BEYOND_MODEL), or a PARC tracker replay."""
     hit = next((x for x in EXCLUDE if x in name), "")
+    if not hit and any(x in name for x in BEYOND_MODEL):
+        hit = BEYOND_MODEL_LABEL
     if not hit and DATASETS[dataset].get("no_replays") and name.startswith("parc_") and SIM_REPLAY.search(name):
         hit = "PARC tracker replay (_dm)"
     return hit
