@@ -119,8 +119,8 @@ details.more[open] summary { margin-bottom:10px }
   <h1>A planner that sketches motion, a muscle policy that carries it out</h1>
   <p class="lede">A diffusion planner draws the next 1.2 s of whole-body motion. The 90-muscle policy follows only its pelvis, foot and trunk targets.</p>
   <div class="chips">
-    <span class="chip"><i></i>v9 done · 120,000 iterations · best checkpoint at 36,000</span>
-    <span class="chip"><i></i>Sampling: no goal guidance (w = 1) · foot hold on</span>
+    <span class="chip"><i></i>4 transformer blocks · 10 M weights · 50,000 iterations</span>
+    <span class="chip"><i></i>Sampling: 10 steps · seam crossfade · smoothed foot hold</span>
   </div>
 </header>
 
@@ -152,7 +152,7 @@ details.more[open] summary { margin-bottom:10px }
       <text class="ts" x="20" y="54">the last 0.4 s: 8 frames</text>
       <g id="hist"></g>
       <text class="t" x="20" y="166">Ground ahead</text>
-      <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m, 10 cm cells</text>
+      <text class="ts" x="20" y="186">height map, 3.6 m × 1.6 m, 5 cm cells</text>
       <g id="patch"></g>
       <text class="t" x="20" y="272">Goal</text>
       <text class="ts" x="20" y="292">pelvis position in 1.2 s</text>
@@ -164,20 +164,21 @@ details.more[open] summary { margin-bottom:10px }
 
       <rect class="n hl" x="490" y="110" width="250" height="130" rx="12"/>
       <text class="t" x="615" y="166" text-anchor="middle">Diffusion model</text>
-      <text class="ts" x="615" y="190" text-anchor="middle">noise → motion in 50 steps</text>
+      <text class="ts" x="615" y="190" text-anchor="middle">noise → motion in 10 steps</text>
 
       <path class="ar" d="M740,175 H786" marker-end="url(#ah)"/>
 
       <text class="t" x="792" y="34">Next 1.2 s of motion</text>
       <g id="fut"></g>
-      <text class="ts" x="792" y="300">24 frames at 20 Hz, 45 numbers each</text>
+      <text class="ts" x="792" y="300">24 frames at 20 Hz, 126 numbers each</text>
     </svg>
   </div>
   <div class="panel scroll">
-    <svg class="dia dia-wide" viewBox="0 0 1280 150" role="img" aria-label="The 45 numbers of a frame: 4 contact flags, 4 foothold numbers, 3 pelvis position numbers and 5 heading and tilt numbers reach the muscle policy; 17 joint angles and 12 foot point numbers stay in the planner.">
+    <svg class="dia dia-wide" viewBox="0 0 1280 166" role="img" aria-label="The 126 numbers of a frame: 4 contact flags, 4 foothold numbers, 3 pelvis position numbers and 5 heading and tilt numbers reach the muscle policy; 17 joint angles and 12 foot point numbers stay in the planner; 81 segment pose numbers are recomputed from the joint angles.">
       <g id="frameBar"></g>
-      <rect x="20" y="118" width="14" height="14" rx="3" fill="var(--blue)"/><text class="ts" x="42" y="130">reaches the muscle policy</text>
-      <rect x="230" y="118" width="14" height="14" rx="3" fill="var(--wire)" opacity=".45"/><text class="ts" x="252" y="130">stays in the planner: shapes the motion, then dropped</text>
+      <rect x="20" y="140" width="14" height="14" rx="3" fill="var(--blue)"/><text class="ts" x="42" y="152">reaches the muscle policy</text>
+      <rect x="230" y="140" width="14" height="14" rx="3" fill="var(--wire)" opacity=".45"/><text class="ts" x="252" y="152">stays in the planner: shapes the motion, then dropped</text>
+      <rect x="640" y="140" width="14" height="14" rx="3" fill="var(--teal)" opacity=".85"/><text class="ts" x="662" y="152">segment poses: recomputed from the joint angles, targets for the bodies the policy moves</text>
     </svg>
   </div>
 </section>
@@ -186,8 +187,8 @@ details.more[open] summary { margin-bottom:10px }
 <section>
   <div class="sec-head">
     <span class="eyebrow">How · what keeps it physical</span>
-    <h2>Four design choices</h2>
-    <p>Borrowed from large motion models (Kimodo, MotionBricks) and sized for our data.</p>
+    <h2>Six design choices</h2>
+    <p>Borrowed from large motion models (Kimodo, MotionBricks) and PARC, and sized for our data.</p>
   </div>
   <div class="grid2">
     <div class="card">
@@ -229,24 +230,23 @@ details.more[open] summary { margin-bottom:10px }
       </svg>
       <span class="tag">2 · Foot points + contact</span>
       <h3>Feet that agree with the joints and stay planted</h3>
-      <p>The planner also outputs heel and ball points. Training ties them to the feet its own joint angles make, and holds still any point the data has on the ground.</p>
+      <p>The planner also outputs heel and ball points. Training ties them to the feet its own joint angles make, and holds still any point the data has on the ground, at the data's height over the terrain under it.</p>
     </div>
     <div class="card">
-      <svg viewBox="0 0 520 230" role="img" aria-label="A foot on the floor next to a box edge. Interpolating the 10 cm height cells smears the edge into a slope that puts the foot inside; the lowest of the four surrounding cells keeps it on the floor.">
-        <path class="gfill" d="M0,180 L260,180 L260,100 L520,100 L520,230 L0,230 Z"/>
+      <svg viewBox="0 0 520 230" role="img" aria-label="Two stairs drawn to scale. Height cells every 5 cm put four cells on a 22 cm tread; a foot on the tread is checked against the exact step, edge included.">
+        <path class="gfill" d="M0,196 L180,196 L180,132 L268,132 L268,68 L520,68 L520,230 L0,230 Z"/>
         <g id="penGrid"></g>
-        <path d="M220,180 L260,100" stroke="var(--bad)" stroke-width="2.5" stroke-dasharray="6 5" fill="none"/>
-        <circle cx="236" cy="169" r="10" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
-        <rect x="216" y="176" width="48" height="8" rx="3" fill="none" stroke="var(--blue)" stroke-width="2"/>
-        <text class="tr" x="20" y="40">interpolated cells: the box edge</text>
-        <text class="tr" x="20" y="56">becomes a slope, foot looks "inside"</text>
-        <text class="tb" x="280" y="150">lowest of the 4 cells around it:</text>
-        <text class="tb" x="280" y="166">on the floor, fine</text>
-        <text class="ts" x="20" y="208">10 cm cells · 1 cm allowed below</text>
+        <circle cx="226" cy="122" r="9" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
+        <circle cx="250" cy="123" r="8" fill="none" stroke="var(--ink)" stroke-width="2.5"/>
+        <text class="tb" x="300" y="112">5 cm cells: a 22 cm tread</text>
+        <text class="tb" x="300" y="128">holds 4 of them</text>
+        <text class="ts" x="16" y="40">training checks each foot sphere</text>
+        <text class="ts" x="16" y="56">against the exact step, edge included</text>
+        <text class="ts" x="16" y="220">16 cm rise · 22 cm tread · 1 cm allowed below</text>
       </svg>
       <span class="tag">3 · Terrain penetration</span>
       <h3>No foot inside the ground</h3>
-      <p>Every foot sphere, placed by the joint angles, may sit at most 1 cm under the terrain patch. Using the lowest nearby cell keeps box edges sharp.</p>
+      <p>Every foot sphere, placed by the joint angles, may sit at most 1 cm under the terrain. Training checks it against the exact terrain, and the patch the planner sees has 5 cm cells. With 10 cm cells and a check against the coarse patch, feet sank into the treads on 34 % of stair-descent frames; now 9 %.</p>
     </div>
     <div class="card">
       <svg viewBox="0 0 520 230" role="img" aria-label="Pelvis yaw swings with each step; the anchor heading is its one-second average.">
@@ -261,6 +261,37 @@ details.more[open] summary { margin-bottom:10px }
       <h3>A steady frame to plan in</h3>
       <p>Each plan is laid out along the pelvis heading averaged over the last second, so replans don't twist with every step.</p>
     </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="A leg and trunk with a small position-and-orientation marker on the trunk, thigh, shank, heel and toes; all are computed from the joint angles.">
+        <rect x="0" y="200" width="520" height="30" fill="var(--terrain)"/><line x1="0" y1="200" x2="520" y2="200" stroke="var(--wire)" stroke-width="2"/>
+        <path class="bone" d="M150,96 L156,30"/><circle class="head" cx="158" cy="17" r="11"/>
+        <path class="bone" d="M150,96 L166,146 L156,192 L182,196"/><path class="bone" d="M150,96 L128,144 L110,190" opacity=".55"/>
+        <g id="segFrames"></g>
+        <text class="ts" x="250" y="40">each segment: position + orientation</text>
+        <text class="ts" x="250" y="56">9 segments × 9 numbers = 81</text>
+        <text class="tt" x="250" y="96">recomputed from the joint angles</text>
+        <text class="tt" x="250" y="112">after sampling: always agree</text>
+      </svg>
+      <span class="tag">5 · Segment poses</span>
+      <h3>Targets for every body segment, not only the pelvis</h3>
+      <p>Each frame carries the pose of the trunk and of each thigh, shank, heel and toe segment, so the muscle policy can be given targets for the bodies it moves. The joint angles stay the truth: a small network fitted to exact kinematics (worst case 0.7 mm) recomputes the segments from them.</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="A level walk drawn over random boxes: the motion is the clip's own, the ground is random, and only a foot that ends up inside a box is scored.">
+        <path class="gfill" d="M0,190 L110,190 L110,158 L190,158 L190,190 L300,190 L300,146 L372,146 L372,190 L520,190 L520,230 L0,230 Z"/>
+        <line x1="0" y1="190" x2="520" y2="190" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="6 5"/>
+        <path class="bone" d="M260,86 L264,30"/><circle class="head" cx="266" cy="17" r="11"/>
+        <path class="bone" d="M260,86 L270,138 L262,186"/><path class="bone" d="M260,86 L292,132 L326,184" opacity=".7"/>
+        <circle cx="326" cy="184" r="7" fill="none" stroke="var(--bad)" stroke-width="2.5"/>
+        <text class="tr" x="382" y="176">foot inside a box: scored</text>
+        <text class="tb" x="16" y="214">the clip's own level motion</text>
+        <text class="ts" x="16" y="40">random boxes or stairs</text>
+        <text class="ts" x="16" y="56">under it</text>
+      </svg>
+      <span class="tag">6 · Random terrain</span>
+      <h3>Read the ground, don't recognise the clip</h3>
+      <p>In 1 of 10 training windows the terrain patch is swapped for random boxes or a staircase, and only feet inside the ground are scored. When the patch always matched the recorded motion, the planner could recall a clip instead of reading the ground.</p>
+    </div>
   </div>
 </section>
 
@@ -273,12 +304,12 @@ details.more[open] summary { margin-bottom:10px }
   </div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1280 550" role="img" aria-label="Terrain patch through two convolutions gives 50 tokens; 32 frames through a linear layer give 32 tokens; together 82 tokens pass six transformer blocks steered by the diffusion step and goal; the frame tokens are read out as 24 clean future frames.">
+      <svg class="dia dia-xl" viewBox="0 0 1280 550" role="img" aria-label="Terrain patch through three convolutions gives 50 tokens; 32 frames through a linear layer give 32 tokens; together 82 tokens pass four transformer blocks steered by the diffusion step and goal; the frame tokens are read out as 24 clean future frames.">
         <defs><marker id="ahN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
               <marker id="ahNa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk amb" d="M0,0 L10,5 L0,10 z"/></marker></defs>
         <!-- inputs -->
         <text class="t" x="20" y="36">Terrain patch</text>
-        <text class="ts" x="20" y="54">37 × 17 heights · 10 cm cells</text>
+        <text class="ts" x="20" y="54">73 × 33 heights · 5 cm cells</text>
         <g id="netPatch"></g>
         <text class="t" x="20" y="200">Frames</text>
         <text class="ts" x="20" y="218">8 given (0.4 s) + 24 to generate (1.2 s)</text>
@@ -295,15 +326,15 @@ details.more[open] summary { margin-bottom:10px }
         <path class="ar" d="M290,409 H326" marker-end="url(#ahN)"/>
         <path class="ar" d="M290,475 H326" marker-end="url(#ahN)"/>
         <rect class="n" x="330" y="76" width="230" height="66" rx="10"/>
-        <text class="t" x="445" y="104" text-anchor="middle">2 convolutions</text>
-        <text class="tm" x="445" y="126" text-anchor="middle">stride 2 · 1 → 32 → 512</text>
+        <text class="t" x="445" y="104" text-anchor="middle">3 convolutions</text>
+        <text class="tm" x="445" y="126" text-anchor="middle">stride 2 · 1 → 32 → 64 → 256</text>
         <rect class="n" x="330" y="229" width="230" height="66" rx="10"/>
-        <text class="t" x="445" y="257" text-anchor="middle">Linear 46 → 512</text>
-        <text class="ts" x="445" y="279" text-anchor="middle">45 numbers + flag · + position</text>
+        <text class="t" x="445" y="257" text-anchor="middle">Linear 127 → 256</text>
+        <text class="ts" x="445" y="279" text-anchor="middle">126 numbers + flag · + position</text>
         <rect class="n" x="330" y="386" width="230" height="46" rx="10"/>
-        <text class="tm" x="445" y="414" text-anchor="middle">sinusoid 256 → MLP → 512</text>
+        <text class="tm" x="445" y="414" text-anchor="middle">sinusoid 256 → MLP → 256</text>
         <rect class="n" x="330" y="452" width="230" height="46" rx="10"/>
-        <text class="tm" x="445" y="480" text-anchor="middle">MLP → 512</text>
+        <text class="tm" x="445" y="480" text-anchor="middle">MLP → 256</text>
         <text class="ta" x="330" y="524">10 % of training: a learned "no goal" token instead</text>
         <path class="ar" d="M560,409 C580,409 584,436 598,438" marker-end="url(#ahN)"/>
         <path class="ar" d="M560,475 C580,475 584,448 598,446" marker-end="url(#ahN)"/>
@@ -311,9 +342,9 @@ details.more[open] summary { margin-bottom:10px }
         <path class="ar" d="M622,442 H646" marker-end="url(#ahN)"/>
         <rect class="n amb" x="650" y="418" width="160" height="48" rx="10"/>
         <text class="tm" x="730" y="438" text-anchor="middle">SiLU + Linear</text>
-        <text class="ts" x="730" y="456" text-anchor="middle">→ 6 × 512 numbers</text>
+        <text class="ts" x="730" y="456" text-anchor="middle">→ 6 × 256 numbers</text>
         <!-- tokens -->
-        <text class="tm" x="600" y="64">82 tokens × 512</text>
+        <text class="tm" x="600" y="64">82 tokens × 256</text>
         <path class="ar" d="M560,109 C580,109 580,130 596,130" marker-end="url(#ahN)"/>
         <path class="ar" d="M560,262 C580,262 580,252 596,252" marker-end="url(#ahN)"/>
         <rect class="n gs" x="600" y="76" width="96" height="120" rx="6"/>
@@ -322,15 +353,13 @@ details.more[open] summary { margin-bottom:10px }
         <text class="ts" x="648" y="246" text-anchor="middle">32 frame</text><text class="ts" x="648" y="262" text-anchor="middle">tokens</text>
         <!-- blocks -->
         <path class="ar" d="M696,186 H756" marker-end="url(#ahN)"/>
-        <rect class="n" x="790" y="66" width="220" height="190" rx="12"/>
-        <rect class="n" x="784" y="72" width="220" height="190" rx="12"/>
         <rect class="n" x="778" y="78" width="220" height="190" rx="12"/>
         <rect class="n" x="772" y="84" width="220" height="190" rx="12"/>
         <rect class="n" x="766" y="90" width="220" height="190" rx="12"/>
         <rect class="n hl" x="760" y="96" width="220" height="190" rx="12"/>
         <text class="t" x="870" y="164" text-anchor="middle">Transformer block</text>
         <text class="ts" x="870" y="188" text-anchor="middle">attention + feed-forward</text>
-        <text class="tb" x="870" y="214" text-anchor="middle">× 6 identical blocks</text>
+        <text class="tb" x="870" y="214" text-anchor="middle">× 4 identical blocks</text>
         <text class="ts" x="870" y="238" text-anchor="middle">every token sees every token</text>
         <path class="ar amb" d="M810,442 H870 V292" marker-end="url(#ahNa)"/>
         <text class="ta" x="884" y="392">shift · scale · gate</text>
@@ -341,21 +370,21 @@ details.more[open] summary { margin-bottom:10px }
         <rect class="n" x="1040" y="140" width="220" height="92" rx="10"/>
         <text class="t" x="1150" y="168" text-anchor="middle">Read out</text>
         <text class="tm" x="1150" y="190" text-anchor="middle">LayerNorm → Linear</text>
-        <text class="tm" x="1150" y="210" text-anchor="middle">512 → 45, frame tokens</text>
+        <text class="tm" x="1150" y="210" text-anchor="middle">256 → 126, frame tokens</text>
         <path class="ar" d="M1150,232 V258" marker-end="url(#ahN)"/>
         <g id="netOut"></g>
         <text class="t" x="1040" y="336">24 clean future frames</text>
         <text class="ts" x="1040" y="354">x̂₀: the clean-motion guess</text>
       </svg>
     </div>
-    <figcaption>The network predicts the clean future frames directly, not the noise. Its history outputs are thrown away.</figcaption>
+    <figcaption>The network predicts the clean future frames directly, not the noise. Its history outputs are thrown away. 10 million learned weights; the terrain convolutions, the frame and condition layers, the blocks and the read-out all learn together from the training loss below.</figcaption>
   </figure>
   <figure class="panel">
     <div class="scroll">
       <svg class="dia dia-wide" viewBox="0 0 1280 296" role="img" aria-label="One block: LayerNorm shifted and scaled by the condition, self-attention with normalised queries and keys, a gate, a skip connection; then LayerNorm, shift and scale, SwiGLU feed-forward, a gate and a second skip connection.">
         <defs><marker id="ahB2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
               <marker id="ahBa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk amb" d="M0,0 L10,5 L0,10 z"/></marker></defs>
-        <text class="ta" x="130" y="36">from the condition: 6 × 512 numbers, plus this block's own learned table</text>
+        <text class="ta" x="130" y="36">from the condition: 6 × 256 numbers, plus this block's own learned table</text>
         <line x1="130" y1="56" x2="1190" y2="56" stroke="var(--amber)" stroke-width="2"/>
         <path class="ar amb" d="M200,56 V136" marker-end="url(#ahBa)"/><text class="tm" x="208" y="100">shift₁ scale₁</text>
         <path class="ar amb" d="M595,56 V146" marker-end="url(#ahBa)"/><text class="tm" x="603" y="100">gate₁</text>
@@ -370,7 +399,7 @@ details.more[open] summary { margin-bottom:10px }
         <path class="ar" d="M270,170 H306" marker-end="url(#ahB2)"/>
         <rect class="n hl" x="310" y="124" width="210" height="92" rx="10"/>
         <text class="t" x="415" y="152" text-anchor="middle">Self-attention</text>
-        <text class="tm" x="415" y="174" text-anchor="middle">8 heads × 64</text>
+        <text class="tm" x="415" y="174" text-anchor="middle">8 heads × 32</text>
         <text class="ts" x="415" y="196" text-anchor="middle">queries, keys RMS-normalised</text>
         <text class="ta" x="415" y="240" text-anchor="middle">attention scores stay ≤ 8, so training can't blow up</text>
         <path class="ar" d="M520,170 H556" marker-end="url(#ahB2)"/>
@@ -386,7 +415,7 @@ details.more[open] summary { margin-bottom:10px }
         <rect class="n tl" x="900" y="124" width="190" height="92" rx="10"/>
         <text class="t" x="995" y="152" text-anchor="middle">Feed-forward</text>
         <text class="tm" x="995" y="174" text-anchor="middle">SwiGLU</text>
-        <text class="tm" x="995" y="196" text-anchor="middle">512 → 2×2048 → 512</text>
+        <text class="tm" x="995" y="196" text-anchor="middle">256 → 2×1024 → 256</text>
         <path class="ar" d="M1090,170 H1116" marker-end="url(#ahB2)"/>
         <rect class="n" x="1120" y="150" width="70" height="40" rx="8"/>
         <text class="tm" x="1155" y="175" text-anchor="middle">× gate</text>
@@ -401,7 +430,7 @@ details.more[open] summary { margin-bottom:10px }
         <text class="ts" x="900" y="284">skip connection</text>
       </svg>
     </div>
-    <figcaption>One block. The condition sets how each LayerNorm is shifted and scaled, and how much of each branch passes ("adaptive LayerNorm").</figcaption>
+    <figcaption>One block. The condition sets how each LayerNorm is shifted and scaled, and how much of each branch passes ("adaptive LayerNorm"). In training, 10 % of attention weights and branch outputs are dropped at random (dropout).</figcaption>
   </figure>
 </section>
 
@@ -414,7 +443,7 @@ details.more[open] summary { margin-bottom:10px }
   </div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1280 410" role="img" aria-label="A window is drawn from 1.48 million, its 24 future frames are noised to a random step, the network recovers them, and the guess is scored by a denoising error plus four foot-geometry losses computed through a frozen FootFK network.">
+      <svg class="dia dia-xl" viewBox="0 0 1280 424" role="img" aria-label="A window is drawn from 1.48 million, its 24 future frames are noised to a random step, the network recovers them, and the guess is scored by a denoising error plus four geometry losses computed through two frozen kinematics networks.">
         <defs><marker id="ahR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker></defs>
         <!-- data -->
         <text class="t" x="20" y="30">Data</text>
@@ -430,6 +459,7 @@ details.more[open] summary { margin-bottom:10px }
         <text class="ts" x="20" y="340">recordings equal within a source;</text>
         <text class="ts" x="20" y="358">sources, terrain classes by √length</text>
         <text class="tb" x="20" y="386">half mirrored left ↔ right</text>
+        <text class="tb" x="20" y="408">1 in 10 on random terrain</text>
         <!-- window -->
         <path class="ar" d="M290,120 C310,120 306,90 326,90" marker-end="url(#ahR)"/>
         <text class="t" x="330" y="30">One window</text>
@@ -450,7 +480,7 @@ details.more[open] summary { margin-bottom:10px }
         <path class="ar" d="M820,89 H856" marker-end="url(#ahR)"/>
         <rect class="n hl" x="860" y="44" width="150" height="90" rx="10"/>
         <text class="t" x="935" y="84" text-anchor="middle">Network</text>
-        <text class="ts" x="935" y="106" text-anchor="middle">6 blocks</text>
+        <text class="ts" x="935" y="106" text-anchor="middle">4 blocks</text>
         <path class="ar" d="M935,134 V160" marker-end="url(#ahR)"/>
         <g id="trOut"></g>
         <text class="ts" x="860" y="234">x̂₀: clean-future guess</text>
@@ -461,13 +491,14 @@ details.more[open] summary { margin-bottom:10px }
         <rect class="n amb" x="1050" y="44" width="210" height="48" rx="10"/>
         <text class="t" x="1064" y="74">Denoising error</text><text class="tm" x="1246" y="74" text-anchor="end">× 1</text>
         <rect class="n tl" x="1050" y="112" width="210" height="72" rx="10"/>
-        <text class="t" x="1064" y="138">FootFK (frozen)</text>
-        <text class="ts" x="1064" y="158">leg angles → 18 foot spheres</text>
-        <text class="ts" x="1064" y="176">0.2 mm median error</text>
+        <text class="t" x="1064" y="138">Kinematics nets (frozen)</text>
+        <text class="ts" x="1064" y="158">joints → foot spheres, segments</text>
+        <text class="ts" x="1064" y="176">fitted to exact kinematics</text>
         <line x1="1060" y1="184" x2="1060" y2="339" stroke="var(--teal)" stroke-width="2"/>
         <g id="lossRows"></g>
         <text class="ts" x="1050" y="378">each: Huber past 2 cm,</text>
-        <text class="ts" x="1050" y="396">weighted by ā</text>
+        <text class="ts" x="1050" y="396">weighted by ā; terrain checks</text>
+        <text class="ts" x="1050" y="414">use the exact heightfield</text>
       </svg>
     </div>
     <figcaption>Training data: lab walking recordings (AB01), PARC motions and Bones SEED. <span class="credit">Motion Data by Bones Studio</span></figcaption>
@@ -491,13 +522,30 @@ details.more[open] summary { margin-bottom:10px }
     </div>
     <div class="card">
       <span class="tag">Optimiser</span>
-      <h3>120,000 steps, best held-out kept</h3>
+      <h3>50,000 steps, picked by rollouts</h3>
       <ul class="opt">
-        <li><b>AdamW</b>, learning rate 2e-4, cosine decay to 0</li>
-        <li><b>batch 512</b>, gradient clip 1, bfloat16</li>
+        <li><b>AdamW</b>, learning rate 2e-4, cosine decay to 0, weight decay 0.05</li>
+        <li><b>batch 512</b>, gradient clip 1, bfloat16, dropout 0.1</li>
         <li><b>EMA 0.995</b>: a running average of the weights, used for sampling</li>
-        <li><b>kept</b>: lowest held-out loss (held-out trials and terrain, incl. 6 stair clips)</li>
+        <li><b>picked</b>: every 5,000 steps the planner is rolled out on 37 held-out replays and 23 terrain courses; the best mean rank over 9 measures is kept. The held-out loss never sees a replan, and it kept falling while rollouts got worse.</li>
       </ul>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <span class="tag">History</span>
+      <h3>Given as it is, with a little jitter</h3>
+      <p>The 8 history frames go in clean, with up to 0.1 std of jitter. Hiding the history in some training windows, or shaking it as a whole body, made every replan jolt: seam acceleration rose from 1,085 to 2,296 °/s², and the style moved further from human.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Goal</span>
+      <h3>Always 1.2 s ahead</h3>
+      <p>A goal at a random 0.4–1.2 s horizon, with 5 cm of noise, was meant to stop the planner recalling clips. It made goal-following 57 % worse (0.095 → 0.149 m off) for slightly smoother seams, so the goal stays a fixed 1.2 s ahead.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Size and speed</span>
+      <h3>A small network, 10 steps</h3>
+      <p>4 blocks of 256 instead of 6 of 512, and 10 denoising steps instead of 50: 512 plans take about 0.3 s instead of 12 s, which a closed loop at 5 replans a second needs. 50 steps changed jerk and style by under 10 %.</p>
     </div>
   </div>
 </section>
@@ -506,45 +554,60 @@ details.more[open] summary { margin-bottom:10px }
 <section>
   <div class="sec-head">
     <span class="eyebrow">How · sampling</span>
-    <h2>Draw a plan, pin the feet, keep a little, plan again</h2>
+    <h2>Draw a plan, blend the seam, pin the feet, keep a little, plan again</h2>
   </div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-wide" viewBox="0 0 1280 240" role="img" aria-label="Rollout cycle: window, 50 denoising steps, foot hold, keep the first 0.2 s, re-anchor, and plan again from the latest 0.4 s.">
+      <svg class="dia dia-wide" viewBox="0 0 1280 240" role="img" aria-label="Rollout cycle: window, 10 denoising steps, crossfade from the previous plan, smoothed foot hold, keep the first 0.2 s, re-anchor, and plan again from the latest 0.4 s.">
         <defs><marker id="ahS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
               <marker id="ahSb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk blue" d="M0,0 L10,5 L0,10 z"/></marker></defs>
-        <rect class="n" x="20" y="40" width="190" height="100" rx="12"/>
-        <text class="t" x="115" y="76" text-anchor="middle">Window</text>
-        <text class="ts" x="115" y="98" text-anchor="middle">last 0.4 s</text>
-        <text class="ts" x="115" y="118" text-anchor="middle">terrain + goal</text>
-        <path class="ar" d="M210,90 H246" marker-end="url(#ahS)"/>
-        <rect class="n hl" x="250" y="40" width="230" height="100" rx="12"/>
-        <text class="t" x="365" y="76" text-anchor="middle">50 denoising steps</text>
-        <text class="ts" x="365" y="98" text-anchor="middle">noise → 1.2 s plan</text>
-        <text class="ts" x="365" y="118" text-anchor="middle">averaged (EMA) weights</text>
-        <text class="ts" x="365" y="166" text-anchor="middle">no guidance: the goal model alone</text>
-        <path class="ar" d="M480,90 H516" marker-end="url(#ahS)"/>
-        <rect class="n tl" x="520" y="40" width="220" height="100" rx="12"/>
-        <text class="t" x="630" y="76" text-anchor="middle">Foot hold</text>
-        <text class="ts" x="630" y="98" text-anchor="middle">50 optimiser steps</text>
-        <text class="ts" x="630" y="118" text-anchor="middle">leg joints + foot points only</text>
-        <text class="ts" x="630" y="166" text-anchor="middle">pelvis path stays as planned</text>
-        <path class="ar" d="M740,90 H776" marker-end="url(#ahS)"/>
-        <rect class="n" x="780" y="40" width="180" height="100" rx="12"/>
-        <text class="t" x="870" y="76" text-anchor="middle">Keep 0.2 s</text>
-        <text class="ts" x="870" y="98" text-anchor="middle">first 4 of 24 frames</text>
-        <text class="ts" x="870" y="118" text-anchor="middle">the rest is dropped</text>
-        <path class="ar" d="M960,90 H996" marker-end="url(#ahS)"/>
-        <rect class="n" x="1000" y="40" width="260" height="100" rx="12"/>
-        <text class="t" x="1130" y="76" text-anchor="middle">Re-anchor</text>
-        <text class="ts" x="1130" y="98" text-anchor="middle">at the pelvis centre of mass,</text>
-        <text class="ts" x="1130" y="118" text-anchor="middle">1 s heading, ground under it</text>
-        <path class="ar blue" d="M1130,140 V200 H115 V144" marker-end="url(#ahSb)" style="stroke-width:2.5"/>
+        <rect class="n" x="20" y="40" width="170" height="100" rx="12"/>
+        <text class="t" x="105" y="76" text-anchor="middle">Window</text>
+        <text class="ts" x="105" y="98" text-anchor="middle">last 0.4 s</text>
+        <text class="ts" x="105" y="118" text-anchor="middle">terrain + goal</text>
+        <path class="ar" d="M190,90 H222" marker-end="url(#ahS)"/>
+        <rect class="n hl" x="226" y="40" width="200" height="100" rx="12"/>
+        <text class="t" x="326" y="76" text-anchor="middle">10 denoising steps</text>
+        <text class="ts" x="326" y="98" text-anchor="middle">noise → 1.2 s plan</text>
+        <text class="ts" x="326" y="118" text-anchor="middle">averaged (EMA) weights</text>
+        <text class="ts" x="326" y="166" text-anchor="middle">no guidance: the goal model alone</text>
+        <path class="ar" d="M426,90 H458" marker-end="url(#ahS)"/>
+        <rect class="n amb" x="462" y="40" width="190" height="100" rx="12"/>
+        <text class="t" x="557" y="76" text-anchor="middle">Crossfade</text>
+        <text class="ts" x="557" y="98" text-anchor="middle">first 4 frames fade in</text>
+        <text class="ts" x="557" y="118" text-anchor="middle">from the last plan's frames</text>
+        <text class="ts" x="557" y="166" text-anchor="middle">old share 0.8, 0.6, 0.4, 0.2</text>
+        <path class="ar" d="M652,90 H684" marker-end="url(#ahS)"/>
+        <rect class="n tl" x="688" y="40" width="190" height="100" rx="12"/>
+        <text class="t" x="783" y="76" text-anchor="middle">Foot hold</text>
+        <text class="ts" x="783" y="98" text-anchor="middle">50 optimiser steps</text>
+        <text class="ts" x="783" y="118" text-anchor="middle">leg joints + foot points</text>
+        <text class="ts" x="783" y="166" text-anchor="middle">fix spread smoothly</text>
+        <path class="ar" d="M878,90 H910" marker-end="url(#ahS)"/>
+        <rect class="n" x="914" y="40" width="150" height="100" rx="12"/>
+        <text class="t" x="989" y="76" text-anchor="middle">Keep 0.2 s</text>
+        <text class="ts" x="989" y="98" text-anchor="middle">first 4 of 24</text>
+        <text class="ts" x="989" y="118" text-anchor="middle">frames</text>
+        <path class="ar" d="M1064,90 H1096" marker-end="url(#ahS)"/>
+        <rect class="n" x="1100" y="40" width="170" height="100" rx="12"/>
+        <text class="t" x="1185" y="76" text-anchor="middle">Re-anchor</text>
+        <text class="ts" x="1185" y="98" text-anchor="middle">pelvis centre of mass,</text>
+        <text class="ts" x="1185" y="118" text-anchor="middle">1 s heading, ground</text>
+        <path class="ar blue" d="M1185,140 V200 H105 V144" marker-end="url(#ahSb)" style="stroke-width:2.5"/>
         <text class="tb" x="640" y="224" text-anchor="middle">plan again from the latest 0.4 s, every 0.2 s</text>
       </svg>
     </div>
+    <figcaption>Only the denoising steps use the learned network. Crossfade, foot hold and re-anchoring are fixed code.</figcaption>
   </figure>
   <div class="grid2">
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="One joint over time. The previous plan continues smoothly; the new plan starts a little off at the seam; what plays fades from the previous plan into the new one over four frames.">
+        <g id="xfadeSketch"></g>
+      </svg>
+      <span class="tag">Crossfade</span>
+      <h3>A new plan fades in instead of jumping</h3>
+      <p>Each new plan starts a few millimetres away from where the last one was heading, and at 20 Hz a few millimetres is a jolt. The first 4 frames of the new plan fade in from the previous plan's own frames for the same moments, the way Kimodo joins its segments.</p>
+    </div>
     <div class="card">
       <svg viewBox="0 0 520 230" role="img" aria-label="A foot planted at the end of the history stays where it was in the new plan; without the hold it slides forward at each replan. The pelvis path is unchanged.">
         <defs><marker id="ahH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk bad" d="M0,0 L10,5 L0,10 z"/></marker></defs>
@@ -563,15 +626,23 @@ details.more[open] summary { margin-bottom:10px }
       </svg>
       <span class="tag">Foot hold</span>
       <h3>A planted foot stays planted across replans</h3>
-      <p>Each foot point on the ground at the end of the history stays put until the plan's own contact flag lifts it.</p>
+      <p>Each foot point on the ground at the end of the history stays put until the plan's own contact flag lifts it. The fix also pays for changing the plan's speed and acceleration, as Kimodo's clean-up does, so it is spread over the plan; applied all at once on the first frame, it added a fifth of the jerk.</p>
     </div>
     <div class="card">
-      <svg viewBox="0 0 520 230" role="img" aria-label="Stance slip in centimetres per second on 14 held-out replays: at replan seams 14.3 without the hold and 1.7 with it; over the whole replay 5.7 and 2.2; real clips about 3.5.">
-        <g id="slipChart"></g>
+      <svg viewBox="0 0 520 230" role="img" aria-label="Current checkpoint on the rollout scoreboard, without and with crossfade and smoothed hold: jerk 16.7 % to 5.5 % of frames over the human limit (real clips 0.7 %); style distance 0.131 to 0.087 (real clips 0.042 to 0.115).">
+        <g id="fixChart"></g>
       </svg>
       <span class="tag">Effect</span>
-      <h3>Stance slip, cm/s</h3>
-      <p>14 held-out replays, measured on an earlier checkpoint of this design.</p>
+      <h3>Crossfade + smoothed hold, current checkpoint</h3>
+      <p>Rollout scoreboard, 37 held-out replays and 23 courses. Goal-following also improved (0.086 → 0.077 m off) and foot slip eased (5.8 → 5.5 cm/s).</p>
+    </div>
+    <div class="card">
+      <svg viewBox="0 0 520 230" role="img" aria-label="Frame-to-frame pelvis jitter inside one plan, millimetres: forward 15.0 planned vs 2.2 real, sideways 7.2 vs 1.2, height 16.6 vs 4.3.">
+        <g id="jitterChart"></g>
+      </svg>
+      <span class="tag">What's left</span>
+      <h3>The pelvis still jitters inside each plan</h3>
+      <p>One plan per held-out start, no replanning. The pelvis is placed in metres from the anchor, on one scale for all 24 frames, so a 1 % error is several millimetres per frame. Three fixes are in training: a scale per frame (PARC), a velocity loss (PARC, Kimodo), and the pelvis path as per-frame steps (MotionBricks).</p>
     </div>
   </div>
   <figure class="panel">
@@ -678,7 +749,7 @@ details.more[open] summary { margin-bottom:10px }
       <rect class="n hl" x="440" y="70" width="150" height="160" rx="12"/>
       <text class="t" x="515" y="136" text-anchor="middle">Planner</text>
       <text class="ts" x="515" y="158" text-anchor="middle">next 1.2 s</text>
-      <text class="ts" x="515" y="176" text-anchor="middle">+ foot hold</text>
+      <text class="ts" x="515" y="176" text-anchor="middle">+ crossfade, hold</text>
 
       <rect class="n hl" x="620" y="70" width="140" height="160" rx="12"/>
       <text class="t" x="690" y="130" text-anchor="middle">Slice</text>
@@ -715,17 +786,17 @@ details.more[open] summary { margin-bottom:10px }
 </section>
 
 <details class="more">
-  <summary>All settings of the current run</summary>
+  <summary>All settings of the current planner</summary>
   <div class="kv-wrap">
     <table class="kv">
-      <tr><th>Frames</th><td>20 Hz · 8 given (0.4 s) + 24 generated (1.2 s) · 45 numbers each</td></tr>
-      <tr><th>Terrain patch</th><td>37 × 17 cells of 10 cm · 0.6 m behind to 3.0 m ahead, 0.8 m to each side · heights from the ground under the anchor's pelvis</td></tr>
-      <tr><th>Network</th><td>6 blocks · 512 wide · 8 heads × 64 · SwiGLU 2 × 2048 · queries and keys RMS-normalised, no learnable gain · adaptive LayerNorm (shared 6 × 512 + per-block table)</td></tr>
+      <tr><th>Frames</th><td>20 Hz · 8 given (0.4 s) + 24 generated (1.2 s) · 126 numbers each: 45 motion numbers + 81 segment-pose numbers (9 segments, position + 6-number orientation), recomputed from the joint angles after sampling</td></tr>
+      <tr><th>Terrain patch</th><td>73 × 33 cells of 5 cm · 0.6 m behind to 3.0 m ahead, 0.8 m to each side · heights from the ground under the anchor's pelvis</td></tr>
+      <tr><th>Network</th><td>4 blocks · 256 wide · 8 heads × 32 · SwiGLU 2 × 1024 · queries and keys RMS-normalised, no learnable gain · adaptive LayerNorm (shared 6 × 256 + per-block table) · dropout 0.1 · terrain: 3 stride-2 convolutions → 50 tokens · 10.1 M weights</td></tr>
       <tr><th>Diffusion</th><td>50 steps, cosine schedule · predicts the clean frames · goal replaced by a learned "no goal" token 10 % of the time</td></tr>
-      <tr><th>Losses</th><td>denoising 1 · contact height 0.3 · contact slip 0.3 · FK consistency 0.1 · terrain penetration 0.5 (1 cm allowed) · geometry Huber past 2 cm, weighted by ā</td></tr>
-      <tr><th>Data</th><td>13,379 clips · 2.46 M frames at 40 Hz · 1.48 M training windows · 151,431 held-out windows · half mirrored · terrain share: level 78 %, ramps 12 %, obstacles 6 %, stairs 5 %</td></tr>
-      <tr><th>Optimiser</th><td>AdamW 2e-4, cosine to 0 · 120,000 iterations · batch 512 · gradient clip 1 · bfloat16 · EMA 0.995 (every 10 iterations after the first 5,000) · history jitter up to 0.1 std</td></tr>
-      <tr><th>Sampling</th><td>50 DDIM steps · EMA weights · guidance weight 1 · foot hold: 50 Adam steps on leg joints and foot points</td></tr>
+      <tr><th>Losses</th><td>denoising 1 (segment channels at half weight) · contact height over the exact terrain 0.3 · contact slip 0.3 · FK consistency (foot points and segment poses) 0.1 · terrain penetration against the exact heightfield 0.5 (1 cm allowed) · geometry Huber past 2 cm, weighted by ā</td></tr>
+      <tr><th>Data</th><td>13,379 clips · 2.46 M frames at 40 Hz · 1.48 M training windows · 151,431 held-out windows · half mirrored · 1 in 10 windows on random boxes or stairs (penetration loss only) · terrain share: level 78 %, ramps 12 %, obstacles 6 %, stairs 5 %</td></tr>
+      <tr><th>Optimiser</th><td>AdamW 2e-4, cosine to 0, weight decay 0.05 · 50,000 iterations · batch 512 · gradient clip 1 · bfloat16 · EMA 0.995 (every 10 iterations after the first 5,000) · history jitter up to 0.1 std · checkpoint picked by the rollout scoreboard every 5,000 iterations</td></tr>
+      <tr><th>Sampling</th><td>10 DDIM steps · EMA weights · guidance weight 1 · crossfade: 4 frames from the previous plan · foot hold: 50 Adam steps on leg joints and foot points over the whole plan, changes in speed (× 1) and acceleration (× 10) penalised</td></tr>
       <tr><th>Rollout</th><td>keep 0.2 s (4 frames) · re-anchor at the pelvis centre of mass and 1 s mean heading · replan from the latest 0.4 s</td></tr>
     </table>
   </div>
@@ -754,30 +825,50 @@ const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     el("rect", { x: 792 + i * 19.5, y: 56 + r * 15, width: 16.5, height: 11, rx: 2, fill: r < 6 ? "var(--blue)" : "var(--wire)", opacity: r < 6 ? "0.9" : "0.3" }, f);
 })();
 
-// frame composition bar
+// frame composition bar: the 45 motion numbers to scale, then the 81 segment numbers (drawn shorter, count inside)
 (function () {
   const g = $("frameBar");
-  const parts = [["contacts", 4, true, "heel + ball, each foot"], ["footholds", 4, true, "current or next, each foot"],
-                 ["pelvis", 3, true, "position + height"], ["heading, tilt", 5, true, "pelvis orientation"],
-                 ["joint angles", 17, false, "hips, trunk, knees, ankles, toes"], ["foot points", 12, false, "heel + ball positions"]];
-  const x0 = 20, W = 1240, unit = W / 45;
-  let x = x0;
-  for (const [name, n, sent, sub] of parts) {
-    const w = n * unit;
-    el("rect", { x: x + 1, y: 20, width: w - 2, height: 44, rx: 6, fill: sent ? "var(--blue)" : "var(--wire)", opacity: sent ? "0.92" : "0.45" }, g);
-    txt(String(n), { x: x + w / 2, y: 48, class: sent ? "tw" : "t", "text-anchor": "middle" }, g);
-    txt(name, { x: x + 4, y: 84, class: sent ? "tb" : "ts" }, g);
-    if (w > 150) txt(sub, { x: x + 4, y: 100, class: "ts" }, g);
+  const parts = [["contacts", 4, "sent", "heel + ball, each foot"], ["footholds", 4, "sent", "current or next, each foot"],
+                 ["pelvis", 3, "sent", "position + height"], ["heading, tilt", 5, "sent", "pelvis orientation"],
+                 ["joint angles", 17, "stay", "hips, trunk, knees, ankles, toes"], ["foot points", 12, "stay", "heel + ball positions"]];
+  const fill = { sent: "var(--blue)", stay: "var(--wire)", seg: "var(--teal)" }, op = { sent: "0.92", stay: "0.45", seg: "0.85" };
+  const unit = 640 / 45;
+  let x = 20;
+  parts.forEach(([name, n, kind, sub], i) => {
+    const w = n * unit, small = w < 120;
+    el("rect", { x: x + 1, y: 20, width: w - 2, height: 44, rx: 6, fill: fill[kind], opacity: op[kind] }, g);
+    txt(String(n), { x: x + w / 2, y: 48, class: kind === "sent" ? "tw" : "t", "text-anchor": "middle" }, g);
+    txt(name, { x: x + 4, y: small ? 84 + (i % 2) * 16 : 84, class: kind === "sent" ? "tb" : "ts" }, g);
+    if (!small) txt(sub, { x: x + 4, y: 116, class: "ts" }, g);
     x += w;
+  });
+  txt("+", { x: 670, y: 48, class: "t", "text-anchor": "middle" }, g);
+  el("rect", { x: 681, y: 20, width: 578, height: 44, rx: 6, fill: fill.seg, opacity: op.seg }, g);
+  txt("81", { x: 970, y: 48, class: "tw", "text-anchor": "middle" }, g);
+  txt("segment poses", { x: 685, y: 84, class: "tt" }, g);
+  txt("trunk + thigh, shank, heel, toes each side · position + orientation · bar not to scale", { x: 685, y: 116, class: "ts" }, g);
+})();
+
+// penetration card: 5 cm cells (20 px) along a 16 cm x 22 cm staircase (4 px per cm)
+(function () {
+  const g = $("penGrid");
+  for (let x = 10; x <= 510; x += 20) {
+    const tread = x >= 180 && x < 268, y = x < 180 ? 196 : tread ? 132 : 68;
+    el("circle", { cx: x, cy: y, r: tread ? 4.5 : 3.5, fill: tread ? "var(--blue)" : "var(--wire)" }, g);
   }
 })();
 
-// penetration card: 10 cm sample grid along the surface
+// segment poses card: a small position + orientation marker per segment
 (function () {
-  const g = $("penGrid");
-  for (let x = 20; x <= 500; x += 40) {
-    const y = x < 260 ? 180 : 100;
-    el("circle", { cx: x, cy: y, r: 3.5, fill: "var(--wire)" }, g);
+  const g = $("segFrames");
+  const segs = [["trunk", [152, 62], [156, 30], 14, 0], ["thigh", [150, 96], [166, 146], 16, 4], ["shank", [166, 146], [156, 192], 14, 4],
+                ["heel", [156, 192], [182, 196], -40, 26], ["toes", [176, 195], [190, 197], 10, 26]];
+  for (const [name, o, to, lx, ly] of segs) {
+    const dx = to[0] - o[0], dy = to[1] - o[1], n = Math.hypot(dx, dy), u = [dx / n * 22, dy / n * 22], v = [-u[1] * 0.7, u[0] * 0.7];
+    el("line", { x1: o[0], y1: o[1], x2: o[0] + u[0], y2: o[1] + u[1], stroke: "var(--teal)", "stroke-width": 3, "stroke-linecap": "round" }, g);
+    el("line", { x1: o[0], y1: o[1], x2: o[0] + v[0], y2: o[1] + v[1], stroke: "var(--blue)", "stroke-width": 3, "stroke-linecap": "round" }, g);
+    el("circle", { cx: o[0], cy: o[1], r: 4.5, fill: "var(--ink)" }, g);
+    txt(name, { x: o[0] + 18 + lx, y: o[1] + 4 + ly, class: "ts" }, g);
   }
 })();
 
@@ -798,9 +889,9 @@ const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 // network: patch, frames, terrain tokens, output
 (function () {
   const p = $("netPatch");
-  for (let i = 0; i < 37; i++) for (let j = 0; j < 17; j++) {
-    const box = i >= 21 && i <= 30 && j >= 3 && j <= 12;
-    el("rect", { x: 20 + i * 6, y: 66 + j * 5, width: 5.2, height: 4.2, fill: box ? "var(--ink)" : "var(--wire)", opacity: box ? 0.75 : 0.22 }, p);
+  for (let i = 0; i < 73; i++) for (let j = 0; j < 33; j++) {
+    const box = i >= 42 && i <= 61 && j >= 6 && j <= 25;
+    el("rect", { x: 20 + i * 3, y: 66 + j * 2.6, width: 2.5, height: 2.1, fill: box ? "var(--ink)" : "var(--wire)", opacity: box ? 0.75 : 0.22 }, p);
   }
   const f = $("netFrames");
   for (let i = 0; i < 32; i++) {
@@ -890,22 +981,66 @@ function axes(g, ylab, xlab, yt, xt, X, Y) {
   txt("2 cm", { x: X(2) + 6, y: 46, class: "tm" }, g);
 })();
 
-// foot hold effect
+// crossfade sketch: one joint over time, 20 px per 20 Hz frame, seam at x = 200
 (function () {
-  const g = $("slipChart"), Y = v => 190 - v * (150 / 15);
-  for (const v of [0, 5, 10, 15]) { el("line", { x1: 60, x2: 500, y1: Y(v), y2: Y(v), class: "grid-line" }, g); txt(String(v), { x: 52, y: Y(v) + 4, class: "tm", "text-anchor": "end" }, g); }
-  const groups = [["at replan seams", 170, 14.3, 1.7], ["whole replay", 330, 5.7, 2.2]];
-  for (const [name, cx, off, held] of groups) {
-    for (const [v, x, held_] of [[off, cx - 54, false], [held, cx + 4, true]]) {
-      el("rect", { x: x, y: Y(v), width: 50, height: 190 - Y(v), rx: 3, fill: held_ ? "var(--blue)" : "var(--wire)", opacity: held_ ? 0.92 : 0.5 }, g);
-      txt(v.toFixed(1), { x: x + 25, y: Y(v) - 6, class: "tm", "text-anchor": "middle", style: "paint-order:stroke;stroke:var(--grey-soft);stroke-width:5px" }, g);
+  const g = $("xfadeSketch"), old = x => 118 - 44 * Math.sin((x - 40) / 95), neu = x => old(x + 8) + 30;
+  const w = x => Math.min(1, Math.max(0, 1 - (x - 200) / 100));
+  const path = (f, a, b) => { let d = ""; for (let x = a; x <= b; x += 4) d += (x === a ? "M" : "L") + x + "," + f(x).toFixed(1); return d; };
+  el("line", { x1: 30, x2: 500, y1: 204, y2: 204, stroke: "var(--wire)", "stroke-width": 1.5 }, g);
+  txt("time", { x: 500, y: 222, class: "tm", "text-anchor": "end" }, g);
+  el("line", { x1: 200, x2: 200, y1: 30, y2: 204, stroke: "var(--wire)", "stroke-width": 1.2, "stroke-dasharray": "3 4" }, g);
+  txt("replan", { x: 204, y: 40, class: "tm" }, g);
+  for (let k = 1; k <= 4; k++) el("line", { x1: 200 + 20 * k, x2: 200 + 20 * k, y1: 198, y2: 210, stroke: "var(--amber)", "stroke-width": 2 }, g);
+  txt("4 frames", { x: 210, y: 224, class: "ta" }, g);
+  el("path", { d: path(old, 40, 200), fill: "none", stroke: "var(--ink)", "stroke-width": 3 }, g);
+  el("path", { d: path(old, 200, 480), fill: "none", stroke: "var(--wire)", "stroke-width": 2, "stroke-dasharray": "6 5" }, g);
+  el("path", { d: path(neu, 200, 480), fill: "none", stroke: "var(--blue)", "stroke-width": 2, "stroke-dasharray": "2 4" }, g);
+  el("path", { d: path(x => w(x) * old(x) + (1 - w(x)) * neu(x), 200, 480), fill: "none", stroke: "var(--blue)", "stroke-width": 3.5 }, g);
+  txt("what played", { x: 50, y: 150, class: "ts" }, g);
+  txt("previous plan", { x: 488, y: 134, class: "ts", "text-anchor": "end" }, g);
+  txt("new plan starts off here", { x: 192, y: neu(200) + 4, class: "tb", "text-anchor": "end" }, g);
+  txt("what plays: fades in", { x: 306, y: 160, class: "tb" }, g);
+})();
+
+// effect of crossfade + smoothed hold on the current checkpoint (rollout scoreboard)
+(function () {
+  const g = $("fixChart");
+  const panel = (x0, title, max, ticks, fmt, vfmt, vals, real, band) => {
+    const Y = v => 190 - v * (150 / max);
+    for (const t of ticks) { el("line", { x1: x0, x2: x0 + 200, y1: Y(t), y2: Y(t), class: "grid-line" }, g); txt(fmt(t), { x: x0 - 6, y: Y(t) + 4, class: "tm", "text-anchor": "end" }, g); }
+    if (band) el("rect", { x: x0, y: Y(band[1]), width: 200, height: Y(band[0]) - Y(band[1]), fill: "var(--teal-soft)" }, g);
+    vals.forEach(([lab, v, on], k) => {
+      const x = x0 + 20 + k * 64;
+      el("rect", { x: x, y: Y(v), width: 44, height: 190 - Y(v), rx: 4, fill: on ? "var(--blue)" : "var(--wire)", opacity: on ? 0.92 : 0.5 }, g);
+      txt(vfmt(v), { x: x + 22, y: Y(v) - 6, class: "tm", "text-anchor": "middle", style: "paint-order:stroke;stroke:var(--grey-soft);stroke-width:5px" }, g);
+      txt(lab, { x: x + 22, y: 208, class: "ts", "text-anchor": "middle" }, g);
+    });
+    if (real != null) {
+      el("line", { x1: x0, x2: x0 + 200, y1: Y(real), y2: Y(real), stroke: "var(--teal)", "stroke-width": 2, "stroke-dasharray": "6 5" }, g);
+      txt("real clips", { x: x0 + 200, y: Y(real) - 6, class: "tt", "text-anchor": "end" }, g);
+    } else txt("real clips", { x: x0 + 200, y: Y(band[1]) - 6, class: "tt", "text-anchor": "end" }, g);
+    txt(title, { x: x0, y: 22, class: "ts" }, g);
+  };
+  panel(52, "jerk: % frames over human limit", 20, [0, 10, 20], String, v => v.toFixed(1), [["without", 16.7, false], ["with", 5.5, true]], 0.7, null);
+  panel(300, "style: distance from human motion", 0.15, [0, 0.05, 0.1, 0.15], v => v ? v.toFixed(2) : "0", v => v.toFixed(3), [["without", 0.131, false], ["with", 0.087, true]], null, [0.042, 0.115]);
+  txt("crossfade + smoothed hold", { x: 268, y: 226, class: "tb", "text-anchor": "middle" }, g);
+})();
+
+// what's left: pelvis jitter inside one plan vs real clips (3rd difference per 20 Hz frame, mm)
+(function () {
+  const g = $("jitterChart"), Y = v => 190 - v * (150 / 20);
+  for (const t of [0, 5, 10, 15, 20]) { el("line", { x1: 60, x2: 500, y1: Y(t), y2: Y(t), class: "grid-line" }, g); txt(String(t), { x: 52, y: Y(t) + 4, class: "tm", "text-anchor": "end" }, g); }
+  txt("pelvis jitter, mm per frame", { x: 64, y: 22, class: "ts" }, g);
+  [["forward", 15.0, 2.2], ["sideways", 7.2, 1.2], ["height", 16.6, 4.3]].forEach(([lab, pl, re], k) => {
+    const cx = 150 + k * 135;
+    for (const [v, x, plan] of [[pl, cx - 48, true], [re, cx + 2, false]]) {
+      el("rect", { x: x, y: Y(v), width: 46, height: 190 - Y(v), rx: 4, fill: plan ? "var(--blue)" : "var(--teal)", opacity: plan ? 0.92 : 0.8 }, g);
+      txt(v.toFixed(1), { x: x + 23, y: Y(v) - 6, class: "tm", "text-anchor": "middle", style: "paint-order:stroke;stroke:var(--grey-soft);stroke-width:5px" }, g);
     }
-    txt(name, { x: cx, y: 210, class: "ts", "text-anchor": "middle" }, g);
-  }
-  el("line", { x1: 60, x2: 500, y1: Y(3.5), y2: Y(3.5), stroke: "var(--teal)", "stroke-width": 2, "stroke-dasharray": "6 5" }, g);
-  txt("real clips ≈ 3.5", { x: 498, y: Y(3.5) - 6, class: "tt", "text-anchor": "end" }, g);
-  el("rect", { x: 300, y: 26, width: 12, height: 12, rx: 2, fill: "var(--wire)", opacity: 0.5 }, g); txt("no hold", { x: 318, y: 37, class: "ts" }, g);
-  el("rect", { x: 390, y: 26, width: 12, height: 12, rx: 2, fill: "var(--blue)" }, g); txt("foot hold", { x: 408, y: 37, class: "ts" }, g);
+    txt(lab, { x: cx, y: 210, class: "ts", "text-anchor": "middle" }, g);
+  });
+  el("rect", { x: 318, y: 12, width: 12, height: 12, rx: 2, fill: "var(--blue)" }, g); txt("planned", { x: 336, y: 23, class: "ts" }, g);
+  el("rect", { x: 408, y: 12, width: 12, height: 12, rx: 2, fill: "var(--teal)", opacity: 0.8 }, g); txt("real clips", { x: 426, y: 23, class: "ts" }, g);
 })();
 
 // horizon timeline: 0.4 s given, 1.2 s planned, 0.2 s kept
