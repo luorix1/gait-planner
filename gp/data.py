@@ -77,6 +77,9 @@ BEYOND_MODEL = ("seed_jump_on_50cm_002__A415", "seed_broad_jump_002__A360",
                 "seed_jump_over_obstacle_no_hand_0_75m_R_002__A415", "seed_run_loop_180_R_001__A333",
                 "parc_platform_platform_005")
 BEYOND_MODEL_LABEL = "beyond the capabilities of our model"
+#: Clips (by exact name) screened as beyond the model by their soleus shortening demand: gp/beyond_model.txt.
+BEYOND_CLIPS = frozenset(ln.strip() for ln in (Path(__file__).with_name("beyond_model.txt").read_text().splitlines())
+                         if ln.strip() and not ln.startswith("#"))
 #: PARC's physics-tracker replays: its dm_motion_recorder appends ``_dm`` to the motion PARC's torque-driven humanoid
 #: produced while tracking a clip, so these are simulation, not capture. In v2 they were 16.0 of PARC's 17.9 min (all
 #: running, jumps, stairs and walking, half the platforms). Datasets with ``no_replays`` leave them out (user
@@ -319,7 +322,7 @@ def excluded(name: str, dataset: str = DATASET) -> str:
     """Why ``dataset`` leaves a clip out by its name ('' if it does not): an EXCLUDE entry, a take beyond the model
     (BEYOND_MODEL), or a PARC tracker replay."""
     hit = next((x for x in EXCLUDE if x in name), "")
-    if not hit and any(x in name for x in BEYOND_MODEL):
+    if not hit and (name in BEYOND_CLIPS or any(x in name for x in BEYOND_MODEL)):
         hit = BEYOND_MODEL_LABEL
     if not hit and DATASETS[dataset].get("no_replays") and name.startswith("parc_") and SIM_REPLAY.search(name):
         hit = "PARC tracker replay (_dm)"

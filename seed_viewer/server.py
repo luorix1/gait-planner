@@ -47,7 +47,9 @@ SEGMENTS = [("pelvis", "femur_l"), ("pelvis", "femur_r"), ("femur_l", "tibia_l")
             ("calcn_l", "toes_l"), ("calcn_r", "toes_r"), ("pelvis", "torso"), ("torso", "head")]
 COLS = ["name", "source", "subject", "mode", "mode_src", "terrain_class", "seconds", "exported", "not_used", "file",
         "ik_cm", "skate_cms", "worst_sole_cm", "out_of_range_pct", "hip_excess_deg", "toe_stuck_pct", "speed_mps",
-        "grade_deg", "uses_hands", "joint_speed", "difficulty", "difficulty_why"]
+        "grade_deg", "uses_hands", "joint_speed", "difficulty", "difficulty_why", "soleus_demand"]
+#: Peak soleus shortening speed each clip demands, share of its maximum (scripts/capacity/soleus_screen.py).
+SOLEUS = data.ROOT / "data" / "soleus_screen.csv"
 
 
 def _num(v, k=1.0, nd=2):
@@ -111,6 +113,8 @@ def index(names: list[str]) -> list[list]:
     man = [r for f in sorted(LIB.glob("manifest_*.json")) for r in json.loads(f.read_text())]
     speed = joint_speeds([r["file"] for r in man if r.get("exported") and r.get("file")], names)
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
+    import csv
+    sol = {r["name"]: float(r["soleus"]) for r in csv.DictReader(SOLEUS.open())} if SOLEUS.exists() else {}
     rows = []
     for r in man:
         rows.append([r["name"], r.get("source"), r.get("subject"), r.get("mode"), r.get("mode_src"),
@@ -120,7 +124,7 @@ def index(names: list[str]) -> list[list]:
                      _num(r.get("coord_out_of_range_frac"), 100, 1), _num(r.get("hip_rotation_excess_deg"), 1, 1),
                      _num(r.get("toe_stuck_frac"), 100, 1), _num(r.get("speed_path_mps")), _num(r.get("grade_deg"), 1, 1),
                      bool(r.get("uses_hands")), sp if isinstance(sp := speed.get(r.get("file")), float) else None,
-                     *levels.get(r["name"], [None, None])])
+                     *levels.get(r["name"], [None, None]), _num(sol.get(r["name"]), 100, 0)])
     return rows
 
 
