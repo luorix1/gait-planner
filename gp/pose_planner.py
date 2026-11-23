@@ -36,6 +36,13 @@ Version 10 options (roadmap P1; all off by default, so v9 checkpoints load and s
   (boxes, a staircase) with the penetration loss only.
 - ``dropout`` (attention + residual), ``sample_steps`` (DDIM steps when sampling; v9 used all 50).
 
+v12 smoothness options (2026-11-23: rollout jerk was pelvis jitter inside each plan, 3x real in v9, 7x in v11):
+- ``frame_norm``: channel mean/std per window frame (PARC): the pelvis path's std grows from ~0 at the anchor to ~1 m
+  at 1.2 s, so a shared std (0.72 m) turns a 1 % error into 7 mm of frame-to-frame jitter on the frames executed first.
+- ``vel_w``: weight of a frame-difference loss on the continuous channels (pelvis on), each difference over its data
+  std, including the step from the last given frame into the plan (PARC's and Kimodo's velocity terms).
+- ``root_vel``: the pelvis ground path (forward, lateral) as per-frame steps, integrated from the anchor (MotionBricks).
+
 A frame (20 Hz, ``CHANNELS``): 4 contact flags (heel/ball, l/r, +-1), 2 footholds (forward, lateral), the pelvis
 centre of mass (forward, lateral, height), the pelvis heading (cos, sin of its change from the anchor's)
 and tilt (rotation vector), 17 joint coordinates, and 4 foot points (forward, lateral, height). Windows,
@@ -91,6 +98,7 @@ NSEG = len(SEGMENTS)
 SEG_C = 9 * NSEG                      # per segment: origin (f, lat, h) + rotation columns 1, 2 in (f, up, lat)
 SEG_W = 0.5                           # the segment block's weight in the denoising loss (the 45 base channels: 1)
 ROT_SCALE = 0.035                     # a rotation-column miss of 0.035 (~2 deg) costs 1, as 2 cm does for a point
+VEL0 = 8                             # vel_w: channels from the pelvis on (contact flags and footholds step)
 BLEND = 0.65                          # sampling: x = x_no_history + BLEND (x_history - x_no_history)
 GOAL_H0, GOAL_NOISE = 8, 0.05         # random goal horizon from 0.4 s; goal noise (m)
 Q_NOISE, H_NOISE, TILT_NOISE = 0.05, 0.01, 0.03   # body-mode history noise at full strength: rad, m, rad
@@ -377,6 +385,18 @@ def random_terrain(p: torch.Tensor, grid: tuple, boxes: int = 4) -> torch.Tensor
     return out
 
 
+def root_to_vel(x: torch.Tensor) -> torch.Tensor:
+    """Frames ``[..., K, c]`` with the pelvis ground path (channels 8, 9) as per-frame steps (frame 0 repeats frame 1's)."""
+    d = x[..., 1:, 8:10] - x[..., :-1, 8:10]
+    return torch.cat([x[..., :8], torch.cat([d[..., :1, :], d], -2), x[..., 10:]], -1)
+
+
+def root_from_vel(x: torch.Tensor, start: torch.Tensor) -> torch.Tensor:
+    """Generated frames ``[B, K, c]`` with steps in channels 8, 9 -> positions from ``start`` ``[B, 2]`` (the last given
+    frame's)."""
+    return torch.cat([x[..., :8], start[:, None] + x[..., 8:10].cumsum(-2), x[..., 10:]], -1)
+
+
 def seg_channels(sfk: SegFK, x: torch.Tensor) -> torch.Tensor:
     """Unnormalised frames ``[..., >= C]`` (anchor frame) -> the ``SEG_C`` segment channels from their joints and
     pelvis: per segment origin (f, lat, h over the anchor's ground) and rotation columns 1, 2 in (f, up, lat)."""
@@ -398,22 +418,26 @@ class PosePlanner(nn.Module):
                  fk_w: float | None = None, pen_w: float = 0.0, qk_norm: bool = False, qk_gain: bool = True,
                  segments: bool = False, hist_drop: float = 0.0, hist_noise_mode: str = "white", goal_h: bool = False,
                  patch_res: float = 0.1, contact_surface: bool = False, rand_terrain: float = 0.0, dropout: float = 0.0,
-                 sample_steps: int | None = None) -> None:
+                 sample_steps: int | None = None, frame_norm: bool = False, vel_w: float = 0.0,
+                 root_vel: bool = False) -> None:
         super().__init__()
         self.cfg = dict(T=T, layers=layers, heads=heads, head_dim=head_dim, contact_w=contact_w, goal_drop=goal_drop,
                         hist_noise=hist_noise, fk_w=contact_w if fk_w is None else fk_w, pen_w=pen_w, qk_norm=qk_norm,
                         qk_gain=qk_gain, segments=segments, hist_drop=hist_drop, hist_noise_mode=hist_noise_mode,
                         goal_h=goal_h, patch_res=patch_res, contact_surface=contact_surface, rand_terrain=rand_terrain,
-                        dropout=dropout, sample_steps=sample_steps or T)
+                        dropout=dropout, sample_steps=sample_steps or T, frame_norm=frame_norm, vel_w=vel_w,
+                        root_vel=root_vel)
         self.c = C + (SEG_C if segments else 0)
         self.grid = DEFAULT_GRID if patch_res == 0.1 else grid(patch_res)
         self.net = Net(layers, heads, head_dim, qk_norm, qk_gain, self.c, 3 if goal_h else 2, self.grid, dropout,
                        hist_drop > 0)
         self.ema = torch.optim.swa_utils.AveragedModel(self.net, multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.995))
         self.register_buffer("ab", _alphas_cumprod(T))
-        for k, n in (("x", self.c), ("p", 1), ("g", 2)):
+        for k, n in (("x", (HIST + FUT, self.c) if frame_norm else self.c), ("p", 1), ("g", 2)):
             self.register_buffer(f"{k}_mean", torch.zeros(n))
             self.register_buffer(f"{k}_std", torch.ones(n))
+        if vel_w:
+            self.register_buffer("dx_std", torch.ones(self.c))
         self.fk: FootFK | None = None
         self.sfk: SegFK | None = None
 
@@ -431,9 +455,23 @@ class PosePlanner(nn.Module):
         return self
 
     def set_normaliser(self, x: torch.Tensor, p: torch.Tensor, g: torch.Tensor, ctx: Any = None) -> None:
-        for k, v in (("x", x.reshape(-1, self.c)), ("p", p.reshape(-1, 1)), ("g", g)):
+        if self.cfg.get("vel_w"):
+            self.dx_std.copy_((x[:, 1:] - x[:, :-1]).reshape(-1, self.c).std(0).clamp_min(1e-4))
+        xe = self.enc(x)
+        for k, v in (("x", xe if self.cfg.get("frame_norm") else xe.reshape(-1, self.c)), ("p", p.reshape(-1, 1)),
+                     ("g", g)):
             getattr(self, f"{k}_mean").copy_(v.mean(0))
             getattr(self, f"{k}_std").copy_(v.std(0).clamp_min(MIN_STD))
+
+    def enc(self, x: torch.Tensor) -> torch.Tensor:
+        """Frames as the network sees them (before normalising): the pelvis path as steps with ``root_vel``."""
+        return root_to_vel(x) if self.cfg.get("root_vel") else x
+
+    def norm_at(self, a: int, b: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(mean, std) for window frames ``a:b``: per frame with ``frame_norm``, else the shared per-channel pair."""
+        if self.x_mean.dim() == 1:
+            return self.x_mean, self.x_std
+        return self.x_mean[a:b], self.x_std[a:b]
 
     def _n(self, x: torch.Tensor, p: torch.Tensor, g: torch.Tensor) -> tuple[torch.Tensor, ...]:
         return (x - self.x_mean) / self.x_std, (p - self.p_mean) / self.p_std, (g - self.g_mean) / self.g_std
@@ -468,8 +506,9 @@ class PosePlanner(nn.Module):
         xh = x[:, :HIST]
         if cfg.get("hist_noise") and cfg.get("hist_noise_mode") == "body":
             xh = self.body_frames(xh, torch.rand(B, device=dev) * cfg["hist_noise"])
-        xn, pn, gn = self._n(x, p, g)
-        given = (xh - self.x_mean) / self.x_std
+        xn, pn, gn = self._n(self.enc(x), p, g)
+        mh, sh = self.norm_at(0, HIST)
+        given = (self.enc(xh) - mh) / sh
         if cfg.get("hist_noise") and cfg.get("hist_noise_mode", "white") == "white":   # v9
             sd = torch.rand(B, 1, 1, device=dev) * cfg["hist_noise"]
             given = given + sd * torch.randn_like(given)
@@ -489,9 +528,16 @@ class PosePlanner(nn.Module):
         self.parts = {"mse": float(mse.detach())}
         if not (cfg["contact_w"] or cfg["fk_w"] or cfg["pen_w"]) or self.fk is None:
             return mse
-        pu = (pred * self.x_std + self.x_mean).float()
+        mf, sf = self.norm_at(HIST, HIST + FUT)
+        pu = (pred * sf + mf).float()
+        if cfg.get("root_vel"):
+            pu = root_from_vel(pu, x[:, HIST - 1, 8:10].float())
         ru = x[:, HIST - 1:].float()                                      # the last given frame + the future
         pu = torch.cat([ru[:, :1], pu], 1)                                # so the first step is scored too
+        vel_l = None
+        if cfg.get("vel_w"):                                              # every step, the seam into the plan too
+            dv = ((pu[:, 1:] - pu[:, :-1]) - (ru[:, 1:] - ru[:, :-1]))[..., VEL0:] / self.dx_std[VEL0:]
+            vel_l = (dv.square().mean((1, 2)) * d).sum() / nd
         surface = bool(cfg.get("contact_surface")) and ctx is not None
         with torch.autocast(x.device.type, enabled=False):                # millimetres need fp32, not bf16
             ch_p, kin_p, sph_p = geometry(self.fk, pu)
@@ -531,7 +577,11 @@ class PosePlanner(nn.Module):
                           pen=float(pen_l.detach()))
         if seg_l is not None:
             self.parts["seg"] = float(seg_l.detach())
-        return mse + cfg["contact_w"] * (h_l + v_l) + cfg["fk_w"] * fk_l + cfg["pen_w"] * pen_l
+        total = mse + cfg["contact_w"] * (h_l + v_l) + cfg["fk_w"] * fk_l + cfg["pen_w"] * pen_l
+        if vel_l is not None:
+            self.parts["vel"] = float(vel_l.detach())
+            total = total + cfg["vel_w"] * vel_l
+        return total
 
     @torch.no_grad()
     def generate(self, hist: torch.Tensor, p: torch.Tensor, g: torch.Tensor, gen: torch.Generator | None = None,
@@ -548,7 +598,7 @@ class PosePlanner(nn.Module):
             s = BLEND if cfg.get("hist_drop") else 1.0
         B, dev = len(hist), hist.device
         pad = hist.new_zeros(B, FUT, self.c)
-        h, pn, gn = self._n(torch.cat([hist, pad], 1), p, g[..., :2])
+        h, pn, gn = self._n(torch.cat([self.enc(hist), pad], 1), p, g[..., :2])
         if cfg.get("goal_h"):
             gn = torch.cat([gn, g[..., 2:3] if g.shape[-1] > 2 else torch.ones(B, 1, device=dev)], -1)
         h = h[:, :HIST]
@@ -573,7 +623,10 @@ class PosePlanner(nn.Module):
                 break
             eps = (x - self.ab[t].sqrt() * x0) / (1 - self.ab[t]).sqrt()
             x = self.ab[t_prev].sqrt() * x0 + (1 - self.ab[t_prev]).sqrt() * eps
-        x = x * self.x_std + self.x_mean
+        mf, sf = self.norm_at(HIST, HIST + FUT)
+        x = x * sf + mf
+        if cfg.get("root_vel"):
+            x = root_from_vel(x, hist[:, -1, 8:10])
         if self.sfk is not None:
             x = torch.cat([x[..., :C], seg_channels(self.sfk, x)], -1)
         return x

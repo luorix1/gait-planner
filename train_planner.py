@@ -79,6 +79,14 @@ def main() -> None:
     ap.add_argument("--sample-steps", type=int, default=None, help="--pose2: DDIM steps when sampling (default all 50)")
     ap.add_argument("--score-every", type=int, default=0, help="--pose2: roll out the P0 scoreboard every N iterations "
                     "(keeps ckpt_<it>.pt; 0 = off)")
+    ap.add_argument("--frame-norm", action="store_true", help="--pose2 v12: channel mean/std per window frame (PARC)")
+    ap.add_argument("--vel-w", type=float, default=0.0, help="--pose2 v12: frame-difference loss weight, seam step "
+                    "included (PARC/Kimodo)")
+    ap.add_argument("--root-vel", action="store_true", help="--pose2 v12: pelvis ground path as per-frame steps, "
+                    "integrated (MotionBricks)")
+    ap.add_argument("--score-xfade", type=int, default=0, help="--score-every rollouts: seam crossfade frames (v12: 4)")
+    ap.add_argument("--score-hold-smooth", type=float, default=0.0, help="--score-every rollouts: foot-hold smoothness "
+                    "(v12: 1)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     out = Path(a.out)
@@ -109,7 +117,8 @@ def main() -> None:
                               qk_norm=a.qk_norm, qk_gain=False, segments=a.segments, hist_drop=a.hist_drop,
                               hist_noise_mode=a.hist_noise_mode, goal_h=a.goal_horizon, patch_res=a.patch_res,
                               contact_surface=a.contact_surface, rand_terrain=a.rand_terrain, dropout=a.dropout,
-                              sample_steps=a.sample_steps).to(a.device).attach(fk)
+                              sample_steps=a.sample_steps, frame_norm=a.frame_norm, vel_w=a.vel_w,
+                              root_vel=a.root_vel).to(a.device).attach(fk)
         W = Windows2(Dtr, a.device, fk, a.balance, a.balance_terrain, planner.grid, planner.sfk)
         Wt = Windows2(Dte, a.device, fk, grid=planner.grid, sfk=planner.sfk)
     else:
@@ -163,7 +172,7 @@ def main() -> None:
             planner.save(out / name, iters=it, data=a.dataset or str(data.OUT), mirrored=True, pose=a.pose, pose2=a.pose2)
             torch.cuda.empty_cache()
             try:
-                r = dict(board(planner), checkpoint=name, iters=it)
+                r = dict(board(planner, xfade=a.score_xfade, hold_smooth=a.score_hold_smooth), checkpoint=name, iters=it)
             except torch.OutOfMemoryError:          # a shared GPU: skip this pass rather than lose the run
                 r = None
                 print(f"{it:>7d}  scoreboard skipped (out of GPU memory)", flush=True)

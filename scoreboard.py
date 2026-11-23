@@ -29,6 +29,7 @@ Out: <run>/scoreboard.json (one row per checkpoint); with --all also <run>/plann
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import shutil
@@ -238,7 +239,8 @@ class Scoreboard:
         return out
 
     @torch.no_grad()
-    def __call__(self, P: PosePlanner, seed: int = 0, w: float = 1.0, blend: float | None = None) -> dict[str, Any]:
+    def __call__(self, P: PosePlanner, seed: int = 0, w: float = 1.0, blend: float | None = None, xfade: int = 0,
+                 hold_smooth: float = 0.0) -> dict[str, Any]:
         was = P.training
         P.eval()
         W, D, dev = self.W, self.D, self.dev
@@ -256,8 +258,10 @@ class Scoreboard:
                                     dtype=torch.float32, device=dev)
             return to_frame(ahead[:, None], o, psi)[:, 0]
         with torch.enable_grad():                                        # hold_feet's Adam steps need it
-            r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, self.n_plans, KEEP, w, gen, HOLD, blend)
-            r_cou = rollout(P, self.G, self.gid, *self.c_start, course_goal, self.n_plans, KEEP, w, gen, HOLD, blend)
+            r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, self.n_plans, KEEP, w, gen, HOLD,
+                            blend, xfade, hold_smooth)
+            r_cou = rollout(P, self.G, self.gid, *self.c_start, course_goal, self.n_plans, KEEP, w, gen, HOLD, blend,
+                            xfade, hold_smooth)
         t_roll = time.time() - t0
 
         eps = []
@@ -279,7 +283,7 @@ class Scoreboard:
             m.pop("gait_raw")
             eps.append(dict(kind="course", cls=f"course {cls}", name=name, speed=v, gait=None, **m))
 
-        hist = torch.zeros(512, HIST, P.c, device=dev) + P.x_mean
+        hist = torch.zeros(512, HIST, P.c, device=dev) + P.norm_at(0, HIST)[0]
         patch0 = torch.zeros(512, len(P.grid[0]), len(P.grid[1]), device=dev)
         torch.cuda.synchronize() if str(dev).startswith("cuda") else None
         t1 = time.time()
@@ -327,6 +331,11 @@ def main() -> None:
     ap.add_argument("--blend", type=float, nargs="*", default=None, help="history blend s values to score each checkpoint at (models trained with --hist-drop; default the model's)")
     ap.add_argument("--steps", type=int, default=None, help="DDIM sampling steps (default the model's)")
     ap.add_argument("--all", action="store_true", help="every ckpt_*.pt in the run (train_planner.py --score-every)")
+    ap.add_argument("--xfade", type=int, nargs="*", default=[0], help="frames each new plan fades in from the previous "
+                    "plan (v12 seam test; one score per value)")
+    ap.add_argument("--hold-smooth", type=float, nargs="*", default=[0.0], help="foot-hold smoothness weight (v12; one "
+                    "score per value)")
+    ap.add_argument("--out", default=None, help="result file name in the run folder (default by the options)")
     a = ap.parse_args()
     from gp import footfk
     run, dev = Path(a.run), "cuda" if torch.cuda.is_available() else "cpu"
@@ -339,16 +348,18 @@ def main() -> None:
         P = PosePlanner.load(p, dev).attach(fk)
         if a.steps:
             P.cfg["sample_steps"] = a.steps
-        for blend in a.blend or [None]:
-            r = board(P, blend=blend)
+        for blend, xf, hs in itertools.product(a.blend or [None], a.xfade, a.hold_smooth):
+            r = board(P, blend=blend, xfade=xf, hold_smooth=hs)
             r["file"] = p.name
-            r["checkpoint"] = p.name + ("" if blend is None else f" s={blend}") + (f" {a.steps} steps" if a.steps else "")
+            r["checkpoint"] = (p.name + ("" if blend is None else f" s={blend}") + (f" {a.steps} steps" if a.steps else "")
+                               + (f" xf{xf}" if xf else "") + (f" hs{hs:g}" if hs else ""))
             r["iters"] = torch.load(p, map_location="cpu", weights_only=False).get("iters")
             rows.append(r)
             print(f"{r['checkpoint']}: {r['balanced']}  ({r['rollout_s']} s rollouts, {r['gen_s_512']} s per 512 plans)",
                   flush=True)
     best = select(rows) if len(rows) > 1 else rows[0]
-    (run / ("scoreboard_blend.json" if a.blend or a.steps else "scoreboard.json")).write_text(json.dumps(rows, indent=1))
+    out = a.out or ("scoreboard_blend.json" if a.blend or a.steps else "scoreboard.json")
+    (run / out).write_text(json.dumps(rows, indent=1))
     print(table(rows))
     print("real held-out clips per class:", json.dumps(rows[0]["real"]))
     if a.all:

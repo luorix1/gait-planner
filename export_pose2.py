@@ -74,29 +74,39 @@ def decode(x: torch.Tensor, o: torch.Tensor, a_psi: torch.Tensor, g0: torch.Tens
                 points=torch.stack([ptxz[..., 0], pty, ptxz[..., 1]], -1))
 
 
-def hold_feet(P: PosePlanner, hist: torch.Tensor, fut: torch.Tensor, iters: int, lr: float = 0.02) -> torch.Tensor:
+def hold_feet(P: PosePlanner, hist: torch.Tensor, fut: torch.Tensor, iters: int, lr: float = 0.02,
+              smooth: float = 0.0) -> torch.Tensor:
     """Generated frames ``fut`` with every foot point the history ends on the ground kept where it was until the plan's
     own flag lifts it: ``iters`` Adam steps on the leg joints and the foot-point channels only (the pelvis path stays
     as planned), against the joints' foot points (what playback shows) and the channels. Each replan slid the stance
     foot (v7 replays: 14 cm/s at seams, 3.4 within a plan); held, 1.7 / 1.6 and 2.2 overall vs ~3.5 for the real
-    clips (2026-11-22). Moving the pelvis too pushed the other foot into the ground."""
+    clips (2026-11-22). Moving the pelvis too pushed the other foot into the ground. ``smooth`` > 0 also penalises the
+    change's 1st and (x10) 2nd frame differences from the given frames on (Kimodo's corrector weights): the fix spreads
+    over the plan instead of stepping at the seam (11-23: the plain hold added ~20 % of rollout jerk)."""
     tgt = geometry(P.fk, hist[:, -1:])[1][:, 0]                      # [B, 4, 3] the last given frame's foot points
     down = hist[:, -1, :4] > 0
     free = torch.zeros(fut.shape[-1], device=fut.device)
     free[list(LEG_COLS) + list(range(P0, P0 + 12))] = 1.0
-    x = ((fut - P.x_mean) / P.x_std).detach().requires_grad_(True)
+    m, sd = P.norm_at(HIST, HIST + fut.shape[1])
+    x0 = ((fut - m) / sd).detach()
+    x = x0.clone().requires_grad_(True)
     opt = torch.optim.Adam([x], lr=lr)
     with torch.enable_grad():
         for _ in range(iters):
-            xu = x * P.x_std + P.x_mean
+            xu = x * sd + m
             ch, kin, _ = geometry(P.fk, xu)
             held = ((xu[..., :4] > 0).int().cumprod(1).bool() & down[:, None]).detach()   # until the flag lifts
             err = ((kin - tgt[:, None]).square().sum(-1) + (ch - tgt[:, None]).square().sum(-1)) / GEO_SCALE ** 2
+            loss = (err * held).sum()
+            if smooth:
+                dx = torch.cat([torch.zeros_like(x0[:, :2]), x - x0], 1)      # the given frames stay as they are
+                loss = loss + smooth * ((dx[:, 1:] - dx[:, :-1]).square().sum()
+                                        + 10 * (dx[:, 2:] - 2 * dx[:, 1:-1] + dx[:, :-2]).square().sum())
             opt.zero_grad()
-            (err * held).sum().backward()
+            loss.backward()
             x.grad *= free
             opt.step()
-    return (x * P.x_std + P.x_mean).detach()
+    return (x * sd + m).detach()
 
 
 def start(W: Windows, a0: torch.Tensor) -> tuple[dict, torch.Tensor]:
@@ -112,17 +122,29 @@ def start(W: Windows, a0: torch.Tensor) -> tuple[dict, torch.Tensor]:
 
 
 def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tensor, goal_of, n_plans: int, keep: int,
-            w: float, gen: torch.Generator, hold: int = 0, blend: float | None = None) -> dict[str, np.ndarray]:
-    """``n_plans`` plans from world start frames ``s`` (:func:`start`) on terrain ``G`` (row ``gid`` per episode)."""
+            w: float, gen: torch.Generator, hold: int = 0, blend: float | None = None, xfade: int = 0,
+            hold_smooth: float = 0.0) -> dict[str, np.ndarray]:
+    """``n_plans`` plans from world start frames ``s`` (:func:`start`) on terrain ``G`` (row ``gid`` per episode).
+    ``xfade`` > 0: a new plan's first ``xfade`` frames fade in from the previous plan's own frames for those times
+    (weights linear, e.g. 0.8 .. 0.2 old for 4; Kimodo's overlap crossfade)."""
     seq = {key: [v] for key, v in s.items()}
+    prev = None
+    assert keep + xfade <= FUT
     for i in range(n_plans):
         last = {key: torch.cat(v, 1)[:, -HIST:] for key, v in seq.items()}
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
         g0 = G(gid, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
         hist = P.with_segments(frame_features(last, o, a_psi, g0))
-        fut = P.generate(hist, patch(G, gid, o, a_psi, g0, P.grid), goal_of(i, o, a_psi), gen, w=w, s=blend)[:, :keep]
-        if hold:
-            fut = hold_feet(P, hist, fut, hold)
+        plan = P.generate(hist, patch(G, gid, o, a_psi, g0, P.grid), goal_of(i, o, a_psi), gen, w=w, s=blend)
+        if xfade and prev is not None:
+            pw, po, pp, pg = prev
+            tail = P.with_segments(frame_features(decode(pw[:, keep:keep + xfade], po, pp, pg), o, a_psi, g0))
+            wt = torch.linspace(1, 0, xfade + 2, device=plan.device)[1:-1, None]
+            plan = torch.cat([wt * tail + (1 - wt) * plan[:, :xfade], plan[:, xfade:]], 1)
+        if hold:            # the whole plan, so the next crossfade's tail carries the fix (kept frames as before)
+            plan = hold_feet(P, hist, plan, hold, smooth=hold_smooth)
+        prev = (plan, o, a_psi, g0)
+        fut = plan[:, :keep]
         new = decode(fut, o, a_psi, g0)
         for key in seq:
             seq[key].append(new[key])
