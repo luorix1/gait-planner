@@ -17,6 +17,8 @@ main extensors over the episode; then their means.
 
 Run (GPU, detached; a fresh --out per run):
   GP_DATASET=v5 setsid nohup .venv/bin/python jump_test.py --out runs/jump_test_v1 > runs/jump_test_v1.log 2>&1 < /dev/null &
+Studio export of a finished run (3 deterministic jumps from different standing frames):
+  GP_DATASET=v5 .venv/bin/python jump_test.py --export runs/jump_test_v1 [--to-studio]
 """
 
 from __future__ import annotations
@@ -32,6 +34,9 @@ from typing import Any
 import numpy as np
 import sprint
 import torch
+from sprint.export import FrameSource, export_rollout
+from sprint.export import format as fmt
+from sprint.export.meshes import bake
 from sprint.recipes.flashsac import FlashSAC, FlashSACConfig, load_policy
 from sprint.recipes.imitation import _qrot
 
@@ -138,9 +143,37 @@ def evaluate(D: dict, policy: Path, episodes: int, seed: int, device: str) -> di
     return dict(mean=mean, best_apex_cm=max(r["apex_cm"] for r in rows), episodes=rows)
 
 
+def export(run: Path, episodes: int, device: str, to_studio: bool) -> None:
+    import shutil
+    full = data.load(("test_trial", "test_terrain"))
+    D = data.take(full, [list(full["name"]).index(CLIP)])
+    span = int(D["frames"][0]) - MAX_STEPS - 41
+    env, task = jump_env(D, 1, 0, device, starts=[(0, int(f)) for f in np.linspace(0, span, episodes)])
+    act = load_policy(str(run / "policy.pt"), env)
+    out = run / "studio"
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir()
+    shutil.copy2(data.MODEL, out / "model.osim")
+    ev = json.loads((run / "eval.json").read_text())["mean"] if (run / "eval.json").exists() else {}
+    export_rollout(out, env, lambda obs: act(env.torch(obs)), n_steps=MAX_STEPS, episodes=episodes,
+                   config=dict(run=str(run), clip=CLIP, policy="policy.pt (highest mean apex), deterministic",
+                               task="MaxJump: reward = new centre-of-mass height record, no effort cost", eval=ev),
+                   sim={"model": str((out / "model.osim").resolve())}, src=FrameSource(env, meshes=bake(data.MODEL)))
+    print(f"-> {out}")
+    if to_studio:
+        dest = fmt.results_dir() / f"jump_test.{run.name}"
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(out, dest)
+        print(f"-> {dest}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--export", default=None, help="export a finished run's policy to SPRINT Studio instead of training")
+    ap.add_argument("--to-studio", action="store_true")
+    ap.add_argument("--out")
     ap.add_argument("--frames", type=float, default=60e6)
     ap.add_argument("--worlds", type=int, default=2048)
     ap.add_argument("--capacity", type=int, default=2_000_000, help="replay transitions (2M ~6 GB at this obs size)")
@@ -151,6 +184,11 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--smoke", action="store_true", help="a small learner and frequent selections (plumbing test)")
     a = ap.parse_args()
+    if a.export:
+        export(Path(a.export), 3, a.device, a.to_studio)
+        return
+    if not a.out:
+        ap.error("--out is required for training")
     out = Path(a.out)
     out.mkdir(parents=True)                                   # a fresh folder per run
     torch.manual_seed(a.seed)

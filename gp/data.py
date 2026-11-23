@@ -322,7 +322,7 @@ def excluded(name: str, dataset: str = DATASET) -> str:
     """Why ``dataset`` leaves a clip out by its name ('' if it does not): an EXCLUDE entry, a take beyond the model
     (BEYOND_MODEL), or a PARC tracker replay."""
     hit = next((x for x in EXCLUDE if x in name), "")
-    if not hit and (name in BEYOND_CLIPS or any(x in name for x in BEYOND_MODEL)):
+    if not hit and dataset != "hard" and (name in BEYOND_CLIPS or any(x in name for x in BEYOND_MODEL)):  # hard: tests them
         hit = BEYOND_MODEL_LABEL
     if not hit and DATASETS[dataset].get("no_replays") and name.startswith("parc_") and SIM_REPLAY.search(name):
         hit = "PARC tracker replay (_dm)"

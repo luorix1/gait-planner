@@ -23,3 +23,10 @@ seed_broad_jump_002__A360_w0
 seed_high_jump_R_002__A392_w0
 seed_stairs_climbing_up_start_R_001__A300_w0
 seed_stairs_climbing_down_loop_R_001__A300_w0
+# Running calibration (23 Nov): straight forward jog loops spanning the untested 65-84 % peak soleus shortening demand
+# (scripts/capacity/soleus_screen.py; tested passes <= 57 %, failures >= 71 %), all ~1.0-1.4 m/s, clean (skate <= 0.6
+# cm/s), one actor each. Do they fail like the jumps? 50M frames each: every earlier verdict was settled by 25-50M.
+seed_jog_forward_loop_002__A026_w0
+seed_jog_forward_loop_003__A030_w0
+seed_jog_forward_loop_003__A036_w0
+seed_jog_forward_loop_003__A021_w0
