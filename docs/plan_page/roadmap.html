@@ -71,6 +71,13 @@ svg.dia { width:100%; height:auto; display:block }
 .mini h3 { font-size:15px }
 .risk { background:var(--bad-soft); border:1px solid var(--bad); border-radius:12px; padding:12px 16px; font-size:15px }
 .risk b { color:var(--bad) }
+details.more > summary { cursor:pointer; width:fit-content; padding:6px 14px; border:1px solid var(--line); border-radius:999px; background:var(--panel); font-size:14px; font-weight:600; color:var(--blue); list-style:none }
+details.more > summary::-webkit-details-marker { display:none }
+details.more > summary::before { content:"+ "; font-family:var(--mono) }
+details.more[open] > summary::before { content:"− " }
+details.more > summary:focus-visible { outline:2px solid var(--blue); outline-offset:2px }
+.more-body { display:grid; gap:16px; margin-top:14px }
+.note { background:var(--grey-soft); border-radius:12px; padding:12px 16px; font-size:15px; max-width:120ch }
 
 /* what / why furniture */
 .problem { display:flex; gap:12px; align-items:baseline; font-size:16px; max-width:120ch }
@@ -182,7 +189,7 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 380" role="img" aria-label="Simplified pipeline. Stage 1, learn to plan: human motion clips train a planner that sketches the next 1.2 seconds; the muscle body tries those plans in simulation; what worked without a fall and still looks human goes back into training, three rounds. Stage 2, walk with it: the trained planner is frozen; it plans 1.2 seconds ahead, a walking policy follows the footholds and timing by driving the muscle body, and every 0.2 seconds the planner plans again from where the body actually is.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 380" role="img" aria-label="Simplified pipeline. Stage 1, learn to plan: human motion clips train a planner that sketches the next 1.2 seconds; the muscle body tries those plans in simulation; what worked without a fall, with human-like muscle use, goes back into training, three rounds. Stage 2, walk with it: the trained planner is frozen; it plans 1.2 seconds ahead, a walking policy follows the footholds and timing by driving the muscle body, and every 0.2 seconds the planner plans again from where the body actually is.">
         <defs><marker id="z1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
           <marker id="z2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker>
           <marker id="z3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk blue"/></marker></defs>
@@ -199,7 +206,7 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ts c" x="755" y="136">in simulation, 90 muscles</text>
         <rect x="950" y="74" width="230" height="90" rx="12" class="n amb"/>
         <text class="t c" x="1065" y="112">Keep what worked</text>
-        <text class="ts c" x="1065" y="136">no fall, still looks human</text>
+        <text class="ts c" x="1065" y="136">no fall, human-like muscle use</text>
         <line class="ar" x1="250" y1="119" x2="328" y2="119" marker-end="url(#z1)"/>
         <text class="tf c" x="289" y="109">learn</text>
         <line class="ar" x1="560" y1="119" x2="638" y2="119" marker-end="url(#z1)"/>
@@ -240,13 +247,12 @@ svg.dia { width:100%; height:auto; display:block }
     <span><span class="gdot">G1</span>gate: must pass before the next phase</span>
     <span><span class="dashln"></span>training only</span>
     <span><span class="num">1</span>step order in that diagram; the card with that number explains it</span>
-  </div>
-  <div class="legend">
     <span><span class="sw b"></span>planner</span>
     <span><span class="sw t"></span>muscle-body policies</span>
     <span><span class="sw a"></span>filters and checks</span>
     <span><span class="sw g"></span>data and the simulated body</span>
   </div>
+  <details class="more"><summary>Terms</summary><div class="more-body">
   <dl class="gloss">
     <div><dt>Window</dt><dd>0.4 s of history (8 frames) + 1.2 s of planned future (24 frames), 20 Hz.</dd></div>
     <div><dt>Seam</dt><dd>Where one replanned stretch joins the next.</dd></div>
@@ -255,8 +261,10 @@ svg.dia { width:100%; height:auto; display:block }
     <div><dt>Teacher / student</dt><dd>Teacher tracks a plan's full pose; the student sees only a slice.</dd></div>
     <div><dt>Slice</dt><dd>Footholds, contact timing, centre of mass (COM), pelvis, own heightmap.</dd></div>
     <div><dt>DAgger</dt><dd>The student learns the teacher's actions on the student's own states.</dd></div>
+    <div><dt>Static optimisation</dt><dd>The least-effort muscle activations that make given joint torques; fails when none can.</dd></div>
     <div><dt>Stance sphere</dt><dd>A foot contact sphere while that foot is planted.</dd></div>
   </dl>
+  </div></details>
 </section>
 
 <!-- ============ OVERVIEW ============ -->
@@ -268,7 +276,7 @@ svg.dia { width:100%; height:auto; display:block }
   <p class="problem"><b>Problem</b><span>Human clips show what looks human, but not what the 90-muscle body can carry out.</span></p>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 546" role="img" aria-label="Overview. Loop 1: human clips feed a training mix that trains the planner; its samples become a plan library; the teacher tracks the plans in simulation; a keep filter sends completed, human-looking episodes back into the training mix for three rounds. Loop 2: the frozen planner hands a slice of each plan to the slice student, which drives the muscle body; the body's last 0.4 s goes back to the planner to replan. A scoreboard judges gates G1, G2 and G4.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 546" role="img" aria-label="Overview. Loop 1: human clips feed a training mix that trains the planner; its samples become a plan library; the teacher tracks the plans in simulation; a keep filter sends completed episodes with human-like muscle use back into the training mix for three rounds. Loop 2: the frozen planner hands a slice of each plan to the slice student, which drives the muscle body; the body's last 0.4 s goes back to the planner to replan. A scoreboard judges gates G1, G2 and G4.">
         <defs>
           <marker id="o1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
           <marker id="o2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker>
@@ -302,19 +310,19 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tp" x="671" y="158">P2</text>
         <text class="t c" x="736" y="184">Plan library</text>
         <text class="ts c" x="736" y="206">best of 16 · cleaned</text>
-        <text class="ts c" x="736" y="224">physics-checked</text>
+        <text class="ts c" x="736" y="224">physics + muscle check</text>
 
         <rect x="872" y="136" width="154" height="104" rx="12" class="n tl"/>
         <text class="tp" x="884" y="158">P2</text>
         <text class="t c" x="949" y="184">Teacher in sim</text>
         <text class="ts c" x="949" y="206">tracks the full pose</text>
-        <text class="ts c" x="949" y="224">90-muscle body</text>
+        <text class="ts c" x="949" y="224">re-tuned each round</text>
 
         <rect x="1085" y="136" width="154" height="104" rx="12" class="n amb"/>
         <text class="tp" x="1097" y="158">P3</text>
         <text class="t c" x="1162" y="184">Keep filter</text>
         <text class="ts c" x="1162" y="206">no fall · ≤ 8° · ≤ 5 cm</text>
-        <text class="ts c" x="1162" y="224">human-like style</text>
+        <text class="ts c" x="1162" y="224">human-like muscle use</text>
 
         <line class="ar" x1="174" y1="188" x2="231" y2="188" marker-end="url(#o1)"/>
         <text class="tf c" x="203" y="170">windows</text>
@@ -369,13 +377,9 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tm c" x="630" y="511">P0 scoreboard · held-out windows + fixed courses · picks every checkpoint · judges gates G1, G2, G4</text>
       </svg>
     </div>
-    <figcaption>The amber loop is the physics relabeling: only episodes the muscle body actually completed, and that still look human, go back into the planner's data. After three rounds the planner is frozen and drives a student that sees only a slice of each plan.</figcaption>
+    <figcaption>The amber loop is the physics relabeling: only episodes the muscle body actually completed, using its muscles the way a person would, go back into the planner's data. After three rounds the planner is frozen and drives a student that sees only a slice of each plan.</figcaption>
   </figure>
-  <div class="whys">
-    <div class="why"><span class="num">1</span><b>Loop 1 · ground the planner</b><span>The muscle body tries the planner's plans; only completed, human-looking episodes go back into training.</span></div>
-    <div class="why"><span class="num">2</span><b>Loop 2 · run it live</b><span>The frozen planner replans from the simulated body, so an infeasible stretch is corrected 0.2 s later instead of piling up.</span></div>
-    <div class="why"><span class="num">3</span><b>Scoreboard first</b><span>One fixed benchmark picks every checkpoint and judges every gate, so the phases stay comparable.</span></div>
-  </div>
+  <details class="more"><summary>What counts as success</summary><div class="more-body">
   <div class="grid2">
     <div class="card"><span class="tag">Plausible</span><h3>Looks human, breaks no physics</h3>
       <ul><li>Matches held-out human motion on the same terrain: joint angles, step length, contact timing.</li>
@@ -384,6 +388,7 @@ svg.dia { width:100%; height:auto; display:block }
       <ul><li>The teacher tracks the plans in simulation.</li>
         <li>The student follows the planner's slice live without falling, at human-like effort.</li></ul></div>
   </div>
+  </div></details>
 </section>
 
 <!-- ============ LEARNED PARTS ============ -->
@@ -391,7 +396,7 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="eyebrow">What learns</span>
     <h2>Four networks; everything else is fixed code</h2>
-    <p>The planner and the style prior learn from human clips. The teacher and the student learn to drive the muscles. Best-of-16, clean-up, physics check, keep filter and foot hold are hand-written rules.</p>
+    <p>The planner and the style prior learn from human clips. The teacher and the student learn to drive the muscles. Best-of-16, clean-up, physics + muscle check, keep filter and foot hold are fixed rules.</p>
   </div>
   <div class="subhead"><h3>Planner</h3><span>a diffusion transformer that turns noise into the next 1.2 s</span></div>
   <figure class="panel">
@@ -462,10 +467,10 @@ svg.dia { width:100%; height:auto; display:block }
     <figcaption>Training noises the future frames of a real clip by a random amount; the network learns to predict them back from the past frames, the terrain and the goal. Sampling starts from pure noise and repeats that prediction (Fix 3). P1 also trains a smaller 4 × 256 version (~5 M parameters) to see whether it is as good and faster.</figcaption>
   </figure>
 
-  <div class="subhead"><h3>Teacher, student and style prior</h3><span>two muscle controllers of the same shape, and a judge of human-likeness</span></div>
+  <div class="subhead"><h3>Teacher, student and style prior</h3><span>two muscle controllers of the same shape, and a judge of familiar motion</span></div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 350" role="img" aria-label="The teacher network reads the body state plus the full plan and outputs 90 muscle excitations; it learns by reinforcement learning to track the plan without falling. The student reads the body state plus only a slice of the plan (footholds, contact timing, centre of mass, pelvis, its own height map) and outputs 90 muscle excitations; it first copies the teacher's actions, then is fine-tuned by reinforcement learning. Both are MLPs with hidden layers 512, 2048, 512, 2048, 512. The style prior, a small diffusion transformer with 2 blocks and 4 heads, reads 0.3 seconds of motion and outputs a human-likeness score; it learns from human clips and is then frozen.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 350" role="img" aria-label="The teacher network reads the body state plus the full plan and outputs 90 muscle excitations; it learns by reinforcement learning to track the plan without falling. The student reads the body state plus only a slice of the plan (footholds, contact timing, centre of mass, pelvis, its own height map) and outputs 90 muscle excitations; it first copies the teacher's actions, then is fine-tuned by reinforcement learning. Both are MLPs with hidden layers 512, 2048, 512, 2048, 512. The style prior, a small diffusion transformer with 2 blocks and 4 heads, reads 0.3 seconds of motion and outputs a familiarity score; it learns from human clips and is then frozen.">
         <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
           <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
         <rect x="20" y="20" width="200" height="74" rx="12" class="n gs"/>
@@ -514,18 +519,78 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tf c" x="705" y="314">diffusion transformer · 2 blocks · 4 heads</text>
         <line class="ar" x1="870" y1="300" x2="928" y2="300" marker-end="url(#a3)"/>
         <rect x="930" y="268" width="310" height="64" rx="12" class="n"/>
-        <text class="t c" x="1085" y="294">How human it looks</text>
+        <text class="t c" x="1085" y="294">How familiar it looks</text>
         <text class="ts c" x="1085" y="314">learned from clips, then frozen</text>
       </svg>
     </div>
-    <figcaption>The teacher and student have the same network; only their inputs differ. Each also has a critic of the same shape that scores states during RL and is dropped afterwards. The style prior judges a short window by how easily it can denoise it: human-looking motion is easy. Its score feeds the keep filter, the scoreboard and the RL rewards.</figcaption>
+    <figcaption>The teacher and student have the same network; only their inputs differ. Each also has a critic of the same shape that scores states during RL and is dropped afterwards. The style prior judges a short window by how easily it can denoise it: familiar motion is easy. Its score feeds the RL rewards and the scoreboard, not the keep filter.</figcaption>
   </figure>
+  <details class="more"><summary>Why these designs</summary><div class="more-body">
   <div class="cards">
     <div class="card"><span class="tag">Planner</span><h3>Why diffusion</h3><p>A step can come now or a bit later, long or short. A network trained to predict one answer averages those into a shuffle; diffusion picks one whole, consistent option.</p></div>
     <div class="card"><span class="tag">Planner</span><h3>Why a transformer</h3><p>Terrain and frames are tokens, so each future frame can look at the ground where that foot will land.</p></div>
     <div class="card"><span class="tag">Teacher → student</span><h3>Why two controllers</h3><p>Tracking every joint of a plan is easy to learn. A deployable controller only gets where and when to step, so it learns by copying the teacher.</p></div>
-    <div class="card"><span class="tag">Style prior</span><h3>Why learned style</h3><p>"Looks human" is hard to write as rules; a model of human clips scores it directly.</p></div>
+    <div class="card"><span class="tag">Style prior</span><h3>Why learned style</h3><p>"Looks human" is hard to write as rules; a model of human clips scores it directly. It measures familiarity, though (below).</p></div>
   </div>
+  </div></details>
+
+  <div class="subhead"><h3>Style prior</h3><span>a judge of how familiar a short piece of motion looks</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 290" role="img" aria-label="Style prior. Training, once, on human clips: a real 0.33 second window of 13 frames gets a random amount of noise; the style prior, a diffusion transformer with 2 blocks and 4 heads, guesses the noise that was added and learns from the miss, 200 thousand steps, about 2.4 hours on one RTX 4090. Scoring, frozen: any 0.33 seconds of motion gets noise at 3 fixed amounts; the same network guesses the noise again; a small miss means the window is familiar and scores high.">
+        <defs><marker id="y1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
+        <text class="t" x="20" y="28">Training · once, on human clips</text>
+        <rect x="20" y="44" width="250" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="145" y="74">Real motion, 0.33 s</text>
+        <text class="ts c" x="145" y="96">13 frames from a human clip</text>
+        <text class="tf c" x="145" y="113">joints · pelvis · feet · torso</text>
+        <line class="ar" x1="270" y1="84" x2="318" y2="84" marker-end="url(#y1)"/>
+        <rect x="320" y="44" width="220" height="80" rx="12" class="n"/>
+        <text class="t c" x="430" y="78">Add noise</text>
+        <text class="ts c" x="430" y="100">a random amount</text>
+        <line class="ar" x1="540" y1="84" x2="588" y2="84" marker-end="url(#y1)"/>
+        <rect x="590" y="44" width="280" height="80" rx="12" class="n amb"/>
+        <text class="t c" x="730" y="72">Style prior</text>
+        <text class="tf c" x="730" y="92">2-block diffusion transformer</text>
+        <text class="ts c" x="730" y="112">guesses the noise that was added</text>
+        <line class="ar" x1="870" y1="84" x2="918" y2="84" marker-end="url(#y1)"/>
+        <rect x="920" y="44" width="320" height="80" rx="12" class="n"/>
+        <text class="t c" x="1080" y="72">Learn from the miss</text>
+        <text class="ts c" x="1080" y="94">guess vs true noise → update</text>
+        <text class="tf c" x="1080" y="113">200k steps, ~2.4 h on one 4090</text>
+
+        <line class="grid-line" x1="20" y1="148" x2="1240" y2="148"/>
+        <text class="t" x="20" y="178">Scoring · frozen</text>
+        <rect x="20" y="194" width="250" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="145" y="224">Any 0.33 s of motion</text>
+        <text class="ts c" x="145" y="246">a plan, a simulated episode</text>
+        <text class="tf c" x="145" y="263">or a clip</text>
+        <line class="ar" x1="270" y1="234" x2="318" y2="234" marker-end="url(#y1)"/>
+        <rect x="320" y="194" width="220" height="80" rx="12" class="n"/>
+        <text class="t c" x="430" y="228">Add noise</text>
+        <text class="ts c" x="430" y="250">3 fixed amounts</text>
+        <line class="ar" x1="540" y1="234" x2="588" y2="234" marker-end="url(#y1)"/>
+        <rect x="590" y="194" width="280" height="80" rx="12" class="n amb"/>
+        <text class="t c" x="730" y="228">Same network, frozen</text>
+        <text class="ts c" x="730" y="250">guesses the noise again</text>
+        <line class="ar" x1="870" y1="234" x2="918" y2="234" marker-end="url(#y1)"/>
+        <rect x="920" y="194" width="320" height="80" rx="12" class="n"/>
+        <text class="t c" x="1080" y="222">Small miss = familiar</text>
+        <text class="ts c" x="1080" y="244">high score: like the training clips</text>
+        <text class="tf c" x="1080" y="263">score = exp(−6 × normalised miss)</text>
+      </svg>
+    </div>
+    <figcaption>Trained on the training split of the AB01, PARC and Bones SEED clips, balanced so long recordings don't dominate, with half of every batch mirrored left to right. It sees body motion only (17 joint angles, pelvis path and height over the ground, heels, toes, torso): no muscles, no forces. Method: SMP (Mu et al. 2025), ported from MimicKit. Today it is half of the plan-tracking reward and one of the scoreboard's measures.</figcaption>
+  </figure>
+  <details class="more"><summary>How well it judges motion</summary><div class="more-body">
+  <div class="reads">
+    <div class="read"><b>99.8 %</b><span>a held-out real window scores above a corrupted copy of itself (faster, skating, crouched)</span></div>
+    <div class="read target"><b>50–100 %</b><span>of each held-out person's real windows fall below a cut-off that only 5 % of corrupted copies pass</span></div>
+    <div class="read target"><b>100 %</b><span>of real 10° ramp walking rejected by a prior that never saw 10° ramps (11-16 test)</span></div>
+    <div class="read"><b>Use</b><span>as a reward and to compare checkpoints: yes. As a yes/no gate on new terrain: no</span></div>
+  </div>
+  </div></details>
+  <p class="note"><b>Decided 11-22:</b> a reward and a drift monitor on familiar ground, not a veto. On new terrain it would reject real motion, so the P3 keep filter judges muscle use instead.</p>
 </section>
 
 <!-- ============ P0 ============ -->
@@ -579,7 +644,7 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tn" x="680" y="298">floating</text><text class="tf" x="680" y="314">contact foot in the air</text>
         <text class="tn" x="870" y="172">seam jump</text><text class="tf" x="870" y="188">jump where replans join</text>
         <text class="tn" x="870" y="214">high-jerk frames</text><text class="tf" x="870" y="230">teleports</text>
-        <text class="tn" x="870" y="256">style-prior score</text><text class="tf" x="870" y="272">how human it looks</text>
+        <text class="tn" x="870" y="256">style-prior score</text><text class="tf" x="870" y="272">how familiar it looks</text>
         <text class="tn" x="870" y="298">step length + timing</text><text class="tf" x="870" y="314">vs human, same terrain</text>
         <text class="tm" x="680" y="340">jerk threshold = dataset maximum</text>
 
@@ -594,11 +659,13 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
     <figcaption>The same benchmark scores the planner alone (P1), the library (P2), each loop round (P3) and the closed loop (P4), so improvements stay comparable.</figcaption>
   </figure>
+  <details class="more"><summary>Why these choices</summary><div class="more-body">
   <div class="whys">
     <div class="why"><span class="num">1</span><b>Fixed test cases</b><span>Held-out windows and fixed courses: every checkpoint faces the same test.</span></div>
     <div class="why"><span class="num">2</span><b>Rollouts, not loss</b><span>Every 5k iterations, fixed seeds. A rollout shows where the feet meet the ground; held-out loss does not.</span></div>
     <div class="why"><span class="num">3</span><b>One benchmark for every phase</b><span>Planner, library, loop rounds and closed loop on one scale.</span></div>
   </div>
+  </div></details>
 </section>
 
 <!-- ============ P1 ============ -->
@@ -606,7 +673,7 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="phase"><b>P1</b><span class="eyebrow">2–3 days · 2–3 runs of ~2 h</span></span>
     <h2>The planner: lean on terrain, not on memory</h2>
-    <p>Given the past 0.4 s and an exact goal, the planner memorised its two minutes of stairs instead of learning to read them. So we give it weaker clues, make the ground a direct target, and keep the terrain in charge when sampling. The ideas come from PARC, CAMDM, SCENIC and PRIMAL.</p>
+    <p>Three fixes: weaker clues, the ground as a direct target, and the terrain in charge when sampling. Ideas from PARC, CAMDM, SCENIC and PRIMAL.</p>
   </div>
   <p class="problem"><b>Problem</b><span>With that much information, the planner recognises which training clip it is in and replays what came next instead of reading the terrain.</span></p>
   <figure class="panel">
@@ -659,7 +726,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tr" x="1040" y="180">memorised, not learned</text>
       </svg>
     </div>
-    <figcaption>0.4 s of history plus an exact goal (pelvis position at exactly 1.2 s) is nearly a fingerprint for a rare clip, such as one of the 33 stair takes. Stair training loss is about 0.002 vs about 0.05 held out, and feet end up inside unfamiliar treads.</figcaption>
   </figure>
 
   <div class="subhead"><h3>Fix 1 · training windows</h3><span>make history and goal weaker clues</span></div>
@@ -737,11 +803,13 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
     <figcaption>Hiding the history and loosening the goal stop the model from recognising a memorised clip from its first frames.</figcaption>
   </figure>
+  <details class="more"><summary>Why these choices</summary><div class="more-body">
   <div class="whys">
     <div class="why"><span class="num">1</span><b>Goal at a random 0.4–1.2 s horizon, + 5 cm noise</b><span>The horizon is an input, so the goal means <i>head about here</i> instead of a clip's exact pelvis position.</span></div>
     <div class="why"><span class="num">2</span><b>Noise = smooth whole-body offset, re-run through FK</b><span>A noisy history is still a body a policy could produce. Before, per-channel noise made joints and foot positions disagree.</span></div>
     <div class="why"><span class="num">3</span><b>Hide the history in 15 % of windows</b><span>The model must learn what terrain + goal alone call for. This also trains the history-free prediction that sampling mixes in (Fix 3).</span></div>
   </div>
+  </div></details>
 
   <div class="subhead"><h3>Fix 2 · terrain</h3><span>make the foot's relation to the ground a direct target</span></div>
   <figure class="panel">
@@ -799,14 +867,16 @@ svg.dia { width:100%; height:auto; display:block }
         <circle class="sph" cx="1022" cy="244" r="6"/><circle class="sph" cx="1125" cy="234" r="6"/><circle class="sph" cx="1217" cy="238" r="6"/>
       </svg>
     </div>
-    <figcaption>The terrain terms make the foot's relation to the ground a direct target. In ④ tread and cells are to scale; spheres are foot contact spheres.</figcaption>
+    <figcaption>In ④ tread and cells are to scale; spheres are foot contact spheres.</figcaption>
   </figure>
+  <details class="more"><summary>Why these choices</summary><div class="more-body">
   <div class="whys">
     <div class="why"><span class="num">4</span><b>5 cm cells near the feet</b><span>A 22 cm tread was only 2 cells at 10 cm.</span></div>
     <div class="why"><span class="num">5</span><b>Contact points pulled onto the surface</b><span>Before, they only matched the data's height.</span></div>
     <div class="why"><span class="num">6</span><b>Penetration on the exact heightfield</b><span>The lowest of 4 coarse cells missed about 20 % of stair stance spheres.</span></div>
     <div class="why"><span class="num">7</span><b>Random terrain in 10 % of batches</b><span>Penetration loss only: teaches <i>never put feet in the ground</i> beyond the few real terrains.</span></div>
   </div>
+  </div></details>
 
   <div class="subhead"><h3>Fix 3 · sampling</h3><span>keep the terrain in charge at run time</span></div>
   <figure class="panel">
@@ -875,8 +945,9 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tt c" x="640" y="342">outer loop, every 0.2 s: execute the first 0.2 s · rebuild the history from the joints · plan again</text>
       </svg>
     </div>
-    <figcaption>Read left to right: the inner loop runs ten times to make one plan, then FK and the foot hold run once, then the outer loop executes 0.2 s and replans. Blending with a history-free prediction keeps the terrain in charge, as PARC (s = 0.65) and CAMDM (γ = 0.7) do. Ten steps instead of fifty, and no unused guidance pass, cut sampling time about tenfold.</figcaption>
+    <figcaption>Read left to right: the inner loop runs ten times to make one plan, then FK and the foot hold run once, then the outer loop executes 0.2 s and replans.</figcaption>
   </figure>
+  <details class="more"><summary>How the mix works on one step, and sampling time</summary><div class="more-body">
   <div class="split">
     <figure class="panel">
       <div class="scroll">
@@ -917,7 +988,9 @@ svg.dia { width:100%; height:auto; display:block }
     <div class="read target"><b>≤ 0.5 s</b><span>needed: 4,096 plans, for training with the planner in the loop (P4)</span></div>
     <div class="read"><b>4×256</b><span>PARC-size network vs our 6×512: ~6× faster; P1 compares both</span></div>
   </div>
+  </div></details>
 
+  <details class="more"><summary>Optional · warp the rare terrain, only if the planner still memorises stairs</summary><div class="more-body">
   <div class="subhead"><h3>Optional · warp the rare terrain</h3><span>only if the planner still memorises stairs</span></div>
   <figure class="panel">
     <div class="scroll">
@@ -946,6 +1019,7 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
     <figcaption>Only if the planner still memorises stairs: many stair shapes make any one take a weaker clue. Otherwise the loop in P3 supplies terrain variety from executed motion.</figcaption>
   </figure>
+  </div></details>
 
   <div class="gates"><span class="lbl">G1 vs the current planner · before P2</span>
     <span class="gate">stair-descent penetration ≤ 10 % (now 36 %)</span>
@@ -967,7 +1041,7 @@ svg.dia { width:100%; height:auto; display:block }
   <p class="problem"><b>Problem</b><span>P3 needs plans on terrain the clips never covered, and a muscle-body policy that can carry them out. Today's teacher has only been tested on AB01.</span></p>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 376" role="img" aria-label="Library pipeline: clip terrains and generated courses feed open-loop rollouts of the P1 planner; 16 samples per plan are scored and the best kept; a clean-up optimiser and a physics check follow; passing plans form the library. The library and real windows train the teacher, which starts from the AB01 teacher. Gate G2 requires 90 percent of real held-out windows played.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 376" role="img" aria-label="Library pipeline: clip terrains and generated courses feed open-loop rollouts of the P1 planner; 16 samples per plan are scored and the best kept; a clean-up optimiser and a physics and muscle-capacity check follow; passing plans form the library. The library and real windows train the teacher, which starts from the AB01 teacher. Gate G2 requires 90 percent of real held-out windows played.">
         <defs><marker id="l1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
           <marker id="l2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
         <rect x="20" y="30" width="180" height="72" rx="12" class="n gs"/>
@@ -1011,10 +1085,10 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tf c" x="1014" y="103">clean</text>
 
         <rect x="1040" y="50" width="200" height="124" rx="12" class="n amb"/>
-        <text class="t c" x="1140" y="80">Physics check</text>
-        <text class="ts c" x="1140" y="102">centre-of-mass accel</text>
-        <text class="ts c" x="1140" y="120">inside the friction cone</text>
-        <text class="ts c" x="1140" y="138">joint limits · jerk</text>
+        <text class="t c" x="1140" y="80">Physics + muscle check</text>
+        <text class="ts c" x="1140" y="102">friction cone · joint limits</text>
+        <text class="ts c" x="1140" y="120">muscles can make the torques</text>
+        <text class="tf c" x="1140" y="138">static optimisation</text>
         <text class="tr c" x="1140" y="160">drops failures</text>
         <g class="nm"><circle cx="1054" cy="50" r="10"/><text x="1054" y="54">3</text></g>
         <line class="ar" x1="1140" y1="174" x2="1140" y2="228" marker-end="url(#l1)"/>
@@ -1046,12 +1120,14 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
     <figcaption>Library success is measured here but has no threshold. Raising it is the job of P3.</figcaption>
   </figure>
+  <details class="more"><summary>Why these choices</summary><div class="more-body">
   <div class="whys">
     <div class="why"><span class="num">1</span><b>Best of 16</b><span>Samples vary; score each on penetration, contact, seam, jerk and goal, and keep the cleanest.</span></div>
     <div class="why"><span class="num">2</span><b>Clean-up</b><span>Fix small flaws (jerk, sliding, feet off the surface) while staying close to the plan.</span></div>
-    <div class="why"><span class="num">3</span><b>Physics check</b><span>Drop plans no body could do: an acceleration the feet cannot push, joints past their limits.</span></div>
+    <div class="why"><span class="num">3</span><b>Physics + muscle check</b><span>Drop plans no body could do: an acceleration the feet cannot push, joints past their limits, or joint torques these muscles cannot make (inverse dynamics with ground forces estimated from the contacts, then static optimisation). Seconds per plan, no policy involved. Necessary, not sufficient: it ignores activation dynamics and delays.</span></div>
     <div class="why"><span class="num">4</span><b>Teacher from the AB01 teacher</b><span>Starts from a policy that already tracks (4.9° · 2.2 % falls) and practises most where it fails.</span></div>
   </div>
+  </div></details>
   <p class="risk"><b>Risk:</b> one teacher tracking the whole SEED library has never worked for us. Earlier policies fell on every clip, but they used an older recipe; the current teacher recipe has only been tested on AB01. Fallback: SEED's walking, stairs and box subsets only.</p>
 </section>
 
@@ -1066,33 +1142,36 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="split">
     <figure class="panel">
       <div class="scroll">
-        <svg class="dia dia-mid" viewBox="0 0 820 460" role="img" aria-label="Loop: the round's planner samples plans on wider terrain, the teacher tracks them in simulation, every episode is recorded with kinematics, contacts, forces and effort, a keep filter rejects falls, large tracking error and non-human style, and kept episodes join real human clips in the training mix, which retrains the planner from scratch for the next round.">
+        <svg class="dia dia-mid" viewBox="0 0 820 460" role="img" aria-label="Loop: the round's planner samples plans on wider terrain and drops those that fail the physics and muscle-capacity check; the teacher, fine-tuned on the round's plans, plays them in simulation; every episode is recorded with kinematics, contacts, forces and muscle activity; a keep filter rejects falls, large tracking error and non-human muscle use, and kept episodes join real human clips in the training mix, which retrains the planner from scratch for the next round.">
           <defs><marker id="r1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
             <marker id="r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk bad"/></marker></defs>
           <rect x="25" y="180" width="170" height="80" rx="12" class="n hl"/>
           <text class="t c" x="110" y="214">Planner, round k</text>
           <text class="ts c" x="110" y="236">round 1 = the P1 planner</text>
           <rect x="215" y="40" width="170" height="80" rx="12" class="n"/>
-          <text class="t c" x="300" y="74">Generate</text>
-          <text class="ts c" x="300" y="96">wider terrain</text>
+          <text class="t c" x="300" y="68">Generate</text>
+          <text class="ts c" x="300" y="88">wider terrain</text>
+          <text class="tf c" x="300" y="106">physics + muscle check</text>
           <g class="nm"><circle cx="229" cy="40" r="10"/><text x="229" y="44">1</text></g>
           <rect x="475" y="40" width="170" height="80" rx="12" class="n tl"/>
-          <text class="t c" x="560" y="74">Teacher tracks</text>
-          <text class="ts c" x="560" y="96">in simulation</text>
+          <text class="t c" x="560" y="68">Teacher</text>
+          <text class="ts c" x="560" y="88">fine-tuned each round,</text>
+          <text class="ts c" x="560" y="106">then plays the plans</text>
+          <g class="nm"><circle cx="489" cy="40" r="10"/><text x="489" y="44">2</text></g>
           <rect x="630" y="180" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="715" y="208">Record</text>
           <text class="ts c" x="715" y="228">kinematics · contacts</text>
-          <text class="ts c" x="715" y="246">forces · effort</text>
+          <text class="ts c" x="715" y="246">forces · muscle activity</text>
           <rect x="475" y="320" width="170" height="80" rx="12" class="n amb"/>
           <text class="t c" x="560" y="348">Keep filter</text>
           <text class="ts c" x="560" y="368">no fall · ≤ 8° · ≤ 5 cm</text>
-          <text class="ts c" x="560" y="386">style in human range</text>
-          <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">2</text></g>
+          <text class="ts c" x="560" y="386">human-like muscle use</text>
+          <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">3</text></g>
           <rect x="215" y="320" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="300" y="348">Training mix</text>
           <text class="ts c" x="300" y="368">real ≥ 2/3</text>
           <text class="ts c" x="300" y="386">kept ≤ 1/3</text>
-          <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">3</text></g>
+          <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">4</text></g>
           <rect x="25" y="330" width="130" height="60" rx="12" class="n gs"/>
           <text class="t c" x="90" y="356">Human clips</text>
           <text class="ts c" x="90" y="376">AB01 · PARC · SEED</text>
@@ -1113,7 +1192,7 @@ svg.dia { width:100%; height:auto; display:block }
           <text class="tf" x="122" y="282">retrain from scratch</text>
           <line class="ar bad" x1="560" y1="400" x2="560" y2="428" marker-end="url(#r2)"/>
           <text class="tr" x="572" y="426">rejected</text>
-          <text class="tf" x="572" y="442">fell · tracking error · style</text>
+          <text class="tf" x="572" y="442">fell · tracking error · muscle use</text>
           <text class="tl2 c" x="410" y="206">3 rounds</text>
           <text class="tm c" x="410" y="230">PARC: tracker success 27 → 68 %</text>
         </svg>
@@ -1137,11 +1216,14 @@ svg.dia { width:100%; height:auto; display:block }
       <p style="color:var(--muted); font-size:15px">Stop when success plateaus or realism drops. Kept episodes come from a SEED-trained generator, so they stay confidential.</p>
     </div>
   </div>
+  <details class="more"><summary>Why these choices</summary><div class="more-body">
   <div class="whys">
-    <div class="why"><span class="num">1</span><b>Wider terrain each round</b><span>Pushes past the clips' terrain as far as the body succeeds.</span></div>
-    <div class="why"><span class="num">2</span><b>Keep filter</b><span>The body decides what is doable: no fall, tracking error ≤ 8° · ≤ 5 cm, style in human range.</span></div>
-    <div class="why"><span class="num">3</span><b>Real ≥ 2/3, kept ≤ 1/3 of each batch</b><span>Real data stays in every batch as the human anchor.</span></div>
+    <div class="why"><span class="num">1</span><b>Wider terrain each round</b><span>Pushes past the clips' terrain as far as the body succeeds. Plans first pass P2's physics + muscle check, so impossible ones never reach the simulator.</span></div>
+    <div class="why"><span class="num">2</span><b>Teacher fine-tuned each round</b><span>On the round's plans, replaying its failures more, as PARC does with its tracker. A plan that still fails is then more likely impossible than the teacher too weak.</span></div>
+    <div class="why"><span class="num">3</span><b>Keep filter: muscle use, not style</b><span>No fall; tracking error ≤ 8° · ≤ 5 cm; little time at maximum activation; co-contraction and energy per metre in human ranges; EMG on/off timing of key muscles near the references. On new terrain these are bounds, not matches: no human EMG exists for it.</span></div>
+    <div class="why"><span class="num">4</span><b>Real ≥ 2/3, kept ≤ 1/3 of each batch</b><span>Real data stays in every batch as the human anchor.</span></div>
   </div>
+  </div></details>
 </section>
 
 <!-- ============ P4 ============ -->
@@ -1215,6 +1297,7 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
     <figcaption>After distillation, the student is fine-tuned with RL against the frozen planner on random terrain (as CLoSD and Zhang–Hutter do): loose slice tracking, effort, style.</figcaption>
   </figure>
+  <details class="more"><summary>Why these choices, and what changed from before</summary><div class="more-body">
   <div class="whys">
     <div class="why"><span class="num">1</span><b>Only a slice of the plan</b><span>Where and when each foot lands and where the body goes; the body finds its own joint motion.</span></div>
     <div class="why"><span class="num">2</span><b>Teacher reads the same plan</b><span>Training only: its actions are the student's targets, and only the full-pose vs slice gap remains (below).</span></div>
@@ -1258,6 +1341,7 @@ svg.dia { width:100%; height:auto; display:block }
       <p>Only the full-pose vs slice gap remains. The plan student, given a clip's slice, is at <b>8.2 %</b> falls.</p>
     </figure>
   </div>
+  </div></details>
 
   <div class="gates"><span class="lbl">G4 closed loop</span>
     <span class="gate">≤ 10 % falls per episode, held-out terrain</span>
@@ -1337,6 +1421,7 @@ svg.dia { width:100%; height:auto; display:block }
     <div class="card open"><span class="tag">3 · Warping</span><h3>Warp stairs and boxes?</h3><p>Or leave terrain variety to the loop.</p></div>
     <div class="card open"><span class="tag">4 · Kept share</span><h3>Cap at 1/3 of each batch?</h3><p>Real data stays in every batch as the human anchor.</p></div>
   </div>
+  <p class="note"><b>Decided 11-22:</b> the keep filter judges muscle use, not style; a muscle-capacity check runs before simulating; the teacher is fine-tuned on each round's plans.</p>
   <p class="credit">Motion Data by Bones Studio</p>
 </section>
 
