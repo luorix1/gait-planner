@@ -163,11 +163,26 @@ details.more > summary:focus-visible { outline:2px solid var(--blue); outline-of
 .stance { fill:var(--teal-soft); stroke:var(--teal); stroke-width:1.2 }
 .dim { stroke:var(--wire); stroke-width:1.2 }
 
+.tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--line) }
+.tabs a { padding:9px 14px; font:600 14.5px var(--display); color:var(--muted); text-decoration:none; border-bottom:3px solid transparent; margin-bottom:-1px }
+.tabs a:hover { color:var(--ink) }
+.tabs a[aria-current="page"] { color:var(--ink); border-bottom-color:var(--blue) }
+.tabs a:focus-visible { outline:3px solid var(--blue); outline-offset:3px; border-radius:4px }
+.reads a { color:var(--blue); font-weight:600 }
+a { color:var(--blue) }
+
 @media (max-width:1100px) { .cards, .reads, .gloss { grid-template-columns:repeat(2, minmax(0, 1fr)) } .split { grid-template-columns:1fr } }
 @media (max-width:760px) { .cards, .reads, .grid2, .gloss { grid-template-columns:1fr } .problem { flex-direction:column; gap:6px } }
 </style>
 
 <div class="wrap">
+
+<nav class="tabs" aria-label="Pages">
+  <a href="./" aria-current="page">Roadmap</a>
+  <a href="planner.html">Planner</a>
+  <a href="lit-graphics.html">Literature · graphics</a>
+  <a href="lit-biomech.html">Literature · biomechanics &amp; robotics</a>
+</nav>
 
 <header>
   <span class="eyebrow">gait_planner · roadmap</span>
@@ -399,73 +414,12 @@ details.more > summary:focus-visible { outline:2px solid var(--blue); outline-of
     <p>The planner and the style prior learn from human clips. The teacher and the student learn to drive the muscles. Best-of-16, clean-up, physics + muscle check, keep filter and foot hold are fixed rules.</p>
   </div>
   <div class="subhead"><h3>Planner</h3><span>a diffusion transformer that turns noise into the next 1.2 s</span></div>
-  <figure class="panel">
-    <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 340" role="img" aria-label="Planner architecture. Inputs: a terrain height map 3.6 by 1.6 metres in 5 centimetre cells, which three stride-2 convolutions turn into 50 terrain tokens; motion frames, 8 given from the past 0.4 seconds and 24 noised for the next 1.2 seconds, each turned into one token by a linear layer; and the goal plus the noise level, which a small MLP turns into conditioning. A transformer with 6 blocks, 8 heads, 512 wide and about 28 million parameters lets every token attend to every other; the conditioning scales and shifts each block. It outputs the clean next 1.2 seconds: 24 frames with every joint. It learns from human clips by noising a clip's future and predicting it back, plus foot terms.">
-        <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
-          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker></defs>
-        <rect x="20" y="24" width="230" height="80" rx="12" class="n gs"/>
-        <text class="t c" x="135" y="54">Terrain</text>
-        <text class="ts c" x="135" y="76">height map, 3.6 m × 1.6 m</text>
-        <text class="tf c" x="135" y="94">5 cm cells, around the pelvis</text>
-        <rect x="20" y="124" width="230" height="100" rx="12" class="n gs"/>
-        <text class="t c" x="135" y="154">Motion</text>
-        <text class="ts c" x="135" y="176">past 0.4 s · 8 frames, given</text>
-        <text class="ts c" x="135" y="196">next 1.2 s · 24 frames, noised</text>
-        <text class="tf c" x="135" y="214">contacts · joints · feet · pelvis</text>
-        <rect x="20" y="244" width="230" height="80" rx="12" class="n gs"/>
-        <text class="t c" x="135" y="274">Goal + noise level</text>
-        <text class="ts c" x="135" y="296">where to head · which step</text>
-
-        <line class="ar" x1="250" y1="64" x2="318" y2="64" marker-end="url(#a1)"/>
-        <line class="ar" x1="250" y1="174" x2="318" y2="174" marker-end="url(#a1)"/>
-        <line class="ar" x1="250" y1="284" x2="318" y2="284" marker-end="url(#a1)"/>
-
-        <text class="tf c" x="440" y="48">3 stride-2 convolutions</text>
-        <g><rect class="tile ok" x="360" y="58" width="12" height="12"/><rect class="tile ok" x="376" y="58" width="12" height="12"/><rect class="tile ok" x="392" y="58" width="12" height="12"/><rect class="tile ok" x="408" y="58" width="12" height="12"/><rect class="tile ok" x="424" y="58" width="12" height="12"/>
-          <rect class="tile ok" x="440" y="58" width="12" height="12"/><rect class="tile ok" x="456" y="58" width="12" height="12"/><rect class="tile ok" x="472" y="58" width="12" height="12"/><rect class="tile ok" x="488" y="58" width="12" height="12"/><rect class="tile ok" x="504" y="58" width="12" height="12"/></g>
-        <text class="tf c" x="440" y="90">50 terrain tokens</text>
-        <text class="tf c" x="440" y="158">one linear layer per frame</text>
-        <g><rect class="cellh" x="328" y="168" width="5" height="12"/><rect class="cellh" x="335" y="168" width="5" height="12"/><rect class="cellh" x="342" y="168" width="5" height="12"/><rect class="cellh" x="349" y="168" width="5" height="12"/><rect class="cellh" x="356" y="168" width="5" height="12"/><rect class="cellh" x="363" y="168" width="5" height="12"/><rect class="cellh" x="370" y="168" width="5" height="12"/><rect class="cellh" x="377" y="168" width="5" height="12"/>
-          <rect class="cellf" x="384" y="168" width="5" height="12"/><rect class="cellf" x="391" y="168" width="5" height="12"/><rect class="cellf" x="398" y="168" width="5" height="12"/><rect class="cellf" x="405" y="168" width="5" height="12"/><rect class="cellf" x="412" y="168" width="5" height="12"/><rect class="cellf" x="419" y="168" width="5" height="12"/><rect class="cellf" x="426" y="168" width="5" height="12"/><rect class="cellf" x="433" y="168" width="5" height="12"/>
-          <rect class="cellf" x="440" y="168" width="5" height="12"/><rect class="cellf" x="447" y="168" width="5" height="12"/><rect class="cellf" x="454" y="168" width="5" height="12"/><rect class="cellf" x="461" y="168" width="5" height="12"/><rect class="cellf" x="468" y="168" width="5" height="12"/><rect class="cellf" x="475" y="168" width="5" height="12"/><rect class="cellf" x="482" y="168" width="5" height="12"/><rect class="cellf" x="489" y="168" width="5" height="12"/>
-          <rect class="cellf" x="496" y="168" width="5" height="12"/><rect class="cellf" x="503" y="168" width="5" height="12"/><rect class="cellf" x="510" y="168" width="5" height="12"/><rect class="cellf" x="517" y="168" width="5" height="12"/><rect class="cellf" x="524" y="168" width="5" height="12"/><rect class="cellf" x="531" y="168" width="5" height="12"/><rect class="cellf" x="538" y="168" width="5" height="12"/><rect class="cellf" x="545" y="168" width="5" height="12"/></g>
-        <text class="tf c" x="440" y="200">32 motion tokens: 8 given + 24 to clean</text>
-        <rect x="360" y="270" width="160" height="30" rx="8" class="n amb"/>
-        <text class="tn c" x="440" y="290">conditioning</text>
-        <text class="tf c" x="440" y="262">small MLP</text>
-
-        <line class="ar" x1="560" y1="64" x2="598" y2="64" marker-end="url(#a1)"/>
-        <line class="ar" x1="560" y1="174" x2="598" y2="174" marker-end="url(#a1)"/>
-        <line class="ar amb" x1="520" y1="285" x2="598" y2="285" marker-end="url(#a2)"/>
-
-        <rect x="600" y="24" width="300" height="300" rx="14" class="n hl"/>
-        <text class="t c" x="750" y="58">Transformer</text>
-        <text class="ts c" x="750" y="80">6 blocks · 8 heads · 512 wide</text>
-        <text class="tf c" x="750" y="98">~28 M parameters</text>
-        <rect x="640" y="116" width="220" height="16" rx="4" class="n"/><text class="tf c" x="750" y="128">attention + feed-forward</text>
-        <rect x="640" y="136" width="220" height="16" rx="4" class="n"/><rect x="640" y="156" width="220" height="16" rx="4" class="n"/>
-        <rect x="640" y="176" width="220" height="16" rx="4" class="n"/><rect x="640" y="196" width="220" height="16" rx="4" class="n"/>
-        <rect x="640" y="216" width="220" height="16" rx="4" class="n"/>
-        <text class="ts c" x="750" y="258">all 82 tokens attend to each other:</text>
-        <text class="ts c" x="750" y="276">each frame sees the ground and the</text>
-        <text class="ts c" x="750" y="294">other frames</text>
-        <text class="ta c" x="750" y="314">conditioning scales + shifts each block</text>
-
-        <line class="ar" x1="900" y1="174" x2="958" y2="174" marker-end="url(#a1)"/>
-        <rect x="960" y="124" width="280" height="100" rx="12" class="n"/>
-        <text class="t c" x="1100" y="154">Clean next 1.2 s</text>
-        <text class="ts c" x="1100" y="176">24 frames, every joint</text>
-        <text class="tf c" x="1100" y="196">segment poses rebuilt by FK</text>
-        <text class="tf c" x="1100" y="212">run 10× per plan (Fix 3)</text>
-        <rect x="960" y="244" width="280" height="80" rx="12" class="n gs"/>
-        <text class="tn" x="976" y="268">Learns from human clips</text>
-        <text class="ts" x="976" y="290">noise a clip's future, predict it back</text>
-        <text class="ts" x="976" y="310">+ feet on the surface, none under it</text>
-      </svg>
-    </div>
-    <figcaption>Training noises the future frames of a real clip by a random amount; the network learns to predict them back from the past frames, the terrain and the goal. Sampling starts from pure noise and repeats that prediction (Fix 3). P1 also trains a smaller 4 × 256 version (~5 M parameters) to see whether it is as good and faster.</figcaption>
-  </figure>
+  <div class="reads">
+    <div class="read"><b>0.4 s → 1.2 s</b><span>history, terrain and a goal in; 24 whole-body frames out</span></div>
+    <div class="read"><b>4 × 256</b><span>transformer blocks × width · 10 M weights</span></div>
+    <div class="read"><b>10 steps</b><span>noise to plan · 512 plans in 0.3 s</span></div>
+    <div class="read"><b><a href="planner.html">Planner tab →</a></b><span>inputs, network, training, sampling, and why each part is there</span></div>
+  </div>
 
   <div class="subhead"><h3>Teacher, student and style prior</h3><span>two muscle controllers of the same shape, and a judge of familiar motion</span></div>
   <figure class="panel">
@@ -671,9 +625,9 @@ details.more > summary:focus-visible { outline:2px solid var(--blue); outline-of
 <!-- ============ P1 ============ -->
 <section>
   <div class="sec-head">
-    <span class="phase"><b>P1</b><span class="eyebrow">2–3 days · 2–3 runs of ~2 h</span></span>
+    <span class="phase"><b>P1</b><span class="eyebrow">runs of ~2 h each</span></span>
     <h2>The planner: lean on terrain, not on memory</h2>
-    <p>Three fixes: weaker clues, the ground as a direct target, and the terrain in charge when sampling. Ideas from PARC, CAMDM, SCENIC and PRIMAL.</p>
+    <p>A human prior that reads the terrain. How it works, part by part: <a href="planner.html">Planner tab</a>.</p>
   </div>
   <p class="problem"><b>Problem</b><span>With that much information, the planner recognises which training clip it is in and replays what came next instead of reading the terrain.</span></p>
   <figure class="panel">
@@ -728,267 +682,13 @@ details.more > summary:focus-visible { outline:2px solid var(--blue); outline-of
     </div>
   </figure>
 
-  <div class="subhead"><h3>Fix 1 · training windows</h3><span>make history and goal weaker clues</span></div>
-  <figure class="panel">
-    <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Training windows. Problem: history always visible and the goal is the pelvis at exactly 1.2 s. Fix: in 85 percent of windows the history carries smooth noise and the goal sits at a random 0.4 to 1.2 s horizon with 5 cm noise; in 15 percent the history is hidden. History noise: per-channel noise made joints and feet disagree; instead the whole body is offset and forward kinematics re-run. Outputs per future frame now add nine segment poses.">
-        <text class="tf" x="150" y="22">history 0.4 s</text>
-        <text class="tf" x="150" y="36">8 frames</text>
-        <text class="tf" x="266" y="22">future 1.2 s</text>
-        <text class="tf" x="266" y="36">24 frames</text>
-
-        <text class="tn" x="20" y="70">problem</text>
-        <text class="tf" x="20" y="86">every window</text>
-        <g>
-          <rect class="cellh" x="150" y="50" width="14" height="30"/><rect class="cellh" x="164" y="50" width="14" height="30"/><rect class="cellh" x="178" y="50" width="14" height="30"/><rect class="cellh" x="192" y="50" width="14" height="30"/>
-          <rect class="cellh" x="206" y="50" width="14" height="30"/><rect class="cellh" x="220" y="50" width="14" height="30"/><rect class="cellh" x="234" y="50" width="14" height="30"/><rect class="cellh" x="248" y="50" width="14" height="30"/>
-        </g>
-        <rect class="cellf" x="262" y="50" width="336" height="30"/>
-        <line class="ar amb" x1="598" y1="46" x2="598" y2="86"/>
-        <circle class="gb" cx="598" cy="40" r="6"/>
-        <text class="ta" x="614" y="62">goal: pelvis at exactly 1.2 s</text>
-        <text class="tr" x="614" y="80">≈ a fingerprint for a rare clip</text>
-
-        <text class="tn" x="20" y="140">fix</text>
-        <text class="tf" x="20" y="156">85 % of windows</text>
-        <g>
-          <rect class="cellh" x="150" y="130" width="14" height="30"/><rect class="cellh" x="164" y="130" width="14" height="30"/><rect class="cellh" x="178" y="130" width="14" height="30"/><rect class="cellh" x="192" y="130" width="14" height="30"/>
-          <rect class="cellh" x="206" y="130" width="14" height="30"/><rect class="cellh" x="220" y="130" width="14" height="30"/><rect class="cellh" x="234" y="130" width="14" height="30"/><rect class="cellh" x="248" y="130" width="14" height="30"/>
-        </g>
-        <path class="ar tl" d="M152 152 C 185 134, 225 160, 260 140"/>
-        <rect class="cellf" x="262" y="130" width="336" height="30"/>
-        <path class="ar amb" d="M374 124 V118 H598 V124"/>
-        <circle class="noise" cx="490" cy="118" r="11"/><circle class="gb" cx="490" cy="118" r="5"/>
-        <g class="nm"><circle cx="388" cy="97" r="9"/><text x="388" y="101">1</text></g>
-        <text class="ta" x="402" y="101">goal at a random horizon 0.4–1.2 s (an input) · 5 cm noise</text>
-        <g class="nm"><circle cx="624" cy="146" r="9"/><text x="624" y="150">2</text></g>
-        <text class="tt" x="640" y="150">smooth noise, see right</text>
-
-        <text class="tn" x="20" y="210">fix</text>
-        <text class="tf" x="20" y="226">15 % of windows</text>
-        <rect class="cellx" x="150" y="200" width="112" height="30"/>
-        <text class="tf c" x="206" y="219">hidden</text>
-        <rect class="cellf" x="262" y="200" width="336" height="30"/>
-        <path class="ar amb" d="M374 194 V188 H598 V194"/>
-        <circle class="noise" cx="540" cy="188" r="11"/><circle class="gb" cx="540" cy="188" r="5"/>
-        <g class="nm"><circle cx="624" cy="216" r="9"/><text x="624" y="220">3</text></g>
-        <text class="tt" x="640" y="220">hidden: read terrain + goal</text>
-
-        <line class="grid-line" x1="150" y1="246" x2="598" y2="246"/>
-        <line class="dim" x1="150" y1="242" x2="150" y2="250"/><line class="dim" x1="262" y1="242" x2="262" y2="250"/><line class="dim" x1="374" y1="242" x2="374" y2="250"/><line class="dim" x1="598" y1="242" x2="598" y2="250"/>
-        <text class="tf c" x="150" y="264">−0.4 s</text><text class="tf c" x="262" y="264">now</text><text class="tf c" x="374" y="264">+0.4 s</text><text class="tf c" x="598" y="264">+1.2 s</text>
-
-        <text class="tn" x="840" y="34">History noise</text>
-        <g class="nm"><circle cx="946" cy="30" r="9"/><text x="946" y="34">2</text></g>
-        <polyline class="leg ghost" points="930,60 918,110 934,156 962,160"/>
-        <polyline class="leg bad" points="930,60 906,108 930,152"/>
-        <circle class="dot bad" cx="948" cy="170" r="4"/><circle class="dot bad" cx="976" cy="164" r="4"/>
-        <circle class="dot" cx="930" cy="60" r="4"/>
-        <text class="tf" x="860" y="192">noise per channel</text>
-        <text class="tr" x="860" y="210">joints and feet disagree</text>
-        <polyline class="leg ghost" points="1150,60 1138,110 1154,156 1182,160"/>
-        <polyline class="leg ok" points="1150,60 1131,108 1141,156 1168,164"/>
-        <circle class="dot ok" cx="1141" cy="160" r="4"/><circle class="dot ok" cx="1168" cy="164" r="4"/>
-        <circle class="dot" cx="1150" cy="60" r="4"/>
-        <text class="tf" x="1060" y="192">smooth offset → FK</text>
-        <text class="tt" x="1060" y="210">still one consistent body</text>
-
-        <rect x="840" y="232" width="400" height="126" rx="10" class="n"/>
-        <text class="tn" x="856" y="256">Planner outputs, per future frame</text>
-        <text class="ts" x="856" y="278">contacts · footholds · pelvis · 4 foot points</text>
-        <text class="ts" x="856" y="298">17 joint angles (the truth)</text>
-        <text class="tb" x="856" y="322">+ 9 segment poses (origin + 6D rotation):</text>
-        <text class="tb" x="856" y="342">femur, tibia, calcn (heel), toes L/R, torso</text>
-      </svg>
-    </div>
-    <figcaption>Hiding the history and loosening the goal stop the model from recognising a memorised clip from its first frames.</figcaption>
-  </figure>
-  <details class="more"><summary>Why these choices</summary><div class="more-body">
-  <div class="whys">
-    <div class="why"><span class="num">1</span><b>Goal at a random 0.4–1.2 s horizon, + 5 cm noise</b><span>The horizon is an input, so the goal means <i>head about here</i> instead of a clip's exact pelvis position.</span></div>
-    <div class="why"><span class="num">2</span><b>Noise = smooth whole-body offset, re-run through FK</b><span>A noisy history is still a body a policy could produce. Before, per-channel noise made joints and foot positions disagree.</span></div>
-    <div class="why"><span class="num">3</span><b>Hide the history in 15 % of windows</b><span>The model must learn what terrain + goal alone call for. This also trains the history-free prediction that sampling mixes in (Fix 3).</span></div>
+  <div class="cards">
+    <div class="card"><span class="tag">Exact ground</span><h3>Feet checked on the real step</h3><p>5 cm cells and the exact terrain in the loss. Feet in the treads on stair descent: 34 % → 9 % of frames.</p></div>
+    <div class="card"><span class="tag">Random terrain</span><h3>Read the ground, not the clip</h3><p>1 in 10 windows on random boxes or stairs, so recalling the clip stops paying.</p></div>
+    <div class="card"><span class="tag">Segment poses</span><h3>Targets for every body</h3><p>Trunk, thigh, shank, heel and toe poses, recomputed from the joint angles.</p></div>
+    <div class="card"><span class="tag">Smooth seams</span><h3>Crossfade + smoothed foot hold</h3><p>Fixed code at sampling time. Jerky frames 16.7 % → 5.5 %; the pelvis jitter left inside each plan is the next target.</p></div>
   </div>
-  </div></details>
-
-  <div class="subhead"><h3>Fix 2 · terrain</h3><span>make the foot's relation to the ground a direct target</span></div>
-  <figure class="panel">
-    <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 310" role="img" aria-label="Terrain fixes, side views, problem above and fix below. Cells: a 22 cm tread is 2 cells at 10 cm and 4 cells at 5 cm. Contacts: matching the data's height let them sit inside the step; the fix pulls contact points onto the surface. Penetration: the lowest of 4 coarse cells missed a sphere inside the step corner, about 20 percent of stair stance spheres; the fix checks the exact heightfield. Random terrain in 10 percent of batches with only the penetration loss.">
-        <line class="grid-line" x1="320" y1="10" x2="320" y2="300"/><line class="grid-line" x1="630" y1="10" x2="630" y2="300"/><line class="grid-line" x1="940" y1="10" x2="940" y2="300"/>
-        <line class="grid-line" x1="20" y1="168" x2="930" y2="168"/>
-
-        <g class="nm"><circle cx="30" cy="24" r="9"/><text x="30" y="28">4</text></g>
-        <text class="tn" x="46" y="29">5 cm cells near the feet</text>
-        <text class="tn" x="20" y="58">problem</text>
-        <text class="tf" x="20" y="78">tread 22 cm = 2 cells</text>
-        <path class="gfill" d="M20 160 V150 H120 V110 H175 V70 H310 V160 Z"/>
-        <rect class="cellf" x="120" y="85" width="25" height="25"/><rect class="cellf" x="145" y="85" width="25" height="25"/>
-        <text class="tn" x="20" y="190">fix</text>
-        <text class="tf" x="20" y="210">tread 22 cm = 4 cells</text>
-        <path class="gfill" d="M20 292 V282 H120 V242 H175 V202 H310 V292 Z"/>
-        <rect class="cellf" x="120" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="132.5" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="145" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="157.5" y="229.5" width="12.5" height="12.5"/>
-
-        <g class="nm"><circle cx="340" cy="24" r="9"/><text x="340" y="28">5</text></g>
-        <text class="tn" x="356" y="29">Contacts on the real surface</text>
-        <text class="tn" x="330" y="58">problem</text>
-        <text class="tr" x="440" y="80">matched the data's height</text>
-        <text class="tf" x="440" y="96">not this surface</text>
-        <path class="gfill" d="M330 160 V150 H450 V110 H620 V160 Z"/>
-        <line class="ghl" x1="460" y1="124" x2="610" y2="124"/>
-        <circle class="sph bad" cx="530" cy="118" r="6"/>
-        <text class="tn" x="330" y="190">fix</text>
-        <text class="tt" x="440" y="212">pulled onto the surface</text>
-        <path class="gfill" d="M330 292 V282 H450 V242 H620 V292 Z"/>
-        <circle class="sph" cx="530" cy="236" r="6"/>
-
-        <g class="nm"><circle cx="650" cy="24" r="9"/><text x="650" y="28">6</text></g>
-        <text class="tn" x="666" y="29">Exact penetration check</text>
-        <text class="tn" x="640" y="58">problem</text>
-        <text class="tr" x="640" y="80">missed ~20 % of stair stance spheres</text>
-        <text class="tf" x="640" y="96">lowest of 4 coarse cells: looks clear</text>
-        <path class="gfill" d="M640 160 V150 H790 V110 H930 V160 Z"/>
-        <line class="ar amb dash thin" x1="755" y1="150" x2="830" y2="150"/>
-        <circle class="sph" cx="786" cy="118" r="8"/>
-        <text class="tn" x="640" y="190">fix</text>
-        <text class="tt" x="640" y="212">exact heightfield: caught</text>
-        <path class="gfill" d="M640 292 V282 H790 V242 H930 V292 Z"/>
-        <circle class="sph bad" cx="786" cy="250" r="8"/>
-
-        <g class="nm"><circle cx="960" cy="24" r="9"/><text x="960" y="28">7</text></g>
-        <text class="tn" x="976" y="29">Random terrain</text>
-        <text class="tf" x="950" y="56">10 % of batches</text>
-        <path class="gfill" d="M950 160 V130 H990 V112 H1035 V138 H1080 V100 H1125 V120 H1170 V92 H1240 V160 Z"/>
-        <circle class="sph" cx="1012" cy="106" r="6"/><circle class="sph" cx="1102" cy="94" r="6"/><circle class="sph" cx="1205" cy="86" r="6"/>
-        <text class="tt" x="950" y="190">penetration loss only</text>
-        <text class="tf" x="950" y="206">teaches: never feet in the ground</text>
-        <text class="tf" x="950" y="222">beyond the few real terrains</text>
-        <path class="gfill" d="M950 292 V270 H1000 V250 H1045 V276 H1100 V240 H1150 V262 H1195 V244 H1240 V292 Z"/>
-        <circle class="sph" cx="1022" cy="244" r="6"/><circle class="sph" cx="1125" cy="234" r="6"/><circle class="sph" cx="1217" cy="238" r="6"/>
-      </svg>
-    </div>
-    <figcaption>In ④ tread and cells are to scale; spheres are foot contact spheres.</figcaption>
-  </figure>
-  <details class="more"><summary>Why these choices</summary><div class="more-body">
-  <div class="whys">
-    <div class="why"><span class="num">4</span><b>5 cm cells near the feet</b><span>A 22 cm tread was only 2 cells at 10 cm.</span></div>
-    <div class="why"><span class="num">5</span><b>Contact points pulled onto the surface</b><span>Before, they only matched the data's height.</span></div>
-    <div class="why"><span class="num">6</span><b>Penetration on the exact heightfield</b><span>The lowest of 4 coarse cells missed about 20 % of stair stance spheres.</span></div>
-    <div class="why"><span class="num">7</span><b>Random terrain in 10 % of batches</b><span>Penetration loss only: teaches <i>never put feet in the ground</i> beyond the few real terrains.</span></div>
-  </div>
-  </div></details>
-
-  <div class="subhead"><h3>Fix 3 · sampling</h3><span>keep the terrain in charge at run time</span></div>
-  <figure class="panel">
-    <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Sampling, in order. Inner loop, ten times per plan: the draft plan starts as pure noise; the network predicts the clean plan twice, once with history, terrain and goal, once with terrain and goal only; the two predictions are mixed 65 to 35 toward the with-history one; steps 1 to 9 turn the mix into a less noisy draft for the next step, step 10 outputs the plan. Then, once per plan: FK rebuilds segment poses from the joints, and the foot hold keeps planted feet where they are until the plan lifts them. Outer loop, every 0.2 s: the first 0.2 s is executed and the next history is rebuilt from the joints.">
-        <defs><marker id="q1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
-          <marker id="q2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker>
-          <marker id="q3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker></defs>
-        <rect x="20" y="44" width="180" height="64" rx="12" class="n gs"/>
-        <text class="t c" x="110" y="72">History 0.4 s</text>
-        <text class="ts c" x="110" y="94">rebuilt from joints</text>
-        <rect x="20" y="232" width="180" height="64" rx="12" class="n gs"/>
-        <text class="t c" x="110" y="260">Terrain + goal</text>
-        <text class="ts c" x="110" y="282">command or clip path</text>
-
-        <rect x="236" y="16" width="484" height="308" rx="16" class="n dash"/>
-        <g class="nm"><circle cx="250" cy="16" r="10"/><text x="250" y="20">8</text></g>
-        <text class="tm" x="268" y="42">inner loop · 10 denoising steps per plan · was 50</text>
-
-        <rect x="258" y="138" width="118" height="64" rx="10" class="n"/>
-        <text class="tn c" x="317" y="166">draft plan</text>
-        <text class="tf c" x="317" y="186">step 1: noise</text>
-
-        <rect x="420" y="56" width="200" height="72" rx="10" class="n hl"/>
-        <text class="ts c" x="520" y="86">predict with history</text>
-        <text class="tf c" x="520" y="106">history · terrain · goal</text>
-        <rect x="420" y="212" width="200" height="72" rx="10" class="n hl"/>
-        <text class="ts c" x="520" y="242">predict without history</text>
-        <text class="tf c" x="520" y="262">terrain · goal</text>
-
-        <path class="ar" d="M200 76 H418" marker-end="url(#q1)"/>
-        <path class="ar" d="M200 264 H418" marker-end="url(#q1)"/>
-        <path class="ar" d="M218 264 V96 H418" marker-end="url(#q1)"/>
-        <circle cx="218" cy="264" r="3.5" class="mk"/>
-        <path class="ar" d="M317 138 V116 H418" marker-end="url(#q1)"/>
-        <path class="ar" d="M317 202 V224 H418" marker-end="url(#q1)"/>
-
-        <circle cx="670" cy="170" r="36" class="n amb"/>
-        <text class="ta c" x="670" y="166">mix</text>
-        <text class="tm c" x="670" y="184">65 / 35</text>
-        <g class="nm"><circle cx="638" cy="138" r="10"/><text x="638" y="142">9</text></g>
-        <path class="ar" d="M620 92 H670 V132" marker-end="url(#q1)"/>
-        <text class="tf c" x="648" y="84">65 %</text>
-        <path class="ar" d="M620 248 H670 V208" marker-end="url(#q1)"/>
-        <text class="tf c" x="648" y="240">35 %</text>
-        <path class="ar amb" d="M634 170 H380" marker-end="url(#q3)"/>
-        <text class="ta c" x="505" y="162">steps 1–9: less noisy draft</text>
-
-        <line class="ar" x1="706" y1="170" x2="788" y2="170" marker-end="url(#q1)"/>
-        <text class="tf c" x="747" y="160">step 10</text>
-        <rect x="790" y="130" width="190" height="80" rx="12" class="n"/>
-        <text class="t c" x="885" y="162">Joints are the truth</text>
-        <text class="ts c" x="885" y="186">FK rebuilds segment poses</text>
-        <g class="nm"><circle cx="804" cy="130" r="10"/><text x="804" y="134">10</text></g>
-
-        <line class="ar" x1="980" y1="170" x2="1028" y2="170" marker-end="url(#q1)"/>
-        <rect x="1030" y="130" width="210" height="80" rx="12" class="n tl"/>
-        <text class="t c" x="1135" y="158">Foot hold</text>
-        <text class="ts c" x="1135" y="180">planted feet stay put</text>
-        <text class="ts c" x="1135" y="198">until the plan lifts them</text>
-        <g class="nm"><circle cx="1044" cy="130" r="10"/><text x="1044" y="134">11</text></g>
-        <text class="tf c" x="1015" y="238">once per plan</text>
-        <line class="grid-line" x1="790" y1="226" x2="1240" y2="226"/>
-
-        <path class="ar tl dash" d="M1135 210 V350 H8 V76 H18" marker-end="url(#q2)"/>
-        <text class="tt c" x="640" y="342">outer loop, every 0.2 s: execute the first 0.2 s · rebuild the history from the joints · plan again</text>
-      </svg>
-    </div>
-    <figcaption>Read left to right: the inner loop runs ten times to make one plan, then FK and the foot hold run once, then the outer loop executes 0.2 s and replans.</figcaption>
-  </figure>
-  <details class="more"><summary>How the mix works on one step, and sampling time</summary><div class="more-body">
-  <div class="split">
-    <figure class="panel">
-      <div class="scroll">
-        <svg class="dia dia-mid" viewBox="0 0 640 330" role="img" aria-label="One swing at an unseen staircase, side view. The with-history prediction keeps the stride and clips the step edge 40 cm ahead. The history-free prediction clears the step but does not know the current stride, so it lands long. The mix, applied at every denoising step, clears the edge and lands on the tread at the old stride.">
-          <line class="pw" x1="20" y1="22" x2="56" y2="22"/><text class="tn" x="64" y="26">with history: keeps the stride, misses the step</text>
-          <line class="pwo" x1="20" y1="44" x2="56" y2="44"/><text class="tn" x="64" y="48">without history: sees the step, guesses the stride</text>
-          <line class="pmix" x1="20" y1="66" x2="56" y2="66"/><text class="tn" x="64" y="70">mixed at every denoising step: both</text>
-          <path class="gfill" d="M20 290 V250 H220 V186 H620 V290 Z"/>
-          <path class="pw" d="M60 250 Q175 186 290 250"/>
-          <path class="pwo" d="M60 250 Q150 30 380 186"/>
-          <path class="pmix" d="M60 250 Q163 120 290 186"/>
-          <circle class="dot" cx="60" cy="250" r="5"/>
-          <circle class="dot" cx="290" cy="186" r="5"/>
-          <circle cx="380" cy="186" r="4" class="mk amb"/>
-          <line class="xmark" x1="214" y1="217" x2="226" y2="229"/><line class="xmark" x1="226" y1="217" x2="214" y2="229"/>
-          <text class="tf" x="24" y="240">foot</text>
-          <text class="tr" x="110" y="242">clips the edge</text>
-          <text class="ta" x="392" y="176">lands long</text>
-          <text class="tn" x="304" y="216">mix: clears it, same stride</text>
-          <line class="dim" x1="60" y1="304" x2="220" y2="304"/><line class="dim" x1="60" y1="298" x2="60" y2="310"/><line class="dim" x1="220" y1="298" x2="220" y2="310"/>
-          <text class="tf c" x="140" y="323">step 40 cm ahead</text>
-        </svg>
-      </div>
-      <figcaption>A sketch, not data. The mix is not an average of two finished paths: averaging one that clips the edge with one that clears it can still clip it. It mixes the two clean-plan estimates inside every denoising step, so each next step starts from a draft both predictions accept.</figcaption>
-    </figure>
-    <div class="whys stack">
-      <div class="why"><span class="num">8</span><b>10 denoising steps</b><span>Was 50: 3.4 s instead of 17.2 s for 2,048 plans.</span></div>
-      <div class="why"><span class="num">9</span><b>With and without history, mixed 65/35</b><span>Each step runs the network twice and leans 65 % toward the with-history prediction. Since s &lt; 1 it leans away from the history; ordinary guidance (s &gt; 1) would amplify it. 0.65 is PARC's value, untested here; it only affects sampling, so a trained checkpoint can be swept.</span></div>
-      <div class="why"><span class="num">10</span><b>Joints are the truth</b><span>After step 10, FK rebuilds the segment poses, so a plan is always one consistent body.</span></div>
-      <div class="why"><span class="num">11</span><b>Foot hold, then execute 0.2 s</b><span>A few optimiser steps on the leg joints keep planted feet where they are until the plan's contact flag lifts them; the next history is rebuilt from the joints.</span></div>
-      <div class="why cost"><span class="num">!</span><b>Cost</b><span>Weaker history could make replan seams rougher. The foot hold compensates, and the scoreboard's seam metric measures it.</span></div>
-    </div>
-  </div>
-
-  <div class="reads">
-    <div class="read"><b>17.2 s</b><span>now: 2,048 plans at 50 steps (4090, measured)</span></div>
-    <div class="read"><b>3.4 s</b><span>same, 10 steps (measured)</span></div>
-    <div class="read target"><b>≤ 0.5 s</b><span>needed: 4,096 plans, for training with the planner in the loop (P4)</span></div>
-    <div class="read"><b>4×256</b><span>PARC-size network vs our 6×512: ~6× faster; P1 compares both</span></div>
-  </div>
-  </div></details>
+  <p class="note"><b>Tried and dropped:</b> hiding the history (every replan jolted) and a random goal horizon (goal error 57 % worse). Details and numbers: <a href="planner.html">Planner tab</a>.</p>
 
   <details class="more"><summary>Optional · warp the rare terrain, only if the planner still memorises stairs</summary><div class="more-body">
   <div class="subhead"><h3>Optional · warp the rare terrain</h3><span>only if the planner still memorises stairs</span></div>
@@ -1022,12 +722,12 @@ details.more > summary:focus-visible { outline:2px solid var(--blue); outline-of
   </div></details>
 
   <div class="gates"><span class="lbl">G1 vs the current planner · before P2</span>
-    <span class="gate">stair-descent penetration ≤ 10 % (now 36 %)</span>
-    <span class="gate">box clips no jerkier than human</span>
-    <span class="gate">slip ≤ 1.5× real</span>
-    <span class="gate">goal error no worse than now</span>
-    <span class="gate">style in real range</span>
-    <span class="gate">4,096 plans ≤ 0.5 s</span>
+    <span class="gate">stair-descent penetration ≤ 10 % (now 9 %)</span>
+    <span class="gate">box courses no jerkier than human (now 11 % of frames vs 0.7 %)</span>
+    <span class="gate">slip ≤ 1.5× real (now 1.05×)</span>
+    <span class="gate">goal error no worse (0.095 → 0.077 m)</span>
+    <span class="gate">style in real range (0.087; real 0.042–0.115)</span>
+    <span class="gate">4,096 plans ≤ 0.5 s (512 take 0.3 s)</span>
   </div>
 </section>
 
