@@ -185,7 +185,7 @@ svg.dia { width:100%; height:auto; display:block }
     <span><span class="bdg today">TODAY</span>exists today as is</span>
     <span><span class="gdot">G1</span>gate: must pass before the next phase</span>
     <span><span class="dashln"></span>training only</span>
-    <span><span class="num">1</span>design choice, explained in the card with that number</span>
+    <span><span class="num">1</span>step order in that diagram; the card with that number explains it</span>
   </div>
   <div class="legend">
     <span><span class="sw b"></span>planner</span>
@@ -197,7 +197,7 @@ svg.dia { width:100%; height:auto; display:block }
     <div><dt>Window</dt><dd>0.4 s of history (8 frames) + 1.2 s of planned future (24 frames), 20 Hz.</dd></div>
     <div><dt>Seam</dt><dd>Where one replanned stretch joins the next.</dd></div>
     <div><dt>FK</dt><dd>Forward kinematics: joint angles → segment poses.</dd></div>
-    <div><dt>Foot hold</dt><dd>After sampling: pins stance feet, puts contact feet on the surface.</dd></div>
+    <div><dt>Foot hold</dt><dd>After sampling: planted feet stay where they are until the plan lifts them.</dd></div>
     <div><dt>Teacher / student</dt><dd>Teacher tracks a plan's full pose; the student sees only a slice.</dd></div>
     <div><dt>Slice</dt><dd>Footholds, contact timing, centre of mass (COM), pelvis, own heightmap.</dd></div>
     <div><dt>DAgger</dt><dd>The student learns the teacher's actions on the student's own states.</dd></div>
@@ -234,10 +234,10 @@ svg.dia { width:100%; height:auto; display:block }
         <g class="db"><rect x="118" y="128" width="44" height="16" rx="8"/><text x="140" y="139.5">TODAY</text></g>
 
         <rect x="233" y="136" width="154" height="104" rx="12" class="n"/>
-        <text class="tp" x="245" y="158">P3</text>
+        <text class="tp" x="245" y="158">P1 · P3</text>
         <text class="t c" x="310" y="184">Training mix</text>
-        <text class="ts c" x="310" y="206">real ≥ 2/3</text>
-        <text class="ts c" x="310" y="224">kept ≤ 1/3</text>
+        <text class="ts c" x="310" y="206">P1: human clips</text>
+        <text class="ts c" x="310" y="224">P3: + kept ≤ 1/3</text>
         <g class="nb"><rect x="339" y="128" width="36" height="16" rx="8"/><text x="357" y="139.5">NEW</text></g>
 
         <rect x="446" y="136" width="154" height="104" rx="12" class="n hl"/>
@@ -373,7 +373,7 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="145" y="262">Fixed courses</text>
         <text class="ts c" x="145" y="284">stairs 12–20 cm · boxes 20–60 cm</text>
         <text class="ts c" x="145" y="304">ramps 3–15° · turns</text>
-        <g class="nm"><circle cx="34" cy="116" r="10"/><text x="34" y="120">2</text></g>
+        <g class="nm"><circle cx="34" cy="116" r="10"/><text x="34" y="120">1</text></g>
         <path class="ar" d="M270 164 H320 V276 H270"/>
         <line class="ar" x1="320" y1="220" x2="398" y2="220" marker-end="url(#s1)"/>
         <text class="tf c" x="359" y="210">test cases</text>
@@ -382,7 +382,7 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="500" y="204">Rollouts</text>
         <text class="ts c" x="500" y="226">every 5k iterations</text>
         <text class="ts c" x="500" y="246">fixed seeds, 8 s each</text>
-        <g class="nm"><circle cx="414" cy="170" r="10"/><text x="414" y="174">1</text></g>
+        <g class="nm"><circle cx="414" cy="170" r="10"/><text x="414" y="174">2</text></g>
         <line class="ar" x1="600" y1="220" x2="658" y2="220" marker-end="url(#s1)"/>
         <text class="tf c" x="629" y="210">plans</text>
 
@@ -410,8 +410,8 @@ svg.dia { width:100%; height:auto; display:block }
     <figcaption>The same benchmark scores the planner alone (P1), the library (P2), each loop round (P3) and the closed loop (P4), so improvements stay comparable.</figcaption>
   </figure>
   <div class="whys">
-    <div class="why"><span class="num">1</span><b>Rollouts, not loss</b><span>A rollout shows where the feet meet the ground; held-out loss does not.</span></div>
-    <div class="why"><span class="num">2</span><b>Fixed seeds, fixed courses</b><span>Every checkpoint faces the same test, every 5k iterations.</span></div>
+    <div class="why"><span class="num">1</span><b>Fixed test cases</b><span>Held-out windows and fixed courses: every checkpoint faces the same test.</span></div>
+    <div class="why"><span class="num">2</span><b>Rollouts, not loss</b><span>Every 5k iterations, fixed seeds. A rollout shows where the feet meet the ground; held-out loss does not.</span></div>
     <div class="why"><span class="num">3</span><b>One benchmark for every phase</b><span>Planner, library, loop rounds and closed loop on one scale.</span></div>
   </div>
 </section>
@@ -507,7 +507,7 @@ svg.dia { width:100%; height:auto; display:block }
         <rect class="cellf" x="262" y="130" width="336" height="30"/>
         <path class="ar amb" d="M374 124 V118 H598 V124"/>
         <circle class="noise" cx="490" cy="118" r="11"/><circle class="gb" cx="490" cy="118" r="5"/>
-        <g class="nm"><circle cx="388" cy="97" r="9"/><text x="388" y="101">3</text></g>
+        <g class="nm"><circle cx="388" cy="97" r="9"/><text x="388" y="101">1</text></g>
         <text class="ta" x="402" y="101">goal at a random horizon 0.4–1.2 s (an input) · 5 cm noise</text>
         <g class="nm"><circle cx="624" cy="146" r="9"/><text x="624" y="150">2</text></g>
         <text class="tt" x="640" y="150">smooth noise, see right</text>
@@ -519,7 +519,7 @@ svg.dia { width:100%; height:auto; display:block }
         <rect class="cellf" x="262" y="200" width="336" height="30"/>
         <path class="ar amb" d="M374 194 V188 H598 V194"/>
         <circle class="noise" cx="540" cy="188" r="11"/><circle class="gb" cx="540" cy="188" r="5"/>
-        <g class="nm"><circle cx="624" cy="216" r="9"/><text x="624" y="220">1</text></g>
+        <g class="nm"><circle cx="624" cy="216" r="9"/><text x="624" y="220">3</text></g>
         <text class="tt" x="640" y="220">hidden: read terrain + goal</text>
 
         <line class="grid-line" x1="150" y1="246" x2="598" y2="246"/>
@@ -553,9 +553,9 @@ svg.dia { width:100%; height:auto; display:block }
     <figcaption>Hiding the history and loosening the goal stop the model from recognising a memorised clip from its first frames.</figcaption>
   </figure>
   <div class="whys">
-    <div class="why"><span class="num">1</span><b>Hide the history in 15 % of windows</b><span>The model must learn what terrain + goal alone call for.</span></div>
+    <div class="why"><span class="num">1</span><b>Goal at a random 0.4–1.2 s horizon, + 5 cm noise</b><span>The horizon is an input, so the goal means <i>head about here</i> instead of a clip's exact pelvis position.</span></div>
     <div class="why"><span class="num">2</span><b>Noise = smooth whole-body offset, re-run through FK</b><span>A noisy history is still a body a policy could produce. Before, per-channel noise made joints and foot positions disagree.</span></div>
-    <div class="why"><span class="num">3</span><b>Goal at a random 0.4–1.2 s horizon, + 5 cm noise</b><span>The horizon is an input, so the goal means <i>head about here</i> instead of a clip's exact pelvis position.</span></div>
+    <div class="why"><span class="num">3</span><b>Hide the history in 15 % of windows</b><span>The model must learn what terrain + goal alone call for. This also trains the history-free prediction that sampling mixes in (Fix 3).</span></div>
   </div>
 
   <div class="subhead"><h3>Fix 2 · terrain</h3><span>make the foot's relation to the ground a direct target</span></div>
@@ -627,87 +627,105 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="subhead"><h3>Fix 3 · sampling</h3><span>keep the terrain in charge at run time</span></div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 262" role="img" aria-label="Sampling: at each of ten denoising steps the planner predicts once with history and once without, and mixes them 65 to 35 toward the with-history prediction; the draft plan's joints are the truth and forward kinematics rebuilds segment poses; the foot hold pins stance feet and puts contact feet on the surface; 0.2 s is executed and the next history is rebuilt from the joints.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Sampling, in order. Inner loop, ten times per plan: the draft plan starts as pure noise; the network predicts the clean plan twice, once with history, terrain and goal, once with terrain and goal only; the two predictions are mixed 65 to 35 toward the with-history one; steps 1 to 9 turn the mix into a less noisy draft for the next step, step 10 outputs the plan. Then, once per plan: FK rebuilds segment poses from the joints, and the foot hold keeps planted feet where they are until the plan lifts them. Outer loop, every 0.2 s: the first 0.2 s is executed and the next history is rebuilt from the joints.">
         <defs><marker id="q1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
-          <marker id="q2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
-        <rect x="20" y="40" width="170" height="66" rx="12" class="n gs"/>
-        <text class="t c" x="105" y="68">History</text>
-        <text class="ts c" x="105" y="90">rebuilt from joints</text>
-        <rect x="20" y="130" width="170" height="66" rx="12" class="n gs"/>
-        <text class="t c" x="105" y="158">Terrain + goal</text>
-        <text class="ts c" x="105" y="180">command or clip path</text>
+          <marker id="q2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker>
+          <marker id="q3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker></defs>
+        <rect x="20" y="44" width="180" height="64" rx="12" class="n gs"/>
+        <text class="t c" x="110" y="72">History 0.4 s</text>
+        <text class="ts c" x="110" y="94">rebuilt from joints</text>
+        <rect x="20" y="232" width="180" height="64" rx="12" class="n gs"/>
+        <text class="t c" x="110" y="260">Terrain + goal</text>
+        <text class="ts c" x="110" y="282">command or clip path</text>
 
-        <rect x="250" y="24" width="400" height="192" rx="16" class="n dash"/>
-        <g class="nm"><circle cx="264" cy="24" r="10"/><text x="264" y="28">8</text></g>
-        <text class="tm" x="282" y="47">× 10 denoising steps · was 50</text>
-        <rect x="272" y="62" width="190" height="52" rx="10" class="n hl"/>
-        <text class="ts c" x="367" y="93">predict with history</text>
-        <rect x="272" y="138" width="190" height="52" rx="10" class="n hl"/>
-        <text class="ts c" x="367" y="169">predict without history</text>
-        <g class="nb"><rect x="414" y="130" width="36" height="16" rx="8"/><text x="432" y="141.5">NEW</text></g>
-        <path class="ar" d="M190 73 H226 V84 H270" marker-end="url(#q1)"/>
-        <path class="ar" d="M190 163 H244 V104 H270" marker-end="url(#q1)"/>
-        <path class="ar" d="M244 163 H270" marker-end="url(#q1)"/>
+        <rect x="236" y="16" width="484" height="308" rx="16" class="n dash"/>
+        <g class="nm"><circle cx="250" cy="16" r="10"/><text x="250" y="20">8</text></g>
+        <text class="tm" x="268" y="42">inner loop · 10 denoising steps per plan · was 50</text>
 
-        <circle cx="596" cy="126" r="40" class="n amb"/>
-        <text class="ta c" x="596" y="122">mix</text>
-        <text class="tm c" x="596" y="140">65 / 35</text>
-        <g class="nm"><circle cx="566" cy="92" r="10"/><text x="566" y="96">9</text></g>
-        <path class="ar" d="M462 88 H526 V112 H556" marker-end="url(#q1)"/>
-        <text class="tf c" x="494" y="80">65 %</text>
-        <path class="ar" d="M462 164 H526 V140 H556" marker-end="url(#q1)"/>
-        <text class="tf c" x="494" y="156">35 %</text>
+        <rect x="258" y="138" width="118" height="64" rx="10" class="n"/>
+        <text class="tn c" x="317" y="166">draft plan</text>
+        <text class="tf c" x="317" y="186">step 1: noise</text>
 
-        <line class="ar" x1="636" y1="126" x2="728" y2="126" marker-end="url(#q1)"/>
-        <text class="tf c" x="690" y="116">draft plan</text>
-        <rect x="730" y="86" width="200" height="80" rx="12" class="n"/>
-        <text class="t c" x="830" y="116">Joints are the truth</text>
-        <text class="ts c" x="830" y="140">FK rebuilds segment poses</text>
-        <g class="nb"><rect x="882" y="78" width="36" height="16" rx="8"/><text x="900" y="89.5">NEW</text></g>
-        <g class="nm"><circle cx="744" cy="86" r="10"/><text x="744" y="90">10</text></g>
+        <rect x="420" y="56" width="200" height="72" rx="10" class="n hl"/>
+        <text class="ts c" x="520" y="86">predict with history</text>
+        <text class="tf c" x="520" y="106">history · terrain · goal</text>
+        <rect x="420" y="212" width="200" height="72" rx="10" class="n hl"/>
+        <text class="ts c" x="520" y="242">predict without history</text>
+        <text class="tf c" x="520" y="262">terrain · goal</text>
+        <g class="nb"><rect x="572" y="204" width="36" height="16" rx="8"/><text x="590" y="215.5">NEW</text></g>
 
-        <line class="ar" x1="930" y1="126" x2="998" y2="126" marker-end="url(#q1)"/>
-        <text class="tf c" x="964" y="116">one body</text>
-        <rect x="1000" y="86" width="240" height="80" rx="12" class="n tl"/>
-        <text class="t c" x="1120" y="116">Foot hold</text>
-        <text class="ts c" x="1120" y="140">stance pinned · contacts on surface</text>
-        <g class="db"><rect x="1184" y="78" width="44" height="16" rx="8"/><text x="1206" y="89.5">TODAY</text></g>
-        <g class="nm"><circle cx="1014" cy="86" r="10"/><text x="1014" y="90">11</text></g>
+        <path class="ar" d="M200 76 H418" marker-end="url(#q1)"/>
+        <path class="ar" d="M200 264 H418" marker-end="url(#q1)"/>
+        <path class="ar" d="M218 264 V96 H418" marker-end="url(#q1)"/>
+        <circle cx="218" cy="264" r="3.5" class="mk"/>
+        <path class="ar" d="M317 138 V116 H418" marker-end="url(#q1)"/>
+        <path class="ar" d="M317 202 V224 H418" marker-end="url(#q1)"/>
 
-        <path class="ar tl dash" d="M1120 166 V246 H8 V73 H18" marker-end="url(#q2)"/>
-        <text class="tt c" x="640" y="238">plan out · execute 0.2 s · next history rebuilt from joints</text>
+        <circle cx="670" cy="170" r="36" class="n amb"/>
+        <text class="ta c" x="670" y="166">mix</text>
+        <text class="tm c" x="670" y="184">65 / 35</text>
+        <g class="nm"><circle cx="638" cy="138" r="10"/><text x="638" y="142">9</text></g>
+        <path class="ar" d="M620 92 H670 V132" marker-end="url(#q1)"/>
+        <text class="tf c" x="648" y="84">65 %</text>
+        <path class="ar" d="M620 248 H670 V208" marker-end="url(#q1)"/>
+        <text class="tf c" x="648" y="240">35 %</text>
+        <path class="ar amb" d="M634 170 H380" marker-end="url(#q3)"/>
+        <text class="ta c" x="505" y="162">steps 1–9: less noisy draft</text>
+
+        <line class="ar" x1="706" y1="170" x2="788" y2="170" marker-end="url(#q1)"/>
+        <text class="tf c" x="747" y="160">step 10</text>
+        <rect x="790" y="130" width="190" height="80" rx="12" class="n"/>
+        <text class="t c" x="885" y="162">Joints are the truth</text>
+        <text class="ts c" x="885" y="186">FK rebuilds segment poses</text>
+        <g class="nb"><rect x="932" y="122" width="36" height="16" rx="8"/><text x="950" y="133.5">NEW</text></g>
+        <g class="nm"><circle cx="804" cy="130" r="10"/><text x="804" y="134">10</text></g>
+
+        <line class="ar" x1="980" y1="170" x2="1028" y2="170" marker-end="url(#q1)"/>
+        <rect x="1030" y="130" width="210" height="80" rx="12" class="n tl"/>
+        <text class="t c" x="1135" y="158">Foot hold</text>
+        <text class="ts c" x="1135" y="180">planted feet stay put</text>
+        <text class="ts c" x="1135" y="198">until the plan lifts them</text>
+        <g class="db"><rect x="1184" y="122" width="44" height="16" rx="8"/><text x="1206" y="133.5">TODAY</text></g>
+        <g class="nm"><circle cx="1044" cy="130" r="10"/><text x="1044" y="134">11</text></g>
+        <text class="tf c" x="1015" y="238">once per plan</text>
+        <line class="grid-line" x1="790" y1="226" x2="1240" y2="226"/>
+
+        <path class="ar tl dash" d="M1135 210 V350 H8 V76 H18" marker-end="url(#q2)"/>
+        <text class="tt c" x="640" y="342">outer loop, every 0.2 s: execute the first 0.2 s · rebuild the history from the joints · plan again</text>
       </svg>
     </div>
-    <figcaption>Blending with a history-free prediction keeps the terrain in charge, as PARC (s = 0.65) and CAMDM (γ = 0.7) do. Ten steps instead of fifty, and no unused guidance pass, cut sampling time about tenfold.</figcaption>
+    <figcaption>Read left to right: the inner loop runs ten times to make one plan, then FK and the foot hold run once, then the outer loop executes 0.2 s and replans. Blending with a history-free prediction keeps the terrain in charge, as PARC (s = 0.65) and CAMDM (γ = 0.7) do. Ten steps instead of fifty, and no unused guidance pass, cut sampling time about tenfold.</figcaption>
   </figure>
   <div class="split">
     <figure class="panel">
       <div class="scroll">
-        <svg class="dia dia-mid" viewBox="0 0 640 310" role="img" aria-label="One swing at an unseen staircase, side view. With history alone the foot keeps its rhythm and hits the step 40 cm ahead. Without history, terrain and goal call for a high lift. The 65 to 35 mix lifts the foot over the edge, and the foot hold sets the landing on the tread.">
-          <line class="pw" x1="20" y1="22" x2="56" y2="22"/><text class="tn" x="64" y="26">with history: keep this rhythm</text>
-          <line class="pwo" x1="20" y1="44" x2="56" y2="44"/><text class="tn" x="64" y="48">without history: lift for the step</text>
-          <line class="pmix" x1="20" y1="66" x2="56" y2="66"/><text class="tn" x="64" y="70">mix: 65 % with + 35 % without</text>
-          <path class="gfill" d="M20 270 V250 H220 V186 H620 V270 Z"/>
+        <svg class="dia dia-mid" viewBox="0 0 640 330" role="img" aria-label="One swing at an unseen staircase, side view. The with-history prediction keeps the stride and clips the step edge 40 cm ahead. The history-free prediction clears the step but does not know the current stride, so it lands long. The mix, applied at every denoising step, clears the edge and lands on the tread at the old stride.">
+          <line class="pw" x1="20" y1="22" x2="56" y2="22"/><text class="tn" x="64" y="26">with history: keeps the stride, misses the step</text>
+          <line class="pwo" x1="20" y1="44" x2="56" y2="44"/><text class="tn" x="64" y="48">without history: sees the step, guesses the stride</text>
+          <line class="pmix" x1="20" y1="66" x2="56" y2="66"/><text class="tn" x="64" y="70">mixed at every denoising step: both</text>
+          <path class="gfill" d="M20 290 V250 H220 V186 H620 V290 Z"/>
           <path class="pw" d="M60 250 Q175 186 290 250"/>
-          <path class="pwo" d="M60 250 Q140 40 290 186"/>
-          <path class="pmix" d="M60 250 Q163 135 290 186"/>
+          <path class="pwo" d="M60 250 Q150 30 380 186"/>
+          <path class="pmix" d="M60 250 Q163 120 290 186"/>
           <circle class="dot" cx="60" cy="250" r="5"/>
           <circle class="dot" cx="290" cy="186" r="5"/>
+          <circle cx="380" cy="186" r="4" class="mk amb"/>
           <line class="xmark" x1="214" y1="217" x2="226" y2="229"/><line class="xmark" x1="226" y1="217" x2="214" y2="229"/>
           <text class="tf" x="24" y="240">foot</text>
-          <text class="tr" x="125" y="242">hits the step</text>
-          <text class="tt" x="300" y="176">foot hold sets it on the tread</text>
-          <line class="dim" x1="60" y1="284" x2="220" y2="284"/><line class="dim" x1="60" y1="278" x2="60" y2="290"/><line class="dim" x1="220" y1="278" x2="220" y2="290"/>
-          <text class="tf c" x="140" y="303">step 40 cm ahead</text>
+          <text class="tr" x="110" y="242">clips the edge</text>
+          <text class="ta" x="392" y="176">lands long</text>
+          <text class="tn" x="304" y="216">mix: clears it, same stride</text>
+          <line class="dim" x1="60" y1="304" x2="220" y2="304"/><line class="dim" x1="60" y1="298" x2="60" y2="310"/><line class="dim" x1="220" y1="298" x2="220" y2="310"/>
+          <text class="tf c" x="140" y="323">step 40 cm ahead</text>
         </svg>
       </div>
-      <figcaption>Approaching an unseen staircase, <i>keep walking at this rhythm</i> meets <i>a step is 40 cm ahead, lift the foot</i>, and the mix lifts the foot.</figcaption>
+      <figcaption>A sketch, not data. The mix is not an average of two finished paths: averaging one that clips the edge with one that clears it can still clip it. It mixes the two clean-plan estimates inside every denoising step, so each next step starts from a draft both predictions accept.</figcaption>
     </figure>
     <div class="whys stack">
       <div class="why"><span class="num">8</span><b>10 denoising steps</b><span>Was 50: 3.4 s instead of 17.2 s for 2,048 plans.</span></div>
-      <div class="why"><span class="num">9</span><b>With and without history, mixed 65/35</b><span>Each step runs the network twice and leans 65 % toward the with-history prediction (PARC uses s = 0.65).</span></div>
-      <div class="why"><span class="num">10</span><b>Joints are the truth</b><span>FK rebuilds the segment poses, so a plan is always one consistent body.</span></div>
-      <div class="why"><span class="num">11</span><b>Foot hold, then execute 0.2 s</b><span>Stance feet stay pinned, contact feet land on the surface; the next history is rebuilt from the joints.</span></div>
+      <div class="why"><span class="num">9</span><b>With and without history, mixed 65/35</b><span>Each step runs the network twice and leans 65 % toward the with-history prediction. Since s &lt; 1 it leans away from the history; ordinary guidance (s &gt; 1) would amplify it. 0.65 is PARC's value, untested here; it only affects sampling, so a trained checkpoint can be swept.</span></div>
+      <div class="why"><span class="num">10</span><b>Joints are the truth</b><span>After step 10, FK rebuilds the segment poses, so a plan is always one consistent body.</span></div>
+      <div class="why"><span class="num">11</span><b>Foot hold, then execute 0.2 s</b><span>A few optimiser steps on the leg joints keep planted feet where they are until the plan's contact flag lifts them; the next history is rebuilt from the joints.</span></div>
       <div class="why cost"><span class="num">!</span><b>Cost</b><span>Weaker history could make replan seams rougher. The foot hold compensates, and the scoreboard's seam metric measures it.</span></div>
     </div>
   </div>
@@ -880,13 +898,13 @@ svg.dia { width:100%; height:auto; display:block }
             <marker id="r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk bad"/></marker></defs>
           <rect x="25" y="180" width="170" height="80" rx="12" class="n hl"/>
           <text class="t c" x="110" y="214">Planner, round k</text>
-          <text class="ts c" x="110" y="236">from scratch</text>
+          <text class="ts c" x="110" y="236">round 1 = v10 (P1)</text>
           <g class="ub"><rect x="127" y="172" width="56" height="16" rx="8"/><text x="155" y="183.5">UPGRADE</text></g>
           <rect x="215" y="40" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="300" y="74">Generate</text>
           <text class="ts c" x="300" y="96">wider terrain</text>
           <g class="nb"><rect x="337" y="32" width="36" height="16" rx="8"/><text x="355" y="43.5">NEW</text></g>
-          <g class="nm"><circle cx="229" cy="40" r="10"/><text x="229" y="44">3</text></g>
+          <g class="nm"><circle cx="229" cy="40" r="10"/><text x="229" y="44">1</text></g>
           <rect x="475" y="40" width="170" height="80" rx="12" class="n tl"/>
           <text class="t c" x="560" y="74">Teacher tracks</text>
           <text class="ts c" x="560" y="96">in simulation</text>
@@ -900,13 +918,13 @@ svg.dia { width:100%; height:auto; display:block }
           <text class="ts c" x="560" y="368">no fall · ≤ 8° · ≤ 5 cm</text>
           <text class="ts c" x="560" y="386">style in human range</text>
           <g class="nb"><rect x="597" y="312" width="36" height="16" rx="8"/><text x="615" y="323.5">NEW</text></g>
-          <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">1</text></g>
+          <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">2</text></g>
           <rect x="215" y="320" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="300" y="348">Training mix</text>
           <text class="ts c" x="300" y="368">real ≥ 2/3</text>
           <text class="ts c" x="300" y="386">kept ≤ 1/3</text>
           <g class="nb"><rect x="337" y="312" width="36" height="16" rx="8"/><text x="355" y="323.5">NEW</text></g>
-          <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">2</text></g>
+          <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">3</text></g>
           <rect x="25" y="330" width="130" height="60" rx="12" class="n gs"/>
           <text class="t c" x="90" y="356">Human clips</text>
           <text class="ts c" x="90" y="376">AB01 · PARC · SEED</text>
@@ -952,9 +970,9 @@ svg.dia { width:100%; height:auto; display:block }
     </div>
   </div>
   <div class="whys">
-    <div class="why"><span class="num">1</span><b>Keep filter</b><span>The body decides what is doable: no fall, tracking error ≤ 8° · ≤ 5 cm, style in human range.</span></div>
-    <div class="why"><span class="num">2</span><b>Real ≥ 2/3, kept ≤ 1/3 of each batch</b><span>Real data stays in every batch as the human anchor.</span></div>
-    <div class="why"><span class="num">3</span><b>Wider terrain each round</b><span>Pushes past the clips' terrain as far as the body succeeds.</span></div>
+    <div class="why"><span class="num">1</span><b>Wider terrain each round</b><span>Pushes past the clips' terrain as far as the body succeeds.</span></div>
+    <div class="why"><span class="num">2</span><b>Keep filter</b><span>The body decides what is doable: no fall, tracking error ≤ 8° · ≤ 5 cm, style in human range.</span></div>
+    <div class="why"><span class="num">3</span><b>Real ≥ 2/3, kept ≤ 1/3 of each batch</b><span>Real data stays in every batch as the human anchor.</span></div>
   </div>
 </section>
 
@@ -975,7 +993,7 @@ svg.dia { width:100%; height:auto; display:block }
         <rect x="560" y="20" width="240" height="70" rx="12" class="n tl dash"/>
         <text class="t c" x="680" y="50">Teacher</text>
         <text class="ts c" x="680" y="72">tracks the same full plan</text>
-        <g class="nm"><circle cx="574" cy="20" r="10"/><text x="574" y="24">3</text></g>
+        <g class="nm"><circle cx="574" cy="20" r="10"/><text x="574" y="24">2</text></g>
 
         <rect x="20" y="150" width="170" height="96" rx="12" class="n hl"/>
         <text class="tp" x="32" y="172">P4</text>
@@ -1027,15 +1045,15 @@ svg.dia { width:100%; height:auto; display:block }
 
         <path class="ar blue" d="M1175 238 V318 H105 V248" marker-end="url(#d3)"/>
         <text class="tb c" x="640" y="310">last 0.4 s, rebuilt from joints · replan every 0.2 s and at touchdowns</text>
-        <g class="nm"><circle cx="240" cy="318" r="10"/><text x="240" y="322">2</text></g>
+        <g class="nm"><circle cx="240" cy="318" r="10"/><text x="240" y="322">3</text></g>
       </svg>
     </div>
     <figcaption>After distillation, the student is fine-tuned with RL against the frozen planner on random terrain (as CLoSD and Zhang–Hutter do): loose slice tracking, effort, style.</figcaption>
   </figure>
   <div class="whys">
     <div class="why"><span class="num">1</span><b>Only a slice of the plan</b><span>Where and when each foot lands and where the body goes; the body finds its own joint motion.</span></div>
-    <div class="why"><span class="num">2</span><b>Replan from the simulated body</b><span>An infeasible stretch is corrected 0.2 s later instead of piling up.</span></div>
-    <div class="why"><span class="num">3</span><b>Teacher reads the same plan</b><span>Training only: its actions are the student's targets, and only the full-pose vs slice gap remains (below).</span></div>
+    <div class="why"><span class="num">2</span><b>Teacher reads the same plan</b><span>Training only: its actions are the student's targets, and only the full-pose vs slice gap remains (below).</span></div>
+    <div class="why"><span class="num">3</span><b>Replan from the simulated body</b><span>An infeasible stretch is corrected 0.2 s later instead of piling up.</span></div>
   </div>
 
   <div class="grid2">
