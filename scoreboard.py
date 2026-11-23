@@ -238,7 +238,7 @@ class Scoreboard:
         return out
 
     @torch.no_grad()
-    def __call__(self, P: PosePlanner, seed: int = 0, w: float = 1.0) -> dict[str, Any]:
+    def __call__(self, P: PosePlanner, seed: int = 0, w: float = 1.0, blend: float | None = None) -> dict[str, Any]:
         was = P.training
         P.eval()
         W, D, dev = self.W, self.D, self.dev
@@ -256,8 +256,8 @@ class Scoreboard:
                                     dtype=torch.float32, device=dev)
             return to_frame(ahead[:, None], o, psi)[:, 0]
         with torch.enable_grad():                                        # hold_feet's Adam steps need it
-            r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, self.n_plans, KEEP, w, gen, HOLD)
-            r_cou = rollout(P, self.G, self.gid, *self.c_start, course_goal, self.n_plans, KEEP, w, gen, HOLD)
+            r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, self.n_plans, KEEP, w, gen, HOLD, blend)
+            r_cou = rollout(P, self.G, self.gid, *self.c_start, course_goal, self.n_plans, KEEP, w, gen, HOLD, blend)
         t_roll = time.time() - t0
 
         eps = []
@@ -324,6 +324,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
     ap.add_argument("--checkpoint", default="planner_best.pt")
+    ap.add_argument("--blend", type=float, nargs="*", default=None, help="history blend s values to score each checkpoint at (models trained with --hist-drop; default the model's)")
+    ap.add_argument("--steps", type=int, default=None, help="DDIM sampling steps (default the model's)")
     ap.add_argument("--all", action="store_true", help="every ckpt_*.pt in the run (train_planner.py --score-every)")
     a = ap.parse_args()
     from gp import footfk
@@ -335,17 +337,22 @@ def main() -> None:
     rows = []
     for p in paths:
         P = PosePlanner.load(p, dev).attach(fk)
-        r = board(P)
-        r["checkpoint"] = p.name
-        r["iters"] = torch.load(p, map_location="cpu", weights_only=False).get("iters")
-        rows.append(r)
-        print(f"{p.name}: {r['balanced']}  ({r['rollout_s']} s rollouts, {r['gen_s_512']} s per 512 plans)", flush=True)
+        if a.steps:
+            P.cfg["sample_steps"] = a.steps
+        for blend in a.blend or [None]:
+            r = board(P, blend=blend)
+            r["file"] = p.name
+            r["checkpoint"] = p.name + ("" if blend is None else f" s={blend}") + (f" {a.steps} steps" if a.steps else "")
+            r["iters"] = torch.load(p, map_location="cpu", weights_only=False).get("iters")
+            rows.append(r)
+            print(f"{r['checkpoint']}: {r['balanced']}  ({r['rollout_s']} s rollouts, {r['gen_s_512']} s per 512 plans)",
+                  flush=True)
     best = select(rows) if len(rows) > 1 else rows[0]
-    (run / "scoreboard.json").write_text(json.dumps(rows, indent=1))
+    (run / ("scoreboard_blend.json" if a.blend or a.steps else "scoreboard.json")).write_text(json.dumps(rows, indent=1))
     print(table(rows))
     print("real held-out clips per class:", json.dumps(rows[0]["real"]))
     if a.all:
-        shutil.copy2(run / best["checkpoint"], run / "planner_score_best.pt")
+        shutil.copy2(run / best["file"], run / "planner_score_best.pt")
         print(f"best by mean rank: {best['checkpoint']} -> planner_score_best.pt")
 
 

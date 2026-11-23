@@ -112,7 +112,7 @@ def start(W: Windows, a0: torch.Tensor) -> tuple[dict, torch.Tensor]:
 
 
 def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tensor, goal_of, n_plans: int, keep: int,
-            w: float, gen: torch.Generator, hold: int = 0) -> dict[str, np.ndarray]:
+            w: float, gen: torch.Generator, hold: int = 0, blend: float | None = None) -> dict[str, np.ndarray]:
     """``n_plans`` plans from world start frames ``s`` (:func:`start`) on terrain ``G`` (row ``gid`` per episode)."""
     seq = {key: [v] for key, v in s.items()}
     for i in range(n_plans):
@@ -120,7 +120,7 @@ def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tenso
         o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
         g0 = G(gid, last["pcom"][:, -1:, 0], last["pcom"][:, -1:, 2])[:, 0]
         hist = P.with_segments(frame_features(last, o, a_psi, g0))
-        fut = P.generate(hist, patch(G, gid, o, a_psi, g0, P.grid), goal_of(i, o, a_psi), gen, w=w)[:, :keep]
+        fut = P.generate(hist, patch(G, gid, o, a_psi, g0, P.grid), goal_of(i, o, a_psi), gen, w=w, s=blend)[:, :keep]
         if hold:
             fut = hold_feet(P, hist, fut, hold)
         new = decode(fut, o, a_psi, g0)
