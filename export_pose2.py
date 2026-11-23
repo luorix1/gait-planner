@@ -37,7 +37,7 @@ from sprint.recipes.imitation import _qmul
 from sprint.recipes.motion import _rotate, forward_kinematics_np, model_layout
 
 from export_pose_planner import to_qpos
-from gp import data, footfk
+from gp import data, footfk, lazy
 from gp.planner import FUT, HIST, HZ, STRIDE, from_frame, qexp, tilt, to_frame, yaw_quat
 from gp.pose_planner import GEO_SCALE, J0, LEG_COLS, P0, SMOOTH_S, PosePlanner, Windows, _rot, geometry, patch
 from train import build
@@ -149,10 +149,98 @@ def rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tenso
         for key in seq:
             seq[key].append(new[key])
         psi_hist = torch.cat([psi_hist, new["psi"]], 1)
+    return _result(P, seq)
+
+
+def _result(P: PosePlanner, seq: dict[str, list[torch.Tensor]]) -> dict[str, np.ndarray]:
     full = {key: torch.cat(v, 1)[:, HIST - 1:] for key, v in seq.items()}
     origin = full["pcom"] - _rot(full["quat"], P.fk.bcom.expand_as(full["pcom"]))
     return dict(com=full["pcom"].cpu().numpy(), quat=full["quat"].cpu().numpy(), pelvis=origin.cpu().numpy(),
                 joints=full["joints"].cpu().numpy())
+
+
+def lazy_rollout(P: PosePlanner, G, gid: torch.Tensor, s: dict, psi_hist: torch.Tensor, goal_of, n_frames: int,
+                 T: lazy.Triggers, w: float, gen: torch.Generator, hold: int = 0, blend: float | None = None,
+                 xfade: int = 0, hold_smooth: float = 0.0, samples: int = 1, ground_now=None
+                 ) -> tuple[dict[str, np.ndarray], dict[str, float], np.ndarray]:
+    """:func:`rollout` with event-triggered replanning (gp.lazy): each episode plays its plan frame by frame and
+    generates a new one only on ``FRESH``, ``LOW`` (fewer than ``T.min_left_s`` trusted frames left), ``GOAL`` (the
+    goal's offset from the pelvis moved ``T.goal_tol``) or ``TERRAIN`` (``ground_now(f)``, a Ground at plan frame
+    ``f``, differs from what the plan's patch saw; None = static terrain, not checked). Episodes replan on their own
+    frames; the due ones are generated as one batch. ``goal_of(f, o, psi)``: ``f`` = plan frames played so far.
+
+    ``samples`` > 1: that many draws per generation; the first is played, trusted up to where the draws' pelvis and
+    foot points spread past ``T.spread_tol`` (gp.lazy.commit_frames). ``xfade`` and ``hold`` as in :func:`rollout`
+    (the crossfade's old frames are the old plan's for the same times, wherever it was cut).
+
+    Returns (the rollout as :func:`rollout`'s, gp.lazy.Log.summary, seam mask ``[B, n_frames + 1]``: the last
+    frame before and the first frame of each new plan, frame 0 = the last given one, as scoreboard.seam_excess)."""
+    B, dev = len(gid), gid.device
+    ar = torch.arange(B, device=dev)
+    seq = {key: [v] for key, v in s.items()}
+    plan = torch.zeros(B, FUT, P.c, device=dev)
+    o_p, psi_p, g0_p = torch.zeros(B, 2, device=dev), torch.zeros(B, device=dev), torch.zeros(B, device=dev)
+    ptr, since = torch.zeros(B, dtype=torch.long, device=dev), torch.zeros(B, dtype=torch.long, device=dev)
+    trust = torch.full((B,), FUT, dtype=torch.long, device=dev)
+    off0, patch0 = torch.zeros(B, 2, device=dev), None
+    log, seam = lazy.Log(), np.zeros((B, n_frames + 1), bool)
+    min_commit, S = T.frames(T.min_commit_s, HZ), max(samples, 1)
+    wt = torch.linspace(1, 0, xfade + 2, device=dev)[1:-1, None]
+    for f in range(n_frames):
+        seq = {key: [torch.cat(v, 1)] for key, v in seq.items()}
+        last = {key: v[0][:, -HIST:] for key, v in seq.items()}
+        o, a_psi = last["pcom"][:, -1, [0, 2]], circmean(psi_hist[:, -NS:])
+        goal = goal_of(f, o, a_psi)
+        off = from_frame(goal[:, None, :2], o, a_psi)[:, 0] - o                     # the goal from the pelvis, world
+        terr = None
+        if ground_now is not None and patch0 is not None:
+            terr = lazy.terrain_shift(patch(ground_now(f), gid, o_p, psi_p, g0_p, P.grid), patch0)
+        due, why = lazy.decide(T, HZ, since=since, left=trust - ptr, fresh=torch.full((B,), f == 0, device=dev),
+                               goal=lazy.goal_shift(off, off0), terrain=terr)
+        if bool(due.any()):
+            idx = due.nonzero().squeeze(1)
+            log.add(why)
+            seam[idx.cpu().numpy(), f] = True
+            seam[idx.cpu().numpy(), f + 1] = True
+            oi, pi = o[idx], a_psi[idx]
+            g0 = G(gid[idx], oi[:, :1], oi[:, 1:])[:, 0]
+            hist = P.with_segments(frame_features({k: v[idx] for k, v in last.items()}, oi, pi, g0))
+            p = patch(G, gid[idx], oi, pi, g0, P.grid)
+            rep = lambda x: x.repeat(S, *[1] * (x.dim() - 1))                      # noqa: E731
+            draws = P.generate(rep(hist), rep(p), rep(goal[idx]), gen, w=w, s=blend).view(S, len(idx), FUT, -1)
+            new = draws[0]
+            if S > 1:
+                dec = decode(draws.flatten(0, 1), rep(oi), rep(pi), rep(g0))
+                pts = torch.cat([dec["pcom"][..., None, :], dec["points"]], -2).view(S, len(idx), FUT, -1, 3)
+                trust[idx] = lazy.commit_frames(pts, T.spread_tol, min_commit)
+            else:
+                trust[idx] = FUT
+            if xfade and f > 0:
+                j = (ptr[idx, None] + torch.arange(xfade, device=dev)).clamp(max=FUT - 1)
+                old = decode(plan[idx[:, None], j], o_p[idx], psi_p[idx], g0_p[idx])
+                tail = P.with_segments(frame_features(old, oi, pi, g0))
+                new = torch.cat([wt * tail + (1 - wt) * new[:, :xfade], new[:, xfade:]], 1)
+            if hold:
+                new = hold_feet(P, hist, new, hold, smooth=hold_smooth)
+            plan[idx], o_p[idx], psi_p[idx], g0_p[idx] = new, oi, pi, g0
+            ptr[idx], since[idx], off0[idx] = 0, 0, off[idx]
+            if ground_now is not None:
+                patch0 = p.new_zeros(B, *p.shape[1:]) if patch0 is None else patch0
+                patch0[idx] = patch(ground_now(f), gid[idx], oi, pi, g0, P.grid)
+        fr = decode(plan[ar, ptr][:, None], o_p, psi_p, g0_p)
+        for key in seq:
+            seq[key].append(fr[key])
+        psi_hist = torch.cat([psi_hist, fr["psi"]], 1)
+        ptr, since = ptr + 1, since + 1
+    return _result(P, seq), log.summary(n_frames / HZ, B), seam
+
+
+def seam_excess_at(x20: np.ndarray, seam: np.ndarray) -> float | None:
+    """scoreboard.seam_excess with the seam frames given (``seam`` ``[len(x20)]``): mean joint acceleration (deg/s^2)
+    at seam frames minus elsewhere; None without seams."""
+    acc = np.linalg.norm(np.degrees(x20[2:] - 2 * x20[1:-1] + x20[:-2]), axis=1) * HZ ** 2
+    m = seam[1:-1]
+    return round(float(acc[m].mean() - acc[~m].mean()), 1) if m.any() and (~m).any() else None
 
 
 class Scorer:
@@ -201,6 +289,12 @@ def main() -> None:
     ap.add_argument("--xfade", type=int, default=0, help="frames each new plan fades in from the previous plan (v12: 4)")
     ap.add_argument("--hold-smooth", type=float, default=0.0, help="foot-hold smoothness weight (v12: 1)")
     ap.add_argument("--tag", default="", help="output folder suffix: <run>/studio_pose2<tag>")
+    ap.add_argument("--lazy", action="store_true", help="event-triggered replanning (gp.lazy) instead of every --keep")
+    ap.add_argument("--min-left", type=float, default=lazy.Triggers.min_left_s, help="--lazy: buffer floor (s)")
+    ap.add_argument("--goal-tol", type=float, default=lazy.Triggers.goal_tol, help="--lazy: goal shift (m)")
+    ap.add_argument("--samples", type=int, default=1, help="--lazy: draws per generation for the commit horizon")
+    ap.add_argument("--turn-at", type=float, default=0.0, help="the turn command's turn starts this many s in "
+                    "(0 = from the start, as before; > 0 exercises --lazy's GOAL trigger)")
     ap.add_argument("--to-studio", action="store_true")
     a = ap.parse_args()
     run, dev = Path(a.run), "cuda" if torch.cuda.is_available() else "cpu"
@@ -228,8 +322,8 @@ def main() -> None:
 
     clip_last = torch.as_tensor(D["start"] + D["frames"] - 1, device=dev)
 
-    def replay_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
-        tgt = torch.minimum(a_rep + i * a.keep * STRIDE + STRIDE * FUT, clip_last[W.fr.clip[a_rep]])
+    def replay_goal(f: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:           # f: plan frames played
+        tgt = torch.minimum(a_rep + f * STRIDE + STRIDE * FUT, clip_last[W.fr.clip[a_rep]])
         return to_frame(W.fr.pcom[tgt][:, None, [0, 2]], o, psi)[:, 0]
 
     walk = [k for k in range(len(D["name"])) if str(D["mode"][k]) == "walk" and str(D["terrain_class"][k]) == "level"
@@ -237,16 +331,33 @@ def main() -> None:
     k_cmd = max(walk, key=lambda k: float(D["frames"][k]))
     cmds = [(float(v), 0.0) for v in a.speeds.split(",")] + ([(1.2, a.turn_deg)] if a.turn_deg else [])
     a_cmd = torch.full((len(cmds),), int(D["start"][k_cmd]) + STRIDE * (HIST - 1), device=dev)
-    th = W.fr.psi_s[a_cmd] + torch.as_tensor([np.radians(d) for _, d in cmds], dtype=torch.float32, device=dev)
+    th0 = W.fr.psi_s[a_cmd]
+    th = th0 + torch.as_tensor([np.radians(d) for _, d in cmds], dtype=torch.float32, device=dev)
     reach = torch.as_tensor([v * FUT / HZ for v, _ in cmds], dtype=torch.float32, device=dev)
 
-    def command_goal(i: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
-        ahead = o + reach[:, None] * torch.stack([th.cos(), -th.sin()], -1)       # to_frame's forward convention
+    def command_goal(f: int, o: torch.Tensor, psi: torch.Tensor) -> torch.Tensor:
+        d = th if f >= a.turn_at * HZ else th0
+        ahead = o + reach[:, None] * torch.stack([d.cos(), -d.sin()], -1)         # to_frame's forward convention
         return to_frame(ahead[:, None], o, psi)[:, 0]
-    r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, n_plans, a.keep, a.guidance, gen, a.hold,
-                    xfade=a.xfade, hold_smooth=a.hold_smooth)
-    r_cmd = rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), command_goal, n_plans, a.keep, a.guidance, gen, a.hold,
-                    xfade=a.xfade, hold_smooth=a.hold_smooth)
+    n_frames = n_plans * a.keep
+    if a.lazy:
+        T = lazy.Triggers(min_left_s=a.min_left, goal_tol=a.goal_tol)
+        r_rep, st_rep, seam_rep = lazy_rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), replay_goal, n_frames, T,
+                                               a.guidance, gen, a.hold, xfade=a.xfade, hold_smooth=a.hold_smooth,
+                                               samples=a.samples)
+        r_cmd, st_cmd, seam_cmd = lazy_rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), command_goal, n_frames, T,
+                                               a.guidance, gen, a.hold, xfade=a.xfade, hold_smooth=a.hold_smooth,
+                                               samples=a.samples)
+        print("lazy replay", st_rep, "\nlazy command", st_cmd, flush=True)
+    else:
+        r_rep = rollout(P, W.fr.G, W.fr.clip[a_rep], *start(W, a_rep), lambda i, o, p: replay_goal(i * a.keep, o, p),
+                        n_plans, a.keep, a.guidance, gen, a.hold, xfade=a.xfade, hold_smooth=a.hold_smooth)
+        r_cmd = rollout(P, W.fr.G, W.fr.clip[a_cmd], *start(W, a_cmd), lambda i, o, p: command_goal(i * a.keep, o, p),
+                        n_plans, a.keep, a.guidance, gen, a.hold, xfade=a.xfade, hold_smooth=a.hold_smooth)
+        j = np.arange(n_frames + 1) % a.keep
+        seam_rep = seam_cmd = np.broadcast_to((j == 0) | (j == 1), (max(len(cmds), len(picked)), n_frames + 1))
+        st_rep = st_cmd = dict(replans_per_s=round(HZ / a.keep, 2))
+    seams = [("replay", r_rep, seam_rep, b) for b in range(len(picked))] + [("cmd", r_cmd, seam_cmd, b) for b in range(len(cmds))]
     episodes = [("replay", k, to_qpos(r_rep, b, names)) for b, k in enumerate(picked)]
     episodes += [(f"command {v:.1f} m/s" + (f" at {d:+.0f} deg" if d else ""), k_cmd, to_qpos(r_cmd, b, names))
                  for b, (v, d) in enumerate(cmds)]
@@ -284,8 +395,10 @@ def main() -> None:
         clips.append(f"{kind} from {D['name'][k]} ({D['mode'][k]}, {D['terrain_class'][k]})")
         slug = re.sub(r"[^A-Za-z0-9.+-]", "", kind.replace("command", "cmd"))
         fmt.write_episode(out, fmt.episode_name(ep, slug, 0), src.meta(len(frames), frames), frames)
+        _, r_ep, sm, b = seams[ep]
         row = dict(episode=ep, kind=kind, clip=str(D["name"][k]), mode=str(D["mode"][k]),
-                   terrain=str(D["terrain_class"][k]), generated=score(q, k))
+                   terrain=str(D["terrain_class"][k]), generated=score(q, k),
+                   seam=seam_excess_at(r_ep["joints"][b], sm[b]), replans_per_s=float(sm[b].sum() / 2 / (n_frames / HZ)))
         if kind == "replay":
             row["real"] = score(real, k)
         summary.append(row)
@@ -293,7 +406,9 @@ def main() -> None:
     fmt.write_config(out, {"producer": "sprint.export.studio", "model_file": fmt.MODEL_NAME, "dt_ctrl": 1.0 / data.HZ,
                            "run": str(run), "clips": clips,
                            "policy": f"full-pose planner v2 {a.checkpoint}, guidance {a.guidance}, foot hold {a.hold}"
-                                     f" (smooth {a.hold_smooth:g}), crossfade {a.xfade}, kinematic open loop"})
+                                     f" (smooth {a.hold_smooth:g}), crossfade {a.xfade}, kinematic open loop"
+                                     + (f", lazy replanning {T.as_dict()} samples {a.samples}: replay {st_rep}, "
+                                        f"command {st_cmd}" if a.lazy else f", replan every {a.keep} frames")})
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     print(f"-> {out}  ({len(episodes)} episodes)")
     if a.to_studio:

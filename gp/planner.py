@@ -452,19 +452,23 @@ class Replanner:
                      (self.h_quat, q)):
             h.copy_(torch.cat([h[:, 1:], v[:, None]], 1))
 
+    def _goal(self, w: torch.Tensor) -> torch.Tensor:
+        """Worlds ``w``'s goal: the clip's centre-of-mass travel over the next 1.2 s in the clip's heading frame."""
+        t, W = self.task, self.W
+        f = t.frame[w]
+        k = torch.minimum(f + GOAL_FRAMES, t.clip_last[t.clip[w]] + t.taps[-1])
+        return to_frame(W.com[k][:, [0, 2]], W.com[f][:, [0, 2]], W.psi[f])
+
     @torch.no_grad()
     def _replan(self, w: torch.Tensor) -> None:
-        t, W, dev = self.task, self.W, self.dev
+        t, dev = self.task, self.dev
         sl = slice(None, None, STRIDE)
         a_com, a_psi = self.h_com[w, -1], self.h_psi[w, -1]
         hist = features(self.h_down[w, sl], self.h_hold[w, sl], self.h_com[w, sl], self.h_psi[w, sl],
                         self.h_quat[w, sl], a_com, a_psi)
         xz = from_frame(self.g.expand(len(w), -1, -1), a_com[:, [0, 2]], a_psi)
         p = (t.G(t.clip[w], xz[..., 0], xz[..., 1]) - a_com[:, 1:2]).view(len(w), len(PATCH_F), len(PATCH_L))
-        f = t.frame[w]
-        k = torch.minimum(f + GOAL_FRAMES, t.clip_last[t.clip[w]] + t.taps[-1])
-        goal = to_frame(W.com[k][:, [0, 2]], W.com[f][:, [0, 2]], W.psi[f])
-        fut = self.P.generate(hist, p, goal, self.gen, stride=self.stride)
+        fut = self.P.generate(hist, p, self._goal(w), self.gen, stride=self.stride)
         down, hxz, com, _, _ = world(fut, a_com, a_psi)                                # [B, FUT, ...] at 20 Hz
         down = torch.cat([self.h_down[w, -1:], down], 1)                                # now, then the future
         hxz = torch.cat([self.h_hold[w, -1:], hxz], 1)
@@ -500,3 +504,59 @@ class Replanner:
         k = (self.p[:, None] + self.taps).clamp(max=self.contact.shape[1] - 1)
         i = torch.arange(n, device=self.dev)[:, None]
         return plan_obs(self.task, s, self.contact[i, k], self.hold[i, k], self.td[i, k], self.lo[i, k], self.com[i, k])
+
+
+class LazyReplanner(Replanner):
+    """:class:`Replanner` with event triggers (gp.lazy) in place of "every ``every`` steps and at every touchdown":
+    a new plan only when the clip's intent changes (``GOAL``), the body leaves the plan (``DRIFT``), a foot lands off
+    its planned foothold or touches down where the plan has it swinging (``STEP``), or the student's farthest
+    lookahead tap would run past the plan's end (``LOW``). ``self.log`` counts generations by reason.
+
+    The lookahead limits how lazy this can be: the student reads the plan up to ``task.taps[-1]`` frames ahead (40,
+    1 s) and a plan holds ``STRIDE * FUT`` (48, 1.2 s), so ``LOW`` still fires 0.2 s after each generation, exactly
+    today's 5 Hz. The events only remove the replans at uneventful touchdowns. Playing a plan for longer needs a longer
+    plan (e.g. ``FUT`` = 2 s plays 1 s) or a shorter lookahead. Terrain is the task's static ground here, so
+    ``TERRAIN`` is not checked."""
+
+    def __init__(self, planner: Planner, task: Any, D: dict[str, Any], triggers: Any = None, stride: int = 5,
+                 seed: int = 0) -> None:
+        from . import lazy
+        super().__init__(planner, task, D, every=1 << 30, min_gap=0, stride=stride, seed=seed)
+        self.lazy, self.T, self.log = lazy, triggers or lazy.Triggers(), lazy.Log()
+        n = task.n
+        self.goal0 = torch.zeros(n, 2, device=self.dev)                               # the goal at the last generation
+        self.unplanned = torch.zeros(n, 2, dtype=torch.long, device=self.dev)         # steps down while planned swinging
+
+    def _replan(self, w: torch.Tensor) -> None:
+        super()._replan(w)
+        self.goal0[w] = self._goal(w)
+
+    def __call__(self, s: Any) -> torch.Tensor:
+        lz, T, hz = self.lazy, self.T, gpdata.HZ
+        fresh = s.episode_step == 0
+        down_before = self.h_down[:, -1].clone()
+        L = self.contact.shape[1]
+        self.p = torch.where(fresh, 0, (self.p + 1).clamp(max=L - 1))
+        self.since += 1
+        if bool(fresh.any()):
+            self._clip_history(fresh.nonzero().squeeze(1))
+        self._measure(s)
+        n = self.task.n
+        i = torch.arange(n, device=self.dev)
+        down = self.h_down[:, -1]
+        touchdown = down & ~down_before & ~fresh[:, None]
+        self.unplanned = torch.where(down & ~self.contact[i, self.p], self.unplanned + 1, 0)
+        due, why = lz.decide(
+            T, hz, since=self.since, fresh=fresh, min_left=1,
+            left=(L - 1 - self.p) - int(self.taps[-1]),               # frames before the farthest tap runs off the plan
+            goal=lz.goal_shift(self._goal(i), self.goal0),
+            drift_m=lz.drift(self.h_com[:, -1, [0, 2]], self.com[i, self.p][:, [0, 2]]),
+            step=lz.step_miss(touchdown, self.h_hold[:, -1], self.hold[i, self.p][..., [0, 2]]),
+            early=(self.unplanned >= T.frames(T.early_s, hz)).any(1))
+        if bool(due.any()):
+            self.log.add(why)
+            self._replan(due.nonzero().squeeze(1))
+            self.unplanned[due] = 0
+        k = (self.p[:, None] + self.taps).clamp(max=L - 1)
+        j = i[:, None]
+        return plan_obs(self.task, s, self.contact[j, k], self.hold[j, k], self.td[j, k], self.lo[j, k], self.com[j, k])
