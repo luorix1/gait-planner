@@ -89,10 +89,6 @@ svg.dia { width:100%; height:auto; display:block }
 .num { display:inline-block; width:22px; height:22px; border-radius:50%; background:var(--ink); color:var(--panel); font:700 11.5px/22px var(--mono); text-align:center; flex:none }
 .legend { display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center; font-size:14px; color:var(--muted) }
 .legend > span { display:inline-flex; align-items:center; gap:8px }
-.bdg { font:700 10.5px/16px var(--mono); letter-spacing:.06em; padding:0 8px; border-radius:999px; flex:none }
-.bdg.new { background:var(--ink); color:var(--panel); border:1.2px solid var(--ink) }
-.bdg.up { border:1.2px solid var(--ink); color:var(--ink); background:var(--panel) }
-.bdg.today { border:1px dashed var(--wire); color:var(--muted); background:var(--panel) }
 .sw { width:18px; height:13px; border-radius:3px; border:1.5px solid; flex:none }
 .sw.b { background:var(--blue-soft); border-color:var(--blue) } .sw.t { background:var(--teal-soft); border-color:var(--teal) }
 .sw.a { background:var(--amber-soft); border-color:var(--amber) } .sw.g { background:var(--grey-soft); border-color:var(--wire) }
@@ -177,12 +173,70 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
 </header>
 
+<!-- ============ IN ONE PICTURE ============ -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">In one picture</span>
+    <h2>Learn to plan, then walk by the plan</h2>
+    <p>Two stages. Everything after this section adds the details and checks to these seven boxes.</p>
+  </div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 380" role="img" aria-label="Simplified pipeline. Stage 1, learn to plan: human motion clips train a planner that sketches the next 1.2 seconds; the muscle body tries those plans in simulation; what worked without a fall and still looks human goes back into training, three rounds. Stage 2, walk with it: the trained planner is frozen; it plans 1.2 seconds ahead, a walking policy follows the footholds and timing by driving the muscle body, and every 0.2 seconds the planner plans again from where the body actually is.">
+        <defs><marker id="z1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="z2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker>
+          <marker id="z3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk blue"/></marker></defs>
+        <text class="t" x="20" y="30">1 · Learn to plan</text>
+        <text class="tf" x="20" y="50">P1–P3 · training</text>
+        <rect x="20" y="74" width="230" height="90" rx="12" class="n gs"/>
+        <text class="t c" x="135" y="112">Human motion clips</text>
+        <text class="ts c" x="135" y="136">walking, stairs, ramps, boxes</text>
+        <rect x="330" y="74" width="230" height="90" rx="12" class="n hl"/>
+        <text class="t c" x="445" y="112">Planner</text>
+        <text class="ts c" x="445" y="136">sketches the next 1.2 s</text>
+        <rect x="640" y="74" width="230" height="90" rx="12" class="n tl"/>
+        <text class="t c" x="755" y="112">Muscle body tries it</text>
+        <text class="ts c" x="755" y="136">in simulation, 90 muscles</text>
+        <rect x="950" y="74" width="230" height="90" rx="12" class="n amb"/>
+        <text class="t c" x="1065" y="112">Keep what worked</text>
+        <text class="ts c" x="1065" y="136">no fall, still looks human</text>
+        <line class="ar" x1="250" y1="119" x2="328" y2="119" marker-end="url(#z1)"/>
+        <text class="tf c" x="289" y="109">learn</text>
+        <line class="ar" x1="560" y1="119" x2="638" y2="119" marker-end="url(#z1)"/>
+        <text class="tf c" x="599" y="109">plans</text>
+        <line class="ar" x1="870" y1="119" x2="948" y2="119" marker-end="url(#z1)"/>
+        <text class="tf c" x="909" y="109">results</text>
+        <path class="ar amb" d="M1065 164 V194 H480 V166" marker-end="url(#z2)"/>
+        <text class="ta c" x="772" y="214">kept motion joins the training data · retrain · 3 rounds</text>
+
+        <path class="ar blue" d="M410 164 V252" marker-end="url(#z3)"/>
+        <text class="tb" x="420" y="236">trained, then frozen</text>
+        <text class="t" x="20" y="290">2 · Walk with it</text>
+        <text class="tf" x="20" y="310">P4 · deployment</text>
+        <rect x="330" y="254" width="230" height="80" rx="12" class="n hl"/>
+        <text class="t c" x="445" y="288">Planner</text>
+        <text class="ts c" x="445" y="312">plans 1.2 s ahead</text>
+        <rect x="640" y="254" width="230" height="80" rx="12" class="n tl"/>
+        <text class="t c" x="755" y="288">Walking policy</text>
+        <text class="ts c" x="755" y="312">follows footholds + timing</text>
+        <rect x="950" y="254" width="230" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="1065" y="288">Muscle body</text>
+        <text class="ts c" x="1065" y="312">walks on the terrain</text>
+        <line class="ar" x1="560" y1="294" x2="638" y2="294" marker-end="url(#z1)"/>
+        <text class="tf c" x="599" y="284">plan</text>
+        <line class="ar" x1="870" y1="294" x2="948" y2="294" marker-end="url(#z1)"/>
+        <text class="tf c" x="909" y="284">muscles</text>
+        <path class="ar blue" d="M1065 334 V362 H445 V336" marker-end="url(#z3)"/>
+        <text class="tb c" x="755" y="355">every 0.2 s: plan again from where the body is</text>
+      </svg>
+    </div>
+    <figcaption>The planner first learns what human motion looks like. The muscle body then shows which of its plans a body like ours can carry out, and only those go back into training. Once trained, the planner is frozen and a walking policy follows it, replanning every 0.2 s from wherever the body actually is.</figcaption>
+  </figure>
+</section>
+
 <!-- ============ HOW TO READ ============ -->
 <section class="panel" style="gap:16px">
   <div class="legend">
-    <span><span class="bdg new">NEW</span>new in this roadmap</span>
-    <span><span class="bdg up">UPGRADE</span>exists today, changed</span>
-    <span><span class="bdg today">TODAY</span>exists today as is</span>
     <span><span class="gdot">G1</span>gate: must pass before the next phase</span>
     <span><span class="dashln"></span>training only</span>
     <span><span class="num">1</span>step order in that diagram; the card with that number explains it</span>
@@ -231,42 +285,36 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="97" y="184">Human clips</text>
         <text class="ts c" x="97" y="206">AB01 · PARC · SEED</text>
         <text class="tm c" x="97" y="224">2.46 M frames</text>
-        <g class="db"><rect x="118" y="128" width="44" height="16" rx="8"/><text x="140" y="139.5">TODAY</text></g>
 
         <rect x="233" y="136" width="154" height="104" rx="12" class="n"/>
         <text class="tp" x="245" y="158">P1 · P3</text>
         <text class="t c" x="310" y="184">Training mix</text>
         <text class="ts c" x="310" y="206">P1: human clips</text>
         <text class="ts c" x="310" y="224">P3: + kept ≤ 1/3</text>
-        <g class="nb"><rect x="339" y="128" width="36" height="16" rx="8"/><text x="357" y="139.5">NEW</text></g>
 
         <rect x="446" y="136" width="154" height="104" rx="12" class="n hl"/>
         <text class="tp" x="458" y="158">P1</text>
         <text class="t c" x="523" y="184">Planner</text>
         <text class="ts c" x="523" y="206">full-body diffusion</text>
         <text class="ts c" x="523" y="224">retrained each round</text>
-        <g class="ub"><rect x="532" y="128" width="56" height="16" rx="8"/><text x="560" y="139.5">UPGRADE</text></g>
 
         <rect x="659" y="136" width="154" height="104" rx="12" class="n"/>
         <text class="tp" x="671" y="158">P2</text>
         <text class="t c" x="736" y="184">Plan library</text>
         <text class="ts c" x="736" y="206">best of 16 · cleaned</text>
         <text class="ts c" x="736" y="224">physics-checked</text>
-        <g class="nb"><rect x="765" y="128" width="36" height="16" rx="8"/><text x="783" y="139.5">NEW</text></g>
 
         <rect x="872" y="136" width="154" height="104" rx="12" class="n tl"/>
         <text class="tp" x="884" y="158">P2</text>
         <text class="t c" x="949" y="184">Teacher in sim</text>
         <text class="ts c" x="949" y="206">tracks the full pose</text>
         <text class="ts c" x="949" y="224">90-muscle body</text>
-        <g class="ub"><rect x="958" y="128" width="56" height="16" rx="8"/><text x="986" y="139.5">UPGRADE</text></g>
 
         <rect x="1085" y="136" width="154" height="104" rx="12" class="n amb"/>
         <text class="tp" x="1097" y="158">P3</text>
         <text class="t c" x="1162" y="184">Keep filter</text>
         <text class="ts c" x="1162" y="206">no fall · ≤ 8° · ≤ 5 cm</text>
         <text class="ts c" x="1162" y="224">human-like style</text>
-        <g class="nb"><rect x="1191" y="128" width="36" height="16" rx="8"/><text x="1209" y="139.5">NEW</text></g>
 
         <line class="ar" x1="174" y1="188" x2="231" y2="188" marker-end="url(#o1)"/>
         <text class="tf c" x="203" y="170">windows</text>
@@ -294,7 +342,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="523" y="378">Frozen planner</text>
         <text class="ts c" x="523" y="400">frozen after P3</text>
         <text class="ts c" x="523" y="418">replans live</text>
-        <g class="nb"><rect x="552" y="322" width="36" height="16" rx="8"/><text x="570" y="333.5">NEW</text></g>
 
         <line class="ar" x1="600" y1="382" x2="657" y2="382" marker-end="url(#o1)"/>
         <text class="tf c" x="629" y="370">slice</text>
@@ -304,7 +351,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="736" y="378">Slice student</text>
         <text class="ts c" x="736" y="400">footholds · timing</text>
         <text class="ts c" x="736" y="418">COM · pelvis</text>
-        <g class="ub"><rect x="745" y="322" width="56" height="16" rx="8"/><text x="773" y="333.5">UPGRADE</text></g>
 
         <line class="ar tl" x1="813" y1="382" x2="1083" y2="382" marker-end="url(#o2)"/>
         <text class="tf c" x="948" y="362">muscle commands</text>
@@ -315,14 +361,12 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="1162" y="378">Muscle body</text>
         <text class="ts c" x="1162" y="400">90 muscles</text>
         <text class="ts c" x="1162" y="418">walks on terrain</text>
-        <g class="db"><rect x="1183" y="322" width="44" height="16" rx="8"/><text x="1205" y="333.5">TODAY</text></g>
 
         <path class="ar blue" d="M1162 434 V464 H523 V436" marker-end="url(#o4)"/>
         <text class="tb c" x="842" y="456">body's last 0.4 s, rebuilt from joints → replan</text>
 
         <rect x="20" y="486" width="1220" height="40" rx="10" class="n gs"/>
         <text class="tm c" x="630" y="511">P0 scoreboard · held-out windows + fixed courses · picks every checkpoint · judges gates G1, G2, G4</text>
-        <g class="nb"><rect x="1192" y="478" width="36" height="16" rx="8"/><text x="1210" y="489.5">NEW</text></g>
       </svg>
     </div>
     <figcaption>The amber loop is the physics relabeling: only episodes the muscle body actually completed, and that still look human, go back into the planner's data. After three rounds the planner is frozen and drives a student that sees only a slice of each plan.</figcaption>
@@ -342,6 +386,148 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
 </section>
 
+<!-- ============ LEARNED PARTS ============ -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">What learns</span>
+    <h2>Four networks; everything else is fixed code</h2>
+    <p>The planner and the style prior learn from human clips. The teacher and the student learn to drive the muscles. Best-of-16, clean-up, physics check, keep filter and foot hold are hand-written rules.</p>
+  </div>
+  <div class="subhead"><h3>Planner</h3><span>a diffusion transformer that turns noise into the next 1.2 s</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 340" role="img" aria-label="Planner architecture. Inputs: a terrain height map 3.6 by 1.6 metres in 5 centimetre cells, which three stride-2 convolutions turn into 50 terrain tokens; motion frames, 8 given from the past 0.4 seconds and 24 noised for the next 1.2 seconds, each turned into one token by a linear layer; and the goal plus the noise level, which a small MLP turns into conditioning. A transformer with 6 blocks, 8 heads, 512 wide and about 28 million parameters lets every token attend to every other; the conditioning scales and shifts each block. It outputs the clean next 1.2 seconds: 24 frames with every joint. It learns from human clips by noising a clip's future and predicting it back, plus foot terms.">
+        <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk amb"/></marker></defs>
+        <rect x="20" y="24" width="230" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="135" y="54">Terrain</text>
+        <text class="ts c" x="135" y="76">height map, 3.6 m × 1.6 m</text>
+        <text class="tf c" x="135" y="94">5 cm cells, around the pelvis</text>
+        <rect x="20" y="124" width="230" height="100" rx="12" class="n gs"/>
+        <text class="t c" x="135" y="154">Motion</text>
+        <text class="ts c" x="135" y="176">past 0.4 s · 8 frames, given</text>
+        <text class="ts c" x="135" y="196">next 1.2 s · 24 frames, noised</text>
+        <text class="tf c" x="135" y="214">contacts · joints · feet · pelvis</text>
+        <rect x="20" y="244" width="230" height="80" rx="12" class="n gs"/>
+        <text class="t c" x="135" y="274">Goal + noise level</text>
+        <text class="ts c" x="135" y="296">where to head · which step</text>
+
+        <line class="ar" x1="250" y1="64" x2="318" y2="64" marker-end="url(#a1)"/>
+        <line class="ar" x1="250" y1="174" x2="318" y2="174" marker-end="url(#a1)"/>
+        <line class="ar" x1="250" y1="284" x2="318" y2="284" marker-end="url(#a1)"/>
+
+        <text class="tf c" x="440" y="48">3 stride-2 convolutions</text>
+        <g><rect class="tile ok" x="360" y="58" width="12" height="12"/><rect class="tile ok" x="376" y="58" width="12" height="12"/><rect class="tile ok" x="392" y="58" width="12" height="12"/><rect class="tile ok" x="408" y="58" width="12" height="12"/><rect class="tile ok" x="424" y="58" width="12" height="12"/>
+          <rect class="tile ok" x="440" y="58" width="12" height="12"/><rect class="tile ok" x="456" y="58" width="12" height="12"/><rect class="tile ok" x="472" y="58" width="12" height="12"/><rect class="tile ok" x="488" y="58" width="12" height="12"/><rect class="tile ok" x="504" y="58" width="12" height="12"/></g>
+        <text class="tf c" x="440" y="90">50 terrain tokens</text>
+        <text class="tf c" x="440" y="158">one linear layer per frame</text>
+        <g><rect class="cellh" x="328" y="168" width="5" height="12"/><rect class="cellh" x="335" y="168" width="5" height="12"/><rect class="cellh" x="342" y="168" width="5" height="12"/><rect class="cellh" x="349" y="168" width="5" height="12"/><rect class="cellh" x="356" y="168" width="5" height="12"/><rect class="cellh" x="363" y="168" width="5" height="12"/><rect class="cellh" x="370" y="168" width="5" height="12"/><rect class="cellh" x="377" y="168" width="5" height="12"/>
+          <rect class="cellf" x="384" y="168" width="5" height="12"/><rect class="cellf" x="391" y="168" width="5" height="12"/><rect class="cellf" x="398" y="168" width="5" height="12"/><rect class="cellf" x="405" y="168" width="5" height="12"/><rect class="cellf" x="412" y="168" width="5" height="12"/><rect class="cellf" x="419" y="168" width="5" height="12"/><rect class="cellf" x="426" y="168" width="5" height="12"/><rect class="cellf" x="433" y="168" width="5" height="12"/>
+          <rect class="cellf" x="440" y="168" width="5" height="12"/><rect class="cellf" x="447" y="168" width="5" height="12"/><rect class="cellf" x="454" y="168" width="5" height="12"/><rect class="cellf" x="461" y="168" width="5" height="12"/><rect class="cellf" x="468" y="168" width="5" height="12"/><rect class="cellf" x="475" y="168" width="5" height="12"/><rect class="cellf" x="482" y="168" width="5" height="12"/><rect class="cellf" x="489" y="168" width="5" height="12"/>
+          <rect class="cellf" x="496" y="168" width="5" height="12"/><rect class="cellf" x="503" y="168" width="5" height="12"/><rect class="cellf" x="510" y="168" width="5" height="12"/><rect class="cellf" x="517" y="168" width="5" height="12"/><rect class="cellf" x="524" y="168" width="5" height="12"/><rect class="cellf" x="531" y="168" width="5" height="12"/><rect class="cellf" x="538" y="168" width="5" height="12"/><rect class="cellf" x="545" y="168" width="5" height="12"/></g>
+        <text class="tf c" x="440" y="200">32 motion tokens: 8 given + 24 to clean</text>
+        <rect x="360" y="270" width="160" height="30" rx="8" class="n amb"/>
+        <text class="tn c" x="440" y="290">conditioning</text>
+        <text class="tf c" x="440" y="262">small MLP</text>
+
+        <line class="ar" x1="560" y1="64" x2="598" y2="64" marker-end="url(#a1)"/>
+        <line class="ar" x1="560" y1="174" x2="598" y2="174" marker-end="url(#a1)"/>
+        <line class="ar amb" x1="520" y1="285" x2="598" y2="285" marker-end="url(#a2)"/>
+
+        <rect x="600" y="24" width="300" height="300" rx="14" class="n hl"/>
+        <text class="t c" x="750" y="58">Transformer</text>
+        <text class="ts c" x="750" y="80">6 blocks · 8 heads · 512 wide</text>
+        <text class="tf c" x="750" y="98">~28 M parameters</text>
+        <rect x="640" y="116" width="220" height="16" rx="4" class="n"/><text class="tf c" x="750" y="128">attention + feed-forward</text>
+        <rect x="640" y="136" width="220" height="16" rx="4" class="n"/><rect x="640" y="156" width="220" height="16" rx="4" class="n"/>
+        <rect x="640" y="176" width="220" height="16" rx="4" class="n"/><rect x="640" y="196" width="220" height="16" rx="4" class="n"/>
+        <rect x="640" y="216" width="220" height="16" rx="4" class="n"/>
+        <text class="ts c" x="750" y="258">all 82 tokens attend to each other:</text>
+        <text class="ts c" x="750" y="276">each frame sees the ground and the</text>
+        <text class="ts c" x="750" y="294">other frames</text>
+        <text class="ta c" x="750" y="314">conditioning scales + shifts each block</text>
+
+        <line class="ar" x1="900" y1="174" x2="958" y2="174" marker-end="url(#a1)"/>
+        <rect x="960" y="124" width="280" height="100" rx="12" class="n"/>
+        <text class="t c" x="1100" y="154">Clean next 1.2 s</text>
+        <text class="ts c" x="1100" y="176">24 frames, every joint</text>
+        <text class="tf c" x="1100" y="196">segment poses rebuilt by FK</text>
+        <text class="tf c" x="1100" y="212">run 10× per plan (Fix 3)</text>
+        <rect x="960" y="244" width="280" height="80" rx="12" class="n gs"/>
+        <text class="tn" x="976" y="268">Learns from human clips</text>
+        <text class="ts" x="976" y="290">noise a clip's future, predict it back</text>
+        <text class="ts" x="976" y="310">+ feet on the surface, none under it</text>
+      </svg>
+    </div>
+    <figcaption>Training noises the future frames of a real clip by a random amount; the network learns to predict them back from the past frames, the terrain and the goal. Sampling starts from pure noise and repeats that prediction (Fix 3). P1 also trains a smaller 4 × 256 version (~5 M parameters) to see whether it is as good and faster.</figcaption>
+  </figure>
+
+  <div class="subhead"><h3>Teacher, student and style prior</h3><span>two muscle controllers of the same shape, and a judge of human-likeness</span></div>
+  <figure class="panel">
+    <div class="scroll">
+      <svg class="dia dia-xl" viewBox="0 0 1260 350" role="img" aria-label="The teacher network reads the body state plus the full plan and outputs 90 muscle excitations; it learns by reinforcement learning to track the plan without falling. The student reads the body state plus only a slice of the plan (footholds, contact timing, centre of mass, pelvis, its own height map) and outputs 90 muscle excitations; it first copies the teacher's actions, then is fine-tuned by reinforcement learning. Both are MLPs with hidden layers 512, 2048, 512, 2048, 512. The style prior, a small diffusion transformer with 2 blocks and 4 heads, reads 0.3 seconds of motion and outputs a human-likeness score; it learns from human clips and is then frozen.">
+        <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
+          <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
+        <rect x="20" y="20" width="200" height="74" rx="12" class="n gs"/>
+        <text class="t c" x="120" y="52">Body state</text>
+        <text class="ts c" x="120" y="74">what its sensors report</text>
+        <text class="tl2 c" x="240" y="64">+</text>
+        <rect x="260" y="20" width="220" height="74" rx="12" class="n hl"/>
+        <text class="t c" x="370" y="52">Full plan</text>
+        <text class="ts c" x="370" y="74">every joint, coming frames</text>
+        <line class="ar" x1="480" y1="57" x2="538" y2="57" marker-end="url(#a3)"/>
+        <rect x="540" y="20" width="330" height="74" rx="12" class="n tl"/>
+        <text class="t c" x="705" y="50">Teacher</text>
+        <text class="tf c" x="705" y="72">MLP · 512 · 2048 · 512 · 2048 · 512</text>
+        <line class="ar" x1="870" y1="57" x2="928" y2="57" marker-end="url(#a3)"/>
+        <rect x="930" y="20" width="310" height="74" rx="12" class="n"/>
+        <text class="t c" x="1085" y="50">90 muscle excitations</text>
+        <text class="ts c" x="1085" y="72">RL: track the plan, don't fall</text>
+
+        <path class="ar tl dash" d="M705 94 V138" marker-end="url(#a4)"/>
+        <text class="tt" x="716" y="122">its actions are the student's targets · training only</text>
+
+        <rect x="20" y="140" width="200" height="84" rx="12" class="n gs"/>
+        <text class="t c" x="120" y="176">Body state</text>
+        <text class="ts c" x="120" y="198">what its sensors report</text>
+        <text class="tl2 c" x="240" y="189">+</text>
+        <rect x="260" y="140" width="220" height="84" rx="12" class="n hl"/>
+        <text class="t c" x="370" y="168">Plan slice</text>
+        <text class="ts c" x="370" y="190">footholds · contact timing</text>
+        <text class="ts c" x="370" y="208">COM · pelvis · own height map</text>
+        <line class="ar" x1="480" y1="182" x2="538" y2="182" marker-end="url(#a3)"/>
+        <rect x="540" y="140" width="330" height="84" rx="12" class="n tl"/>
+        <text class="t c" x="705" y="172">Student (walking policy)</text>
+        <text class="tf c" x="705" y="194">same shape as the teacher</text>
+        <line class="ar" x1="870" y1="182" x2="928" y2="182" marker-end="url(#a3)"/>
+        <rect x="930" y="140" width="310" height="84" rx="12" class="n"/>
+        <text class="t c" x="1085" y="172">90 muscle excitations</text>
+        <text class="ts c" x="1085" y="194">copy the teacher, then RL</text>
+
+        <line class="grid-line" x1="20" y1="250" x2="1240" y2="250"/>
+        <rect x="20" y="268" width="460" height="64" rx="12" class="n gs"/>
+        <text class="t c" x="250" y="296">0.3 s of motion</text>
+        <text class="ts c" x="250" y="316">from a clip, a plan or a simulated episode</text>
+        <line class="ar" x1="480" y1="300" x2="538" y2="300" marker-end="url(#a3)"/>
+        <rect x="540" y="268" width="330" height="64" rx="12" class="n amb"/>
+        <text class="t c" x="705" y="294">Style prior</text>
+        <text class="tf c" x="705" y="314">diffusion transformer · 2 blocks · 4 heads</text>
+        <line class="ar" x1="870" y1="300" x2="928" y2="300" marker-end="url(#a3)"/>
+        <rect x="930" y="268" width="310" height="64" rx="12" class="n"/>
+        <text class="t c" x="1085" y="294">How human it looks</text>
+        <text class="ts c" x="1085" y="314">learned from clips, then frozen</text>
+      </svg>
+    </div>
+    <figcaption>The teacher and student have the same network; only their inputs differ. Each also has a critic of the same shape that scores states during RL and is dropped afterwards. The style prior judges a short window by how easily it can denoise it: human-looking motion is easy. Its score feeds the keep filter, the scoreboard and the RL rewards.</figcaption>
+  </figure>
+  <div class="cards">
+    <div class="card"><span class="tag">Planner</span><h3>Why diffusion</h3><p>A step can come now or a bit later, long or short. A network trained to predict one answer averages those into a shuffle; diffusion picks one whole, consistent option.</p></div>
+    <div class="card"><span class="tag">Planner</span><h3>Why a transformer</h3><p>Terrain and frames are tokens, so each future frame can look at the ground where that foot will land.</p></div>
+    <div class="card"><span class="tag">Teacher → student</span><h3>Why two controllers</h3><p>Tracking every joint of a plan is easy to learn. A deployable controller only gets where and when to step, so it learns by copying the teacher.</p></div>
+    <div class="card"><span class="tag">Style prior</span><h3>Why learned style</h3><p>"Looks human" is hard to write as rules; a model of human clips scores it directly.</p></div>
+  </div>
+</section>
+
 <!-- ============ P0 ============ -->
 <section>
   <div class="sec-head">
@@ -354,7 +540,7 @@ svg.dia { width:100%; height:auto; display:block }
     <div class="scroll">
       <svg class="dia dia-wide" viewBox="0 0 1260 360" role="img" aria-label="Scoreboard, before and after. Today each checkpoint is picked by the lowest held-out loss. New: held-out windows and fixed courses are rolled out every 5,000 iterations with fixed seeds, scored on eight metrics, and the scores pick the best checkpoint and decide gates G1, G2 and G4.">
         <defs><marker id="s1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
-        <g class="db"><rect x="20" y="28" width="44" height="16" rx="8"/><text x="42" y="39.5">TODAY</text></g>
+        <text class="tn" x="20" y="41">Now</text>
         <rect class="n gs" x="80" y="20" width="150" height="32" rx="8"/><text class="ts c" x="155" y="41">each checkpoint</text>
         <line class="ar" x1="230" y1="36" x2="278" y2="36" marker-end="url(#s1)"/>
         <rect class="n gs" x="280" y="20" width="150" height="32" rx="8"/><text class="ts c" x="355" y="41">held-out loss</text>
@@ -362,8 +548,7 @@ svg.dia { width:100%; height:auto; display:block }
         <rect class="n gs" x="480" y="20" width="150" height="32" rx="8"/><text class="ts c" x="555" y="41">pick the lowest</text>
         <text class="tr" x="650" y="41">noisy · blind to terrain</text>
         <line class="grid-line" x1="20" y1="72" x2="1240" y2="72"/>
-        <g class="nb"><rect x="20" y="86" width="36" height="16" rx="8"/><text x="38" y="97.5">NEW</text></g>
-        <text class="tf" x="66" y="98">every checkpoint and gate judged by rollouts</text>
+        <text class="tn" x="20" y="99">Instead</text><text class="tf" x="84" y="98">every checkpoint and gate judged by rollouts</text>
 
         <rect x="20" y="116" width="250" height="96" rx="12" class="n gs"/>
         <text class="t c" x="145" y="150">Held-out windows</text>
@@ -420,15 +605,15 @@ svg.dia { width:100%; height:auto; display:block }
 <section>
   <div class="sec-head">
     <span class="phase"><b>P1</b><span class="eyebrow">2–3 days · 2–3 runs of ~2 h</span></span>
-    <h2>Human prior v10: lean on terrain, not on memory</h2>
-    <p>v9 memorised its two minutes of stairs and leaned on its history. These changes come from PARC, CAMDM, SCENIC and PRIMAL.</p>
+    <h2>The planner: lean on terrain, not on memory</h2>
+    <p>Given the past 0.4 s and an exact goal, the planner memorised its two minutes of stairs instead of learning to read them. So we give it weaker clues, make the ground a direct target, and keep the terrain in charge when sampling. The ideas come from PARC, CAMDM, SCENIC and PRIMAL.</p>
   </div>
-  <p class="problem"><b>Problem</b><span>v9 recognises which training clip it is in, so it replays a memorised continuation instead of reading the terrain.</span></p>
+  <p class="problem"><b>Problem</b><span>With that much information, the planner recognises which training clip it is in and replays what came next instead of reading the terrain.</span></p>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 280" role="img" aria-label="Why v9 fails: 0.4 s of history plus a goal at exactly 1.2 s pinpoints one of 33 stair takes; the model replays what came next, so on stairs of a different shape the feet land inside the treads. Stair loss is about 0.002 in training and about 0.05 held out, drawn to scale.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 280" role="img" aria-label="Why the planner memorises: 0.4 s of history plus a goal at exactly 1.2 s pinpoints one of 33 stair takes; the model replays what came next, so on stairs of a different shape the feet land inside the treads. Stair loss is about 0.002 in training and about 0.05 held out, drawn to scale.">
         <defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
-        <text class="tn" x="20" y="30">What v9 sees</text>
+        <text class="tn" x="20" y="30">What the planner sees</text>
         <rect class="cellh" x="20" y="50" width="16" height="30"/><rect class="cellh" x="36" y="50" width="16" height="30"/><rect class="cellh" x="52" y="50" width="16" height="30"/><rect class="cellh" x="68" y="50" width="16" height="30"/>
         <rect class="cellh" x="84" y="50" width="16" height="30"/><rect class="cellh" x="100" y="50" width="16" height="30"/><rect class="cellh" x="116" y="50" width="16" height="30"/><rect class="cellh" x="132" y="50" width="16" height="30"/>
         <rect class="cellf" x="148" y="50" width="144" height="30"/>
@@ -480,13 +665,14 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="subhead"><h3>Fix 1 · training windows</h3><span>make history and goal weaker clues</span></div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Training windows before and after. v9: history always visible and the goal is the pelvis at exactly 1.2 s. v10: in 85 percent of windows the history carries smooth noise and the goal sits at a random 0.4 to 1.2 s horizon with 5 cm noise; in 15 percent the history is hidden. History noise: v9 perturbed each channel so joints and feet disagreed; v10 offsets the whole body and re-runs forward kinematics. Outputs per future frame now add nine segment poses.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 372" role="img" aria-label="Training windows. Problem: history always visible and the goal is the pelvis at exactly 1.2 s. Fix: in 85 percent of windows the history carries smooth noise and the goal sits at a random 0.4 to 1.2 s horizon with 5 cm noise; in 15 percent the history is hidden. History noise: per-channel noise made joints and feet disagree; instead the whole body is offset and forward kinematics re-run. Outputs per future frame now add nine segment poses.">
         <text class="tf" x="150" y="22">history 0.4 s</text>
         <text class="tf" x="150" y="36">8 frames</text>
         <text class="tf" x="266" y="22">future 1.2 s</text>
         <text class="tf" x="266" y="36">24 frames</text>
 
-        <text class="tn" x="20" y="70">v9 · today</text>
+        <text class="tn" x="20" y="70">problem</text>
+        <text class="tf" x="20" y="86">every window</text>
         <g>
           <rect class="cellh" x="150" y="50" width="14" height="30"/><rect class="cellh" x="164" y="50" width="14" height="30"/><rect class="cellh" x="178" y="50" width="14" height="30"/><rect class="cellh" x="192" y="50" width="14" height="30"/>
           <rect class="cellh" x="206" y="50" width="14" height="30"/><rect class="cellh" x="220" y="50" width="14" height="30"/><rect class="cellh" x="234" y="50" width="14" height="30"/><rect class="cellh" x="248" y="50" width="14" height="30"/>
@@ -497,7 +683,7 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ta" x="614" y="62">goal: pelvis at exactly 1.2 s</text>
         <text class="tr" x="614" y="80">≈ a fingerprint for a rare clip</text>
 
-        <text class="tn" x="20" y="140">v10</text>
+        <text class="tn" x="20" y="140">fix</text>
         <text class="tf" x="20" y="156">85 % of windows</text>
         <g>
           <rect class="cellh" x="150" y="130" width="14" height="30"/><rect class="cellh" x="164" y="130" width="14" height="30"/><rect class="cellh" x="178" y="130" width="14" height="30"/><rect class="cellh" x="192" y="130" width="14" height="30"/>
@@ -512,7 +698,7 @@ svg.dia { width:100%; height:auto; display:block }
         <g class="nm"><circle cx="624" cy="146" r="9"/><text x="624" y="150">2</text></g>
         <text class="tt" x="640" y="150">smooth noise, see right</text>
 
-        <text class="tn" x="20" y="210">v10</text>
+        <text class="tn" x="20" y="210">fix</text>
         <text class="tf" x="20" y="226">15 % of windows</text>
         <rect class="cellx" x="150" y="200" width="112" height="30"/>
         <text class="tf c" x="206" y="219">hidden</text>
@@ -532,22 +718,21 @@ svg.dia { width:100%; height:auto; display:block }
         <polyline class="leg bad" points="930,60 906,108 930,152"/>
         <circle class="dot bad" cx="948" cy="170" r="4"/><circle class="dot bad" cx="976" cy="164" r="4"/>
         <circle class="dot" cx="930" cy="60" r="4"/>
-        <text class="tf" x="860" y="192">v9 · noise per channel</text>
+        <text class="tf" x="860" y="192">noise per channel</text>
         <text class="tr" x="860" y="210">joints and feet disagree</text>
         <polyline class="leg ghost" points="1150,60 1138,110 1154,156 1182,160"/>
         <polyline class="leg ok" points="1150,60 1131,108 1141,156 1168,164"/>
         <circle class="dot ok" cx="1141" cy="160" r="4"/><circle class="dot ok" cx="1168" cy="164" r="4"/>
         <circle class="dot" cx="1150" cy="60" r="4"/>
-        <text class="tf" x="1060" y="192">v10 · smooth offset → FK</text>
+        <text class="tf" x="1060" y="192">smooth offset → FK</text>
         <text class="tt" x="1060" y="210">still one consistent body</text>
 
         <rect x="840" y="232" width="400" height="126" rx="10" class="n"/>
         <text class="tn" x="856" y="256">Planner outputs, per future frame</text>
         <text class="ts" x="856" y="278">contacts · footholds · pelvis · 4 foot points</text>
         <text class="ts" x="856" y="298">17 joint angles (the truth)</text>
-        <g class="nb"><rect x="856" y="309" width="36" height="16" rx="8"/><text x="874" y="320.5">NEW</text></g>
-        <text class="tb" x="900" y="322">+ 9 segment poses (origin + 6D rotation):</text>
-        <text class="tb" x="900" y="342">femur, tibia, calcn (heel), toes L/R, torso</text>
+        <text class="tb" x="856" y="322">+ 9 segment poses (origin + 6D rotation):</text>
+        <text class="tb" x="856" y="342">femur, tibia, calcn (heel), toes L/R, torso</text>
       </svg>
     </div>
     <figcaption>Hiding the history and loosening the goal stop the model from recognising a memorised clip from its first frames.</figcaption>
@@ -561,50 +746,49 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="subhead"><h3>Fix 2 · terrain</h3><span>make the foot's relation to the ground a direct target</span></div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 310" role="img" aria-label="Terrain fixes, side views, v9 above and v10 below. Cells: a 22 cm tread is 2 cells at 10 cm and 4 cells at 5 cm. Contacts: v9 matched the data's height and could sit inside the step; v10 pulls contact points onto the surface. Penetration: v9 took the lowest of 4 coarse cells and missed a sphere inside the step corner, about 20 percent of stair stance spheres; v10 checks the exact heightfield. Random terrain in 10 percent of batches with only the penetration loss.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 310" role="img" aria-label="Terrain fixes, side views, problem above and fix below. Cells: a 22 cm tread is 2 cells at 10 cm and 4 cells at 5 cm. Contacts: matching the data's height let them sit inside the step; the fix pulls contact points onto the surface. Penetration: the lowest of 4 coarse cells missed a sphere inside the step corner, about 20 percent of stair stance spheres; the fix checks the exact heightfield. Random terrain in 10 percent of batches with only the penetration loss.">
         <line class="grid-line" x1="320" y1="10" x2="320" y2="300"/><line class="grid-line" x1="630" y1="10" x2="630" y2="300"/><line class="grid-line" x1="940" y1="10" x2="940" y2="300"/>
         <line class="grid-line" x1="20" y1="168" x2="930" y2="168"/>
 
         <g class="nm"><circle cx="30" cy="24" r="9"/><text x="30" y="28">4</text></g>
         <text class="tn" x="46" y="29">5 cm cells near the feet</text>
-        <text class="tn" x="20" y="58">v9</text>
+        <text class="tn" x="20" y="58">problem</text>
         <text class="tf" x="20" y="78">tread 22 cm = 2 cells</text>
         <path class="gfill" d="M20 160 V150 H120 V110 H175 V70 H310 V160 Z"/>
         <rect class="cellf" x="120" y="85" width="25" height="25"/><rect class="cellf" x="145" y="85" width="25" height="25"/>
-        <text class="tn" x="20" y="190">v10</text>
+        <text class="tn" x="20" y="190">fix</text>
         <text class="tf" x="20" y="210">tread 22 cm = 4 cells</text>
         <path class="gfill" d="M20 292 V282 H120 V242 H175 V202 H310 V292 Z"/>
         <rect class="cellf" x="120" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="132.5" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="145" y="229.5" width="12.5" height="12.5"/><rect class="cellf" x="157.5" y="229.5" width="12.5" height="12.5"/>
 
         <g class="nm"><circle cx="340" cy="24" r="9"/><text x="340" y="28">5</text></g>
         <text class="tn" x="356" y="29">Contacts on the real surface</text>
-        <text class="tn" x="330" y="58">v9</text>
+        <text class="tn" x="330" y="58">problem</text>
         <text class="tr" x="440" y="80">matched the data's height</text>
         <text class="tf" x="440" y="96">not this surface</text>
         <path class="gfill" d="M330 160 V150 H450 V110 H620 V160 Z"/>
         <line class="ghl" x1="460" y1="124" x2="610" y2="124"/>
         <circle class="sph bad" cx="530" cy="118" r="6"/>
-        <text class="tn" x="330" y="190">v10</text>
+        <text class="tn" x="330" y="190">fix</text>
         <text class="tt" x="440" y="212">pulled onto the surface</text>
         <path class="gfill" d="M330 292 V282 H450 V242 H620 V292 Z"/>
         <circle class="sph" cx="530" cy="236" r="6"/>
 
         <g class="nm"><circle cx="650" cy="24" r="9"/><text x="650" y="28">6</text></g>
         <text class="tn" x="666" y="29">Exact penetration check</text>
-        <text class="tn" x="640" y="58">v9</text>
+        <text class="tn" x="640" y="58">problem</text>
         <text class="tr" x="640" y="80">missed ~20 % of stair stance spheres</text>
         <text class="tf" x="640" y="96">lowest of 4 coarse cells: looks clear</text>
         <path class="gfill" d="M640 160 V150 H790 V110 H930 V160 Z"/>
         <line class="ar amb dash thin" x1="755" y1="150" x2="830" y2="150"/>
         <circle class="sph" cx="786" cy="118" r="8"/>
-        <text class="tn" x="640" y="190">v10</text>
+        <text class="tn" x="640" y="190">fix</text>
         <text class="tt" x="640" y="212">exact heightfield: caught</text>
         <path class="gfill" d="M640 292 V282 H790 V242 H930 V292 Z"/>
         <circle class="sph bad" cx="786" cy="250" r="8"/>
 
         <g class="nm"><circle cx="960" cy="24" r="9"/><text x="960" y="28">7</text></g>
         <text class="tn" x="976" y="29">Random terrain</text>
-        <g class="nb"><rect x="1192" y="17" width="36" height="16" rx="8"/><text x="1210" y="28.5">NEW</text></g>
         <text class="tf" x="950" y="56">10 % of batches</text>
         <path class="gfill" d="M950 160 V130 H990 V112 H1035 V138 H1080 V100 H1125 V120 H1170 V92 H1240 V160 Z"/>
         <circle class="sph" cx="1012" cy="106" r="6"/><circle class="sph" cx="1102" cy="94" r="6"/><circle class="sph" cx="1205" cy="86" r="6"/>
@@ -652,7 +836,6 @@ svg.dia { width:100%; height:auto; display:block }
         <rect x="420" y="212" width="200" height="72" rx="10" class="n hl"/>
         <text class="ts c" x="520" y="242">predict without history</text>
         <text class="tf c" x="520" y="262">terrain · goal</text>
-        <g class="nb"><rect x="572" y="204" width="36" height="16" rx="8"/><text x="590" y="215.5">NEW</text></g>
 
         <path class="ar" d="M200 76 H418" marker-end="url(#q1)"/>
         <path class="ar" d="M200 264 H418" marker-end="url(#q1)"/>
@@ -677,7 +860,6 @@ svg.dia { width:100%; height:auto; display:block }
         <rect x="790" y="130" width="190" height="80" rx="12" class="n"/>
         <text class="t c" x="885" y="162">Joints are the truth</text>
         <text class="ts c" x="885" y="186">FK rebuilds segment poses</text>
-        <g class="nb"><rect x="932" y="122" width="36" height="16" rx="8"/><text x="950" y="133.5">NEW</text></g>
         <g class="nm"><circle cx="804" cy="130" r="10"/><text x="804" y="134">10</text></g>
 
         <line class="ar" x1="980" y1="170" x2="1028" y2="170" marker-end="url(#q1)"/>
@@ -685,7 +867,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="1135" y="158">Foot hold</text>
         <text class="ts c" x="1135" y="180">planted feet stay put</text>
         <text class="ts c" x="1135" y="198">until the plan lifts them</text>
-        <g class="db"><rect x="1184" y="122" width="44" height="16" rx="8"/><text x="1206" y="133.5">TODAY</text></g>
         <g class="nm"><circle cx="1044" cy="130" r="10"/><text x="1044" y="134">11</text></g>
         <text class="tf c" x="1015" y="238">once per plan</text>
         <line class="grid-line" x1="790" y1="226" x2="1240" y2="226"/>
@@ -731,16 +912,16 @@ svg.dia { width:100%; height:auto; display:block }
   </div>
 
   <div class="reads">
-    <div class="read"><b>17.2 s</b><span>v9 today: 2,048 plans at 50 steps (4090, measured)</span></div>
+    <div class="read"><b>17.2 s</b><span>now: 2,048 plans at 50 steps (4090, measured)</span></div>
     <div class="read"><b>3.4 s</b><span>same, 10 steps (measured)</span></div>
     <div class="read target"><b>≤ 0.5 s</b><span>needed: 4,096 plans, for training with the planner in the loop (P4)</span></div>
-    <div class="read"><b>4×256</b><span>PARC-size network vs our 6×512: ~6× faster; v10 compares both</span></div>
+    <div class="read"><b>4×256</b><span>PARC-size network vs our 6×512: ~6× faster; P1 compares both</span></div>
   </div>
 
-  <div class="subhead"><h3>Optional v11 · warp the rare terrain</h3><span>only if v10 still memorises stairs</span></div>
+  <div class="subhead"><h3>Optional · warp the rare terrain</h3><span>only if the planner still memorises stairs</span></div>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-wide" viewBox="0 0 1260 210" role="img" aria-label="Optional v11: our one staircase, rise 16.2 cm and tread 22 cm, is warped into variants such as rise 12 cm with tread 35 cm and rise 20 cm with tread 25 cm, with legs re-solved so contacts sit on the new surface. Drawn to scale.">
+      <svg class="dia dia-wide" viewBox="0 0 1260 210" role="img" aria-label="Optional: our one staircase, rise 16.2 cm and tread 22 cm, is warped into variants such as rise 12 cm with tread 35 cm and rise 20 cm with tread 25 cm, with legs re-solved so contacts sit on the new surface. Drawn to scale.">
         <defs><marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
         <g class="db"><rect x="20" y="14" width="62" height="16" rx="8"/><text x="51" y="25.5">OPTIONAL</text></g>
         <text class="tf" x="94" y="26">one staircase becomes ~20 shapes · to scale</text>
@@ -763,14 +944,14 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="tm" x="1060" y="176">physics check before use</text>
       </svg>
     </div>
-    <figcaption>Only if v10 still memorises stairs: many stair shapes make any one take a weaker clue. Otherwise the loop in P3 supplies terrain variety from executed motion.</figcaption>
+    <figcaption>Only if the planner still memorises stairs: many stair shapes make any one take a weaker clue. Otherwise the loop in P3 supplies terrain variety from executed motion.</figcaption>
   </figure>
 
-  <div class="gates"><span class="lbl">G1 vs v9 · before P2</span>
+  <div class="gates"><span class="lbl">G1 vs the current planner · before P2</span>
     <span class="gate">stair-descent penetration ≤ 10 % (now 36 %)</span>
     <span class="gate">box clips no jerkier than human</span>
     <span class="gate">slip ≤ 1.5× real</span>
-    <span class="gate">goal error ≤ v9</span>
+    <span class="gate">goal error no worse than now</span>
     <span class="gate">style in real range</span>
     <span class="gate">4,096 plans ≤ 0.5 s</span>
   </div>
@@ -786,24 +967,22 @@ svg.dia { width:100%; height:auto; display:block }
   <p class="problem"><b>Problem</b><span>P3 needs plans on terrain the clips never covered, and a muscle-body policy that can carry them out. Today's teacher has only been tested on AB01.</span></p>
   <figure class="panel">
     <div class="scroll">
-      <svg class="dia dia-xl" viewBox="0 0 1260 376" role="img" aria-label="Library pipeline: clip terrains and generated courses feed open-loop rollouts of the v10 planner; 16 samples per plan are scored and the best kept; a clean-up optimiser and a physics check follow; passing plans form the library. The library and real windows train the teacher, which starts from the AB01 teacher. Gate G2 requires 90 percent of real held-out windows played.">
+      <svg class="dia dia-xl" viewBox="0 0 1260 376" role="img" aria-label="Library pipeline: clip terrains and generated courses feed open-loop rollouts of the P1 planner; 16 samples per plan are scored and the best kept; a clean-up optimiser and a physics check follow; passing plans form the library. The library and real windows train the teacher, which starts from the AB01 teacher. Gate G2 requires 90 percent of real held-out windows played.">
         <defs><marker id="l1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker>
           <marker id="l2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk tl"/></marker></defs>
         <rect x="20" y="30" width="180" height="72" rx="12" class="n gs"/>
         <text class="t c" x="110" y="60">Clip terrains</text>
         <text class="ts c" x="110" y="82">aim at each clip's path</text>
-        <g class="db"><rect x="144" y="22" width="44" height="16" rx="8"/><text x="166" y="33.5">TODAY</text></g>
         <rect x="20" y="120" width="180" height="72" rx="12" class="n gs"/>
         <text class="t c" x="110" y="150">Generated courses</text>
         <text class="ts c" x="110" y="172">0.4–2.0 m/s · turns</text>
-        <g class="nb"><rect x="152" y="112" width="36" height="16" rx="8"/><text x="170" y="123.5">NEW</text></g>
         <path class="ar" d="M200 66 H224 V156 H200"/>
         <line class="ar" x1="224" y1="111" x2="298" y2="111" marker-end="url(#l1)"/>
         <text class="tf c" x="261" y="103">terrain</text>
         <text class="tf c" x="261" y="127">+ goal</text>
 
         <rect x="300" y="66" width="170" height="90" rx="12" class="n hl"/>
-        <text class="tp" x="312" y="86">v10</text>
+        <text class="tp" x="312" y="86">P1</text>
         <text class="t c" x="385" y="110">Planner rollout</text>
         <text class="ts c" x="385" y="132">open loop, 6–10 s</text>
         <line class="ar" x1="470" y1="111" x2="528" y2="111" marker-end="url(#l1)"/>
@@ -818,7 +997,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ts c" x="630" y="130">penetration · contact</text>
         <text class="ts c" x="630" y="148">seam · jerk · goal</text>
         <text class="tr c" x="630" y="166">drops 15 of 16</text>
-        <g class="nb"><rect x="682" y="42" width="36" height="16" rx="8"/><text x="700" y="53.5">NEW</text></g>
         <g class="nm"><circle cx="544" cy="50" r="10"/><text x="544" y="54">1</text></g>
         <line class="ar" x1="730" y1="111" x2="778" y2="111" marker-end="url(#l1)"/>
         <text class="tf c" x="754" y="103">best</text>
@@ -828,7 +1006,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ts c" x="885" y="104">stay close · low jerk</text>
         <text class="ts c" x="885" y="124">no penetration · no slide</text>
         <text class="ts c" x="885" y="144">contact feet on the surface</text>
-        <g class="nb"><rect x="942" y="42" width="36" height="16" rx="8"/><text x="960" y="53.5">NEW</text></g>
         <g class="nm"><circle cx="794" cy="50" r="10"/><text x="794" y="54">2</text></g>
         <line class="ar" x1="990" y1="111" x2="1038" y2="111" marker-end="url(#l1)"/>
         <text class="tf c" x="1014" y="103">clean</text>
@@ -839,7 +1016,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ts c" x="1140" y="120">inside the friction cone</text>
         <text class="ts c" x="1140" y="138">joint limits · jerk</text>
         <text class="tr c" x="1140" y="160">drops failures</text>
-        <g class="nb"><rect x="1192" y="42" width="36" height="16" rx="8"/><text x="1210" y="53.5">NEW</text></g>
         <g class="nm"><circle cx="1054" cy="50" r="10"/><text x="1054" y="54">3</text></g>
         <line class="ar" x1="1140" y1="174" x2="1140" y2="228" marker-end="url(#l1)"/>
         <text class="tf" x="1150" y="206">passing plans</text>
@@ -847,7 +1023,6 @@ svg.dia { width:100%; height:auto; display:block }
         <rect x="1040" y="230" width="200" height="80" rx="12" class="n"/>
         <text class="t c" x="1140" y="262">Plan library</text>
         <text class="ts c" x="1140" y="284">2,000–5,000 clips</text>
-        <g class="nb"><rect x="1192" y="222" width="36" height="16" rx="8"/><text x="1210" y="233.5">NEW</text></g>
         <line class="ar tl" x1="1040" y1="270" x2="982" y2="270" marker-end="url(#l2)"/>
         <text class="tf c" x="1011" y="262">plans</text>
 
@@ -855,13 +1030,11 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="870" y="252">Teacher (full pose)</text>
         <text class="ts c" x="870" y="274">starts from AB01 teacher</text>
         <text class="ts c" x="870" y="294">replays its failures more</text>
-        <g class="ub"><rect x="912" y="214" width="56" height="16" rx="8"/><text x="940" y="225.5">UPGRADE</text></g>
         <g class="nm"><circle cx="774" cy="222" r="10"/><text x="774" y="226">4</text></g>
 
         <rect x="470" y="230" width="200" height="80" rx="12" class="n gs"/>
         <text class="t c" x="570" y="262">Real windows</text>
         <text class="ts c" x="570" y="284">AB01 · SEED · PARC</text>
-        <g class="db"><rect x="614" y="222" width="44" height="16" rx="8"/><text x="636" y="233.5">TODAY</text></g>
         <line class="ar tl" x1="670" y1="270" x2="758" y2="270" marker-end="url(#l2)"/>
         <text class="tf c" x="714" y="262">human clips</text>
 
@@ -879,7 +1052,7 @@ svg.dia { width:100%; height:auto; display:block }
     <div class="why"><span class="num">3</span><b>Physics check</b><span>Drop plans no body could do: an acceleration the feet cannot push, joints past their limits.</span></div>
     <div class="why"><span class="num">4</span><b>Teacher from the AB01 teacher</b><span>Starts from a policy that already tracks (4.9° · 2.2 % falls) and practises most where it fails.</span></div>
   </div>
-  <p class="risk"><b>Risk:</b> one teacher tracking the whole SEED library has never worked for us. The v4 policies fell on every clip, but they used the older recipe; the current teacher recipe has only been tested on AB01. Fallback: SEED's walking, stairs and box subsets only.</p>
+  <p class="risk"><b>Risk:</b> one teacher tracking the whole SEED library has never worked for us. Earlier policies fell on every clip, but they used an older recipe; the current teacher recipe has only been tested on AB01. Fallback: SEED's walking, stairs and box subsets only.</p>
 </section>
 
 <!-- ============ P3 ============ -->
@@ -887,7 +1060,7 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="sec-head">
     <span class="phase"><b>P3</b><span class="eyebrow">3 rounds · ~1 day of compute each</span></span>
     <h2>The loop: keep only what the muscle body completed</h2>
-    <p>The Tier 2 relabeling from the 11-20 page and the 11-16 decision: retrain the planner on real data plus executed plans.</p>
+    <p>Retrain the planner on real clips plus plans the muscle body actually carried out.</p>
   </div>
   <p class="problem"><b>Problem</b><span>Human clips cover few terrains and say nothing about what this muscle body can do.</span></p>
   <div class="split">
@@ -898,12 +1071,10 @@ svg.dia { width:100%; height:auto; display:block }
             <marker id="r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk bad"/></marker></defs>
           <rect x="25" y="180" width="170" height="80" rx="12" class="n hl"/>
           <text class="t c" x="110" y="214">Planner, round k</text>
-          <text class="ts c" x="110" y="236">round 1 = v10 (P1)</text>
-          <g class="ub"><rect x="127" y="172" width="56" height="16" rx="8"/><text x="155" y="183.5">UPGRADE</text></g>
+          <text class="ts c" x="110" y="236">round 1 = the P1 planner</text>
           <rect x="215" y="40" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="300" y="74">Generate</text>
           <text class="ts c" x="300" y="96">wider terrain</text>
-          <g class="nb"><rect x="337" y="32" width="36" height="16" rx="8"/><text x="355" y="43.5">NEW</text></g>
           <g class="nm"><circle cx="229" cy="40" r="10"/><text x="229" y="44">1</text></g>
           <rect x="475" y="40" width="170" height="80" rx="12" class="n tl"/>
           <text class="t c" x="560" y="74">Teacher tracks</text>
@@ -912,18 +1083,15 @@ svg.dia { width:100%; height:auto; display:block }
           <text class="t c" x="715" y="208">Record</text>
           <text class="ts c" x="715" y="228">kinematics · contacts</text>
           <text class="ts c" x="715" y="246">forces · effort</text>
-          <g class="nb"><rect x="752" y="172" width="36" height="16" rx="8"/><text x="770" y="183.5">NEW</text></g>
           <rect x="475" y="320" width="170" height="80" rx="12" class="n amb"/>
           <text class="t c" x="560" y="348">Keep filter</text>
           <text class="ts c" x="560" y="368">no fall · ≤ 8° · ≤ 5 cm</text>
           <text class="ts c" x="560" y="386">style in human range</text>
-          <g class="nb"><rect x="597" y="312" width="36" height="16" rx="8"/><text x="615" y="323.5">NEW</text></g>
           <g class="nm"><circle cx="489" cy="320" r="10"/><text x="489" y="324">2</text></g>
           <rect x="215" y="320" width="170" height="80" rx="12" class="n"/>
           <text class="t c" x="300" y="348">Training mix</text>
           <text class="ts c" x="300" y="368">real ≥ 2/3</text>
           <text class="ts c" x="300" y="386">kept ≤ 1/3</text>
-          <g class="nb"><rect x="337" y="312" width="36" height="16" rx="8"/><text x="355" y="323.5">NEW</text></g>
           <g class="nm"><circle cx="229" cy="320" r="10"/><text x="229" y="324">3</text></g>
           <rect x="25" y="330" width="130" height="60" rx="12" class="n gs"/>
           <text class="t c" x="90" y="356">Human clips</text>
@@ -1000,7 +1168,6 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="t c" x="105" y="198">Planner</text>
         <text class="ts c" x="105" y="220">frozen after P3</text>
         <text class="ts c" x="105" y="238">10 steps</text>
-        <g class="nb"><rect x="142" y="142" width="36" height="16" rx="8"/><text x="160" y="153.5">NEW</text></g>
         <line class="ar blue" x1="190" y1="198" x2="278" y2="198" marker-end="url(#d3)"/>
         <text class="tf c" x="234" y="188">every 0.2 s</text>
 
@@ -1035,13 +1202,11 @@ svg.dia { width:100%; height:auto; display:block }
         <rect x="890" y="158" width="160" height="80" rx="12" class="n tl"/>
         <text class="t c" x="970" y="192">Student</text>
         <text class="ts c" x="970" y="214">+ proprioception</text>
-        <g class="ub"><rect x="982" y="150" width="56" height="16" rx="8"/><text x="1010" y="161.5">UPGRADE</text></g>
         <line class="ar" x1="1050" y1="198" x2="1108" y2="198" marker-end="url(#d1)"/>
         <text class="tf c" x="1079" y="188">muscles</text>
         <rect x="1110" y="158" width="130" height="80" rx="12" class="n gs"/>
         <text class="t c" x="1175" y="192">Body in sim</text>
         <text class="ts c" x="1175" y="214">90 muscles</text>
-        <g class="db"><rect x="1184" y="150" width="44" height="16" rx="8"/><text x="1206" y="161.5">TODAY</text></g>
 
         <path class="ar blue" d="M1175 238 V318 H105 V248" marker-end="url(#d3)"/>
         <text class="tb c" x="640" y="310">last 0.4 s, rebuilt from joints · replan every 0.2 s and at touchdowns</text>
@@ -1058,7 +1223,7 @@ svg.dia { width:100%; height:auto; display:block }
 
   <div class="grid2">
     <figure class="card mini">
-      <span class="tag">Before · distill_ab01</span>
+      <span class="tag">Before</span>
       <svg class="dia" viewBox="0 0 560 200" role="img" aria-label="Before: the teacher read the clip's future, which the student could not see, so 84 percent of windows fell.">
         <defs><marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk"/></marker></defs>
         <rect x="20" y="70" width="150" height="60" rx="10" class="n gs"/>
@@ -1128,12 +1293,12 @@ svg.dia { width:100%; height:auto; display:block }
         <text class="ts e" x="184" y="50">P0 scoreboard</text>
         <rect class="bar" x="200" y="33" width="60" height="26" rx="5"/>
         <text class="barlbl" x="230" y="50">~1 d</text>
-        <text class="ts e" x="184" y="90">P1 prior v10 (+ v11)</text>
+        <text class="ts e" x="184" y="90">P1 planner (+ warping)</text>
         <rect class="bar" x="260" y="73" width="120" height="26" rx="5"/>
         <rect class="bar lt" x="380" y="73" width="60" height="26" rx="5"/>
         <text class="barlbl" x="320" y="90">2–3 d</text>
         <circle cx="456" cy="86" r="11" class="gb"/><text class="gt" x="456" y="90">G1</text>
-        <text class="ts" x="474" y="90">v10 beats v9</text>
+        <text class="ts" x="474" y="90">beats the current planner</text>
         <text class="ts e" x="184" y="130">P2 library + teacher</text>
         <rect class="bar" x="440" y="113" width="180" height="26" rx="5"/>
         <rect class="bar lt" x="620" y="113" width="60" height="26" rx="5"/>
@@ -1169,7 +1334,7 @@ svg.dia { width:100%; height:auto; display:block }
   <div class="cards">
     <div class="card open"><span class="tag">1 · Simulate plans</span><h3>Run generated motion in sim?</h3><p>P2–P3 need it. The 11-16 rule against simulating replayed data is read here as PARC's replays only.</p></div>
     <div class="card open"><span class="tag">2 · Teacher scope</span><h3>AB01 → SEED, PARC, library</h3><p>P3 needs a teacher beyond AB01. Fallback: SEED subsets.</p></div>
-    <div class="card open"><span class="tag">3 · v11 warping</span><h3>Warp stairs and boxes?</h3><p>Or leave terrain variety to the loop.</p></div>
+    <div class="card open"><span class="tag">3 · Warping</span><h3>Warp stairs and boxes?</h3><p>Or leave terrain variety to the loop.</p></div>
     <div class="card open"><span class="tag">4 · Kept share</span><h3>Cap at 1/3 of each batch?</h3><p>Real data stays in every batch as the human anchor.</p></div>
   </div>
   <p class="credit">Motion Data by Bones Studio</p>
