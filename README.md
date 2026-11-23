@@ -59,6 +59,8 @@ pose; the prior trains; PPO runs an iteration.
 | `gp/terrain_gen.py` | random terrain courses (level landings between every ramp and flight) for held-out tests and the loop |
 | `gp/free.py` | episodes without a clip: generated courses as free clips; the stand-in plan |
 | `gp/planner.py`, `train_planner.py`, `check_planner.py` | the planner network (diffusion over plan windows); train it; score it before physics |
+| `gp/lazy.py` | event-triggered replanning: replan on a new episode, a low buffer, a goal or terrain change, drift or a missed step, not on a timer (`export_pose2.py --lazy`, `gp.planner.LazyReplanner`) |
+| `gp/takeoff.py`, `export_jumps.py` | the skill layer for jumps that need preparation (run-up before a gap, crouch before a platform): planned once when the feature comes into view, carried by the planner's goals; the jump courses with and without it |
 | `seed_viewer/` | local debug viewer of the whole seed library (clip on its terrain as SPRINT poses it, QA numbers, traces, flags); 127.0.0.1 only |
 | `tests/test_smoke.py` | the CPU checks |
 
